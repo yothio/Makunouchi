@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { HostView, PublicQuestion } from "../../shared/types";
 import { useLiveSocket } from "../use-live-socket";
-import { buildHostUrl, hostActionLabel, listHeader } from "./host-action";
+import { ADVANCE_LOCK_MS, buildHostUrl, hostActionLabel, isAdvanceLocked, listHeader } from "./host-action";
 
 const LABELS = ["A", "B", "C", "D"] as const;
 
 export function HostApp({ sessionId, token }: { sessionId: string; token: string }) {
   const [view, setView] = useState<HostView | null>(null);
-  // phaseKey we already sent an advance for; button stays disabled until it changes.
-  const [sentFrom, setSentFrom] = useState<string | null>(null);
+  // Last advance we sent; locks the button until phase change, disconnect or timeout.
+  const [sent, setSent] = useState<{ from: string; at: number } | null>(null);
 
   const { send, connected } = useLiveSocket(
     () => buildHostUrl(window.location, sessionId, token),
@@ -21,11 +21,24 @@ export function HostApp({ sessionId, token }: { sessionId: string; token: string
   );
 
   const label = view ? hostActionLabel(view) : null;
-  const canAdvance = connected && view !== null && label !== null && sentFrom !== view.phaseKey;
+  const phaseKey = view?.phaseKey ?? null;
+  const locked = phaseKey !== null && isAdvanceLocked(sent, phaseKey, connected, Date.now());
+  const canAdvance = connected && view !== null && label !== null && !locked;
+
+  // Clear the lock on disconnect / phase change, or after the timeout (re-render to unlock).
+  useEffect(() => {
+    if (!sent) return;
+    if (!connected || sent.from !== phaseKey) {
+      setSent(null);
+      return;
+    }
+    const t = setTimeout(() => setSent(null), Math.max(0, ADVANCE_LOCK_MS - (Date.now() - sent.at)));
+    return () => clearTimeout(t);
+  }, [sent, connected, phaseKey]);
 
   const advance = useCallback(() => {
     if (!view || !canAdvance) return;
-    setSentFrom(view.phaseKey);
+    setSent({ from: view.phaseKey, at: Date.now() });
     send({ type: "advance", from: view.phaseKey });
   }, [view, canAdvance, send]);
 
@@ -36,7 +49,7 @@ export function HostApp({ sessionId, token }: { sessionId: string; token: string
       if (e.repeat) return;
       if (e.key !== " " && e.key !== "ArrowRight") return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable)) return;
       e.preventDefault();
       advanceRef.current();
     };
@@ -113,9 +126,9 @@ function Screen({ view, sessionId }: { view: HostView; sessionId: string }) {
       return (
         <div>
           <h1 className="host-title">{listHeader(s.entries)}</h1>
-          <ol className="host-list">
-            {s.entries.map((e, i) => (
-              <li key={i}>
+          <ol className={`host-list host-list-grid ${listSize(s.entries.length)}`}>
+            {s.entries.map((e) => (
+              <li key={`${e.rank}:${e.nickname}`}>
                 <span className="host-rank">{e.rank} 位</span>
                 <span className="host-name">{e.nickname}</span>
                 <span className="host-score">{e.score} 点</span>
@@ -143,6 +156,10 @@ function Screen({ view, sessionId }: { view: HostView; sessionId: string }) {
         </div>
       );
   }
+}
+
+function listSize(n: number): string {
+  return n <= 10 ? "size-l" : n <= 30 ? "size-m" : "size-s";
 }
 
 function QuestionBlock({ q }: { q: PublicQuestion }) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildHostUrl, hostActionLabel, listHeader } from "../../src/client/host/host-action";
+import { buildHostUrl, hostActionLabel, isAdvanceLocked, listHeader } from "../../src/client/host/host-action";
 import type { HostView } from "../../src/shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
@@ -38,5 +38,17 @@ describe("buildHostUrl", () => {
   test("ws/wss with token", () => {
     expect(buildHostUrl({ protocol: "https:", host: "x.dev" }, "s 1", "tk")).toBe("wss://x.dev/ws/s%201/host?token=tk");
     expect(buildHostUrl({ protocol: "http:", host: "localhost:5173" }, "s", "a/b")).toBe("ws://localhost:5173/ws/s/host?token=a%2Fb");
+  });
+});
+
+describe("isAdvanceLocked", () => {
+  const sent = { from: "k1", at: 1000 };
+  test("not locked before any send", () => expect(isAdvanceLocked(null, "k1", true, 1000)).toBe(false));
+  test("locked after send", () => expect(isAdvanceLocked(sent, "k1", true, 1500)).toBe(true));
+  test("unlocks on phaseKey change", () => expect(isAdvanceLocked(sent, "k2", true, 1500)).toBe(false));
+  test("unlocks on disconnect", () => expect(isAdvanceLocked(sent, "k1", false, 1500)).toBe(false));
+  test("unlocks after 3000ms with same phaseKey", () => {
+    expect(isAdvanceLocked(sent, "k1", true, 3999)).toBe(true);
+    expect(isAdvanceLocked(sent, "k1", true, 4000)).toBe(false);
   });
 });

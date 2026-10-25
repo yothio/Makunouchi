@@ -32,3 +32,21 @@ export function buildHostUrl(
   const scheme = loc.protocol === "https:" ? "wss" : "ws";
   return `${scheme}://${loc.host}/ws/${encodeURIComponent(sessionId)}/host?token=${encodeURIComponent(token)}`;
 }
+
+export const ADVANCE_LOCK_MS = 3000;
+
+/**
+ * Whether the advance button should stay locked after a click. Unlocks when the phase changed,
+ * the socket dropped (the advance may have been lost), or the timeout elapsed.
+ * Resending is safe: the server dedupes on `from`.
+ */
+export function isAdvanceLocked(
+  sent: { from: string; at: number } | null,
+  phaseKey: string,
+  connected: boolean,
+  now: number,
+): boolean {
+  if (!sent || !connected) return false;
+  if (sent.from !== phaseKey) return false;
+  return now - sent.at < ADVANCE_LOCK_MS;
+}

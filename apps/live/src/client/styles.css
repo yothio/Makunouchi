@@ -59,3 +59,12 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .host-wait { text-align: center; padding-top: 20vh; }
 .host-advance { position: fixed; right: 3vw; bottom: 4vh; font-size: 1em; font-weight: 800; padding: 0.5em 1.2em; border: 0; border-radius: 16px; background: var(--accent); color: #fff; cursor: pointer; }
 .host-advance:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Long ranking list: bounded above the fixed button, multi-column, font stepped by count. No scroll. */
+.host-list-grid { display: block; columns: 2; column-gap: 1.5vw; column-fill: balance; max-height: calc(100vh - 28vh); overflow: hidden; }
+.host-list-grid li { break-inside: avoid; margin-bottom: 0.3em; }
+.host-list-grid.size-l { columns: 1; font-size: 1em; }
+.host-list-grid.size-m { columns: 2; font-size: 0.7em; }
+.host-list-grid.size-s { columns: 4; font-size: 0.5em; column-gap: 1vw; }
+.host-list-grid.size-s li { padding: 0.15em 0.5em; margin-bottom: 0.15em; gap: 0.5em; }
+.host-list-grid.size-s .host-rank { width: 2.5em; }
