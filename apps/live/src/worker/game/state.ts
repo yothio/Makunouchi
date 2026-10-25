@@ -1,3 +1,4 @@
+import { podiumHasPlayers } from "./ranking";
 import type { Choice, Phase, QuizPayload } from "../../shared/types";
 
 export type Player = {
@@ -74,9 +75,20 @@ export function advance(s: GameState, fromKey: string): GameState {
       }
       return { ...s, phase: { type: "results", stage: { kind: "list" } } };
     }
-    case "results":
-      // Task 3 replaces this with the results-stage progression.
+    case "results": {
+      const stage = phase.stage;
+      if (stage.kind === "podium" && !stage.revealed) {
+        return { ...s, phase: { type: "results", stage: { ...stage, revealed: true } } };
+      }
+      const below = stage.kind === "list" ? 4 : stage.rank;
+      for (let r = below - 1; r >= 1; r--) {
+        const rank = r as 1 | 2 | 3;
+        if (podiumHasPlayers(s, rank)) {
+          return { ...s, phase: { type: "results", stage: { kind: "podium", rank, revealed: false } } };
+        }
+      }
       return s;
+    }
   }
 }
 

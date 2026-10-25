@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload } from "../../src/shared/types";
+import { isFinal } from "../../src/worker/game/ranking";
 import { advance, createGameState, joinPlayer, phaseKey, scoreOf, submitAnswer, type GameState } from "../../src/worker/game/state";
 
 const quiz: QuizPayload = {
@@ -151,5 +152,47 @@ describe("scoreOf", () => {
     s = walk(s, 4);
     expect(s.phase.type).toBe("results");
     expect(scoreOf(s, s.players[0])).toBe(30);
+  });
+});
+
+describe("results progression", () => {
+  function resultsState(scores: number[]): GameState {
+    const qs = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
+      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
+    }));
+    return {
+      quiz: { title: "T", topN: 10, questions: qs },
+      phase: { type: "results", stage: { kind: "list" } },
+      players: scores.map((sc, i) => ({
+        id: `id${i}`, token: `t${i}`, nickname: `p${i}`,
+        answers: Object.fromEntries(Array.from({ length: sc }, (_, k) => [k, 0])),
+      })),
+    };
+  }
+  const keys = (s: GameState, n: number) => {
+    const out = [phaseKey(s.phase)];
+    for (let i = 0; i < n; i++) { s = advance(s, phaseKey(s.phase)); out.push(phaseKey(s.phase)); }
+    return out;
+  };
+  test("results: list → 3 位(伏せ) → 3 位(表) → 2 位(伏せ) → 2 位(表) → 1 位(伏せ) → 1 位(表)", () => {
+    expect(keys(resultsState([9, 8, 7, 6]), 6)).toEqual(["r:list", "r:3:hidden", "r:3:shown", "r:2:hidden", "r:2:shown", "r:1:hidden", "r:1:shown"]);
+  });
+  test("空の発表枠は飛ばす（90,90,90,70 なら list → 1 位(伏せ)）", () => {
+    expect(keys(resultsState([9, 9, 9, 7]), 2)).toEqual(["r:list", "r:1:hidden", "r:1:shown"]);
+  });
+  test("1 位(表) からの advance は何もしない。isFinal は true", () => {
+    const s = walk(resultsState([9, 8, 7]), 6);
+    expect(phaseKey(s.phase)).toBe("r:1:shown");
+    expect(isFinal(s)).toBe(true);
+    expect(advance(s, "r:1:shown")).toBe(s);
+  });
+  test("参加者 0 人でも最後まで進められる（list で isFinal）", () => {
+    const s = resultsState([]);
+    expect(isFinal(s)).toBe(true);
+    expect(advance(s, "r:list")).toBe(s);
+  });
+  test("古い fromKey は同じ参照を返す", () => {
+    const s = resultsState([9, 8, 7]);
+    expect(advance(s, "r:3:hidden")).toBe(s);
   });
 });
