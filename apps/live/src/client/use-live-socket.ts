@@ -14,7 +14,13 @@ export type UseLiveSocketOptions = {
 export function useLiveSocket(
   url: string | (() => string),
   options: UseLiveSocketOptions = {},
-): { last: ServerMessage | null; send(msg: ClientMessage): void; connected: boolean } {
+): {
+  last: ServerMessage | null;
+  send(msg: ClientMessage): void;
+  connected: boolean;
+  /** Drop and re-establish the connection (e.g. an action got no response). */
+  forceReconnect(): void;
+} {
   const [last, setLast] = useState<ServerMessage | null>(null);
   const [connected, setConnected] = useState(false);
   const sockRef = useRef<ReconnectingSocket | null>(null);
@@ -45,5 +51,6 @@ export function useLiveSocket(
   }, []);
 
   const send = useCallback((msg: ClientMessage) => sockRef.current?.send(msg), []);
-  return { last, send, connected };
+  const forceReconnect = useCallback(() => sockRef.current?.forceReconnect(), []);
+  return { last, send, connected, forceReconnect };
 }

@@ -35,6 +35,9 @@ class FakeWebSocket {
     this.readyState = 3;
     this.onclose?.();
   }
+  receiveRaw(data: string) {
+    this.onmessage?.({ data });
+  }
   receive(m: ServerMessage) {
     this.onmessage?.({ data: JSON.stringify(m) });
   }
@@ -121,7 +124,8 @@ describe("createReconnectingSocket", () => {
     last().drop();
     s.reconnectNow();
     expect(FakeWebSocket.instances).toHaveLength(2);
-    vi.advanceTimersByTime(10000);
+    last().open();
+    vi.advanceTimersByTime(9000);
     expect(FakeWebSocket.instances).toHaveLength(2); // 古いタイマーは取り消される
   });
 
@@ -135,6 +139,84 @@ describe("createReconnectingSocket", () => {
     s.close();
     vi.advanceTimersByTime(10000);
     expect(FakeWebSocket.instances).toHaveLength(1);
+  });
+});
+
+describe("heartbeat", () => {
+  test("開いている間 10 秒ごとに ping を送る", () => {
+    make();
+    last().open();
+    vi.advanceTimersByTime(9999);
+    expect(last().sent).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(last().sent).toEqual(["ping"]);
+    last().receiveRaw("pong");
+    vi.advanceTimersByTime(10000);
+    expect(last().sent).toEqual(["ping", "ping"]);
+  });
+
+  test("25 秒何も受信しなければ切断して再接続する", () => {
+    const { statuses } = make();
+    const first = last();
+    first.open();
+    vi.advanceTimersByTime(24999);
+    expect(statuses).toEqual([true]);
+    vi.advanceTimersByTime(1);
+    expect(statuses).toEqual([true, false]);
+    vi.advanceTimersByTime(500);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
+  test("pong も受信時刻を更新するので生きている間は切れない", () => {
+    const { statuses } = make();
+    last().open();
+    for (let i = 0; i < 6; i++) {
+      vi.advanceTimersByTime(10000);
+      last().receiveRaw("pong");
+    }
+    expect(statuses).toEqual([true]);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+  });
+
+  test("5 秒以内に open しなければ閉じて再接続する", () => {
+    make();
+    vi.advanceTimersByTime(4999);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(FakeWebSocket.instances[0]!.readyState).toBe(3);
+    vi.advanceTimersByTime(500);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
+  test("pong はアプリに渡さない", () => {
+    const { messages } = make();
+    last().open();
+    last().receiveRaw("pong");
+    expect(messages).toEqual([]);
+  });
+
+  test("reconnectNow は 10 秒以上無通信の open ソケットを作り直す", () => {
+    const { s } = make();
+    last().open();
+    vi.advanceTimersByTime(9000);
+    s.reconnectNow();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    vi.advanceTimersByTime(2000);
+    s.reconnectNow();
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
+  test("reconnectNow は接続中のまま固まったソケットも作り直す", () => {
+    const { s } = make();
+    s.reconnectNow();
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
+  test("forceReconnect は開いていても即座に再接続する", () => {
+    const { s } = make();
+    last().open();
+    s.forceReconnect();
+    expect(FakeWebSocket.instances).toHaveLength(2);
   });
 });
 

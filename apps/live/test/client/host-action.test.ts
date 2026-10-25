@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildHostUrl, hostActionLabel, isAdvanceLocked, listHeader } from "../../src/client/host/host-action";
+import { buildHostUrl, hostActionLabel, isAdvanceLocked, isInCooldown, listHeader } from "../../src/client/host/host-action";
 import type { HostView } from "../../src/shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
@@ -31,6 +31,7 @@ describe("listHeader", () => {
   test("derives from entries", () => {
     expect(listHeader([])).toBe("4 位以下はいません");
     expect(listHeader([{ rank: 4, nickname: "a", score: 1 }, { rank: 6, nickname: "b", score: 0 }])).toBe("4 位〜6 位");
+    expect(listHeader([{ rank: 5, nickname: "a", score: 1 }, { rank: 5, nickname: "b", score: 1 }, { rank: 7, nickname: "c", score: 0 }])).toBe("5 位〜7 位");
   });
 });
 
@@ -50,5 +51,13 @@ describe("isAdvanceLocked", () => {
   test("unlocks after 3000ms with same phaseKey", () => {
     expect(isAdvanceLocked(sent, "k1", true, 3999)).toBe(true);
     expect(isAdvanceLocked(sent, "k1", true, 4000)).toBe(false);
+  });
+});
+
+describe("isInCooldown", () => {
+  test("no phase change yet", () => expect(isInCooldown(null, 5000)).toBe(false));
+  test("locked at 999ms after phase change, unlocked at 1000ms", () => {
+    expect(isInCooldown(1000, 1999)).toBe(true);
+    expect(isInCooldown(1000, 2000)).toBe(false);
   });
 });

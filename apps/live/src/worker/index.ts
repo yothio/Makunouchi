@@ -4,6 +4,11 @@ import { quizPayloadSchema } from "./payload";
 
 export { SessionRoom } from "./session-room";
 
+/** Weddings are in Japan; pin the DO near there even if Rails (Cloud Run) happens to call first from elsewhere. */
+function roomFor(env: Env, sessionId: string) {
+  return env.SESSION_ROOM.getByName(sessionId, { locationHint: "apac-ne" });
+}
+
 const app = new Hono<{ Bindings: Env }>();
 
 app.get("/api/health", (c) => c.json({ ok: true }));
@@ -22,12 +27,12 @@ app.put("/api/sessions/:sessionId", async (c) => {
   }
   const parsed = quizPayloadSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_payload", issues: parsed.error.issues }, 422);
-  const result = await c.env.SESSION_ROOM.getByName(c.req.param("sessionId")).init(parsed.data);
+  const result = await roomFor(c.env, c.req.param("sessionId")).init(parsed.data);
   return result === "created" ? c.json({ ok: true }, 201) : c.json({ error: "exists" }, 409);
 });
 
 app.get("/api/sessions/:sessionId/ranking", async (c) => {
-  const ranking = await c.env.SESSION_ROOM.getByName(c.req.param("sessionId")).ranking();
+  const ranking = await roomFor(c.env, c.req.param("sessionId")).ranking();
   if (!ranking) return c.json({ error: "not_found" }, 404);
   return c.json(ranking);
 });
@@ -40,9 +45,8 @@ app.get("/ws/:sessionId/:role", async (c) => {
     const expected = await hostTokenFor(c.env.ADMIN_API_SECRET, sessionId);
     if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
   }
-  const stub = c.env.SESSION_ROOM.getByName(sessionId);
-  if (!(await stub.ranking())) return c.json({ error: "not_found" }, 404);
-  return stub.fetch(c.req.raw);
+  // SessionRoom.fetch returns 404 itself when the session was never initialised.
+  return roomFor(c.env, sessionId).fetch(c.req.raw);
 });
 
 export default app;

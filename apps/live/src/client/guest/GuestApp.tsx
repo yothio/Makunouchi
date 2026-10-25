@@ -46,6 +46,7 @@ export function GuestApp({ sessionId }: { sessionId: string }) {
         <ViewBody
           view={view}
           pending={pending}
+          disabled={!connected}
           onAnswer={(questionIndex, choice) => {
             setPending({ index: questionIndex, choice });
             send({ type: "answer", questionIndex, choice });
@@ -55,11 +56,11 @@ export function GuestApp({ sessionId }: { sessionId: string }) {
     }
     if (needJoin) {
       return (
-        <JoinForm error={joinError} onSubmit={(nickname) => send({ type: "join", nickname })} />
+        <JoinForm error={joinError} disabled={!connected} onSubmit={(nickname) => send({ type: "join", nickname })} />
       );
     }
     return <p className="note">接続しています…</p>;
-  }, [view, needJoin, joinError, pending, send]);
+  }, [view, needJoin, joinError, pending, connected, send]);
 
   return (
     <div className="guest">
@@ -73,7 +74,15 @@ export function GuestApp({ sessionId }: { sessionId: string }) {
   );
 }
 
-function JoinForm({ error, onSubmit }: { error: JoinError | null; onSubmit(nickname: string): void }) {
+function JoinForm({
+  error,
+  disabled,
+  onSubmit,
+}: {
+  error: JoinError | null;
+  disabled: boolean;
+  onSubmit(nickname: string): void;
+}) {
   const [name, setName] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -96,7 +105,7 @@ function JoinForm({ error, onSubmit }: { error: JoinError | null; onSubmit(nickn
           {JOIN_ERROR_TEXT[error]}
         </p>
       )}
-      <button className="primary" type="submit">
+      <button className="primary" type="submit" disabled={disabled}>
         参加する
       </button>
     </form>
@@ -106,10 +115,12 @@ function JoinForm({ error, onSubmit }: { error: JoinError | null; onSubmit(nickn
 function ViewBody({
   view,
   pending,
+  disabled,
   onAnswer,
 }: {
   view: GuestView;
   pending: { index: number; choice: Choice } | null;
+  disabled: boolean;
   onAnswer(questionIndex: number, choice: Choice): void;
 }) {
   switch (view.kind) {
@@ -141,6 +152,7 @@ function ViewBody({
                   type="button"
                   className={`choice${mine === i ? " selected" : ""}`}
                   aria-pressed={mine === i}
+                  disabled={disabled}
                   onClick={() => onAnswer(q.index, i as Choice)}
                 >
                   <span className="label">{LABELS[i]}</span>

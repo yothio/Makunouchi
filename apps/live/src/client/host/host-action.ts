@@ -21,7 +21,8 @@ export function hostActionLabel(view: HostView): string | null {
 /** topN is not in HostView, so the header is derived from the listed entries. */
 export function listHeader<T extends { rank: number }>(entries: readonly T[]): string {
   if (entries.length === 0) return "4 位以下はいません";
-  return `4 位〜${Math.max(...entries.map((e) => e.rank))} 位`;
+  const ranks = entries.map((e) => e.rank);
+  return `${Math.min(...ranks)} 位〜${Math.max(...ranks)} 位`;
 }
 
 export function buildHostUrl(
@@ -49,4 +50,11 @@ export function isAdvanceLocked(
   if (!sent || !connected) return false;
   if (sent.from !== phaseKey) return false;
   return now - sent.at < ADVANCE_LOCK_MS;
+}
+
+/** After the phase changes, ignore advance input for a while so a double-click can't skip a screen. */
+export const ADVANCE_COOLDOWN_MS = 1000;
+
+export function isInCooldown(phaseChangedAt: number | null, now: number): boolean {
+  return phaseChangedAt !== null && now - phaseChangedAt < ADVANCE_COOLDOWN_MS;
 }

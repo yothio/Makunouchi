@@ -13,6 +13,8 @@ export class SessionRoom extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    // Heartbeat reply handled by the runtime without waking the DO from hibernation.
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
     this.state = ctx.storage.kv.get<GameState>("state") ?? null;
   }
 
@@ -100,6 +102,14 @@ export class SessionRoom extends DurableObject<Env> {
     }
   }
 
+  webSocketError(ws: WebSocket): void {
+    try {
+      ws.close(1011, "error");
+    } catch {
+      // already closed
+    }
+  }
+
   private commit(next: GameState): void {
     this.state = next;
     this.ctx.storage.kv.put("state", next);
@@ -129,7 +139,12 @@ export class SessionRoom extends DurableObject<Env> {
       const att = ws.deserializeAttachment() as Attachment | null;
       if (att?.role !== "guest" || !att.playerId) continue;
       if (onlyPlayerId && att.playerId !== onlyPlayerId) continue;
-      this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
+      // One bad attachment must not abort the broadcast to everyone else after the commit.
+      try {
+        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
+      } catch {
+        // skip this socket
+      }
     }
   }
 

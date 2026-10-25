@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { SessionRoom } from "../../src/worker/session-room";
@@ -20,6 +20,25 @@ async function joinGuest(id: string, nickname: string) {
   await guest.next("guest_view");
   return { guest, token: joined.playerToken };
 }
+
+describe("SessionRoom heartbeat", () => {
+  it("answers a raw ping with pong and the socket keeps working", async () => {
+    const { id } = await setup();
+    const res = await exports.default.fetch(`https://x/ws/${id}/guest`, { headers: { Upgrade: "websocket" } });
+    const ws = res.webSocket!;
+    const frames: string[] = [];
+    ws.addEventListener("message", (e) => void frames.push(e.data as string));
+    ws.accept();
+    ws.send("ping");
+    const deadline = Date.now() + 3000;
+    while (!frames.includes("pong") && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
+    expect(frames).toContain("pong");
+    // still serves normal messages afterwards
+    ws.send(JSON.stringify({ type: "join", nickname: "Hana" }));
+    while (!frames.some((f) => f.includes('"joined"')) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
+    expect(frames.some((f) => f.includes('"joined"'))).toBe(true);
+  });
+});
 
 describe("SessionRoom sockets", () => {
   it("guest join yields joined + lobby guest_view; host sees playerCount 1", async () => {
