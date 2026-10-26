@@ -4,11 +4,13 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
 
 ## ローカル開発
 
-1. `apps/live/.dev.vars` を作る（git 管理外）。
+1. `apps/live/.dev.vars.sample` をコピーして `apps/live/.dev.vars` を作る（`.dev.vars` は git 管理外）。
 
    ```
-   ADMIN_API_SECRET=dev-secret
+   cp apps/live/.dev.vars.sample apps/live/.dev.vars
    ```
+
+   `.dev.vars` は起動時にだけ読み込まれるので、作成・変更したら `pnpm dev` を再起動する。
 
 2. `pnpm --filter live dev` で起動する（既定は <http://localhost:5173>）。
 3. 開催回を作る。
