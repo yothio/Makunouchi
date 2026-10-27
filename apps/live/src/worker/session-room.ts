@@ -2,9 +2,13 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, QuizPayload, ServerMessage } from "../shared/types";
 import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type GameState, type Transition } from "./game/state";
 import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
+import { parseClientMessage } from "./messages";
 import { guestView, hostView } from "./game/views";
 
-type Attachment = { role: "host" } | { role: "guest"; playerId: string | null };
+type GuestAttachment = { role: "guest"; playerId: string | null };
+type Attachment = { role: "host" } | GuestAttachment;
+
+const attachmentOf = (ws: WebSocket): Attachment | null => ws.deserializeAttachment() as Attachment | null;
 
 export type RankingResult = { phaseKey: string; final: boolean; players: RankedPlayer[] };
 
@@ -54,37 +58,46 @@ export class SessionRoom extends DurableObject<Env> {
   }
 
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
-    const s = this.state;
-    if (!s || typeof raw !== "string") return;
-    const msg = parseMessage(raw);
-    const att = ws.deserializeAttachment() as Attachment | null;
+    if (!this.state || typeof raw !== "string") return;
+    const msg = parseClientMessage(raw);
+    const att = attachmentOf(ws);
     if (!msg || !att) return;
 
-    if (att.role === "host") {
-      if (msg.type !== "advance") return;
-      this.apply(advance(s, msg.from));
+    switch (msg.type) {
+      case "advance":
+        if (att.role === "host") this.onAdvance(msg);
+        break;
+      case "join":
+        if (att.role === "guest") this.onJoin(ws, att, msg);
+        break;
+      case "answer":
+        if (att.role === "guest") this.onAnswer(att, msg);
+        break;
+    }
+  }
+
+  private onAdvance(msg: Extract<ClientMessage, { type: "advance" }>): void {
+    if (!this.state) return;
+    this.apply(advance(this.state, msg.from));
+  }
+
+  private onJoin(ws: WebSocket, att: GuestAttachment, msg: Extract<ClientMessage, { type: "join" }>): void {
+    if (!this.state || att.playerId) return;
+    const result = joinPlayer(this.state, msg.nickname, { id: crypto.randomUUID(), token: crypto.randomUUID() });
+    if (!result.ok) {
+      this.send(ws, { type: "join_error", reason: result.reason });
       return;
     }
+    this.commit(result.state);
+    ws.serializeAttachment({ role: "guest", playerId: result.player.id } satisfies Attachment);
+    // `joined` (with the token) must precede the joiner's guest_view.
+    this.send(ws, { type: "joined", playerToken: result.player.token });
+    this.deliver(result.events);
+  }
 
-    if (msg.type === "join") {
-      if (att.playerId) return;
-      const result = joinPlayer(s, msg.nickname, { id: crypto.randomUUID(), token: crypto.randomUUID() });
-      if (!result.ok) {
-        this.send(ws, { type: "join_error", reason: result.reason });
-        return;
-      }
-      this.commit(result.state);
-      ws.serializeAttachment({ role: "guest", playerId: result.player.id } satisfies Attachment);
-      // `joined` (with the token) must precede the joiner's guest_view.
-      this.send(ws, { type: "joined", playerToken: result.player.token });
-      this.deliver(result.events);
-      return;
-    }
-
-    if (msg.type === "answer") {
-      if (!att.playerId) return;
-      this.apply(submitAnswer(s, att.playerId, msg.questionIndex, msg.choice));
-    }
+  private onAnswer(att: GuestAttachment, msg: Extract<ClientMessage, { type: "answer" }>): void {
+    if (!this.state || !att.playerId) return;
+    this.apply(submitAnswer(this.state, att.playerId, msg.questionIndex, msg.choice));
   }
 
   webSocketClose(ws: WebSocket, code: number, reason: string): void {
@@ -155,7 +168,7 @@ export class SessionRoom extends DurableObject<Env> {
     }
     const hostMsg: ServerMessage | null = hosts ? { type: "host_view", view: hostView(s) } : null;
     for (const ws of this.ctx.getWebSockets()) {
-      const att = ws.deserializeAttachment() as Attachment | null;
+      const att = attachmentOf(ws);
       if (att?.role === "host") {
         if (hostMsg) this.send(ws, hostMsg);
         continue;
@@ -170,20 +183,4 @@ export class SessionRoom extends DurableObject<Env> {
       }
     }
   }
-}
-
-function parseMessage(raw: string): ClientMessage | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null) return null;
-  const m = data as Record<string, unknown>;
-  if (m.type === "join" && typeof m.nickname === "string") return { type: "join", nickname: m.nickname };
-  if (m.type === "answer" && typeof m.questionIndex === "number" && typeof m.choice === "number")
-    return { type: "answer", questionIndex: m.questionIndex, choice: m.choice };
-  if (m.type === "advance" && typeof m.from === "string") return { type: "advance", from: m.from };
-  return null;
 }
