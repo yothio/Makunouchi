@@ -7,20 +7,22 @@ export type UseLiveSocketOptions = {
   onMessage?: (msg: ServerMessage) => void;
 };
 
-/**
- * `url` may be a function; it is re-evaluated on each (re)connect attempt.
- * The socket is created once per component mount.
- */
-export function useLiveSocket(
-  url: string | (() => string),
-  options: UseLiveSocketOptions = {},
-): {
+export type LiveSocket = {
   last: ServerMessage | null;
   send(msg: ClientMessage): void;
   connected: boolean;
   /** Drop and re-establish the connection (e.g. an action got no response). */
   forceReconnect(): void;
-} {
+};
+
+/**
+ * `url` may be a function; it is re-evaluated on each (re)connect attempt.
+ * The socket is created once per component mount.
+ */
+export const useLiveSocket = (
+  url: string | (() => string),
+  options: UseLiveSocketOptions = {},
+): LiveSocket => {
   const [last, setLast] = useState<ServerMessage | null>(null);
   const [connected, setConnected] = useState(false);
   const sockRef = useRef<ReconnectingSocket | null>(null);
@@ -52,4 +54,4 @@ export function useLiveSocket(
   const send = useCallback((msg: ClientMessage) => sockRef.current?.send(msg), []);
   const forceReconnect = useCallback(() => sockRef.current?.forceReconnect(), []);
   return { last, send, connected, forceReconnect };
-}
+};

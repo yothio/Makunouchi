@@ -1,12 +1,13 @@
-import type { Choice, Phase, QuizPayload } from "../../shared/types";
+import type { Choice, Phase, PhaseKey, QuizPayload } from "../../shared/types";
 import { nextPodiumRank, rankPlayers } from "./ranking";
+import { CHOICE_COUNT, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "./rules";
 import type { GameState, Player } from "./types";
 
-export function createGameState(quiz: QuizPayload): GameState {
+export const createGameState = (quiz: QuizPayload): GameState => {
   return { quiz, phase: { type: "lobby" }, players: [] };
-}
+};
 
-export function phaseKey(phase: Phase): string {
+export const phaseKey = (phase: Phase): PhaseKey => {
   switch (phase.type) {
     case "lobby":
       return "lobby";
@@ -17,11 +18,11 @@ export function phaseKey(phase: Phase): string {
         ? "r:list"
         : `r:${phase.stage.rank}:${phase.stage.revealed ? "shown" : "hidden"}`;
   }
-}
+};
 
-export function normalizeNickname(raw: string): string {
+export const normalizeNickname = (raw: string): string => {
   return raw.normalize("NFKC").trim();
-}
+};
 
 /**
  * Facts about what happened in a transition. They say nothing about who is
@@ -36,15 +37,15 @@ export type Transition<R extends string, Extra = {}> =
   | ({ ok: true; state: GameState; events: GameEvent[] } & Extra)
   | { ok: false; reason: R };
 
-export function joinPlayer(
+export const joinPlayer = (
   s: GameState,
   nickname: string,
   ids: { id: string; token: string },
-): Transition<"nickname_taken" | "nickname_invalid" | "closed", { player: Player }> {
+): Transition<"nickname_taken" | "nickname_invalid" | "closed", { player: Player }> => {
   if (s.phase.type === "results") return { ok: false, reason: "closed" };
   const normalized = normalizeNickname(nickname);
   const length = [...normalized].length;
-  if (length < 1 || length > 20) return { ok: false, reason: "nickname_invalid" };
+  if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) return { ok: false, reason: "nickname_invalid" };
   if (s.players.some((p) => p.nickname === normalized)) return { ok: false, reason: "nickname_taken" };
   const player: Player = { id: ids.id, token: ids.token, nickname: normalized, answers: {} };
   return {
@@ -53,18 +54,18 @@ export function joinPlayer(
     player,
     events: [{ type: "player_joined", playerId: player.id }],
   };
-}
+};
 
-export function submitAnswer(
+export const submitAnswer = (
   s: GameState,
   playerId: string,
   questionIndex: number,
   choice: number,
-): Transition<"not_accepting" | "wrong_question" | "invalid_choice" | "unknown_player"> {
+): Transition<"not_accepting" | "wrong_question" | "invalid_choice" | "unknown_player"> => {
   const phase = s.phase;
   if (phase.type !== "question" || phase.status !== "open") return { ok: false, reason: "not_accepting" };
   if (phase.index !== questionIndex) return { ok: false, reason: "wrong_question" };
-  if (!Number.isInteger(choice) || choice < 0 || choice > 3) return { ok: false, reason: "invalid_choice" };
+  if (!Number.isInteger(choice) || choice < 0 || choice >= CHOICE_COUNT) return { ok: false, reason: "invalid_choice" };
   const i = s.players.findIndex((p) => p.id === playerId);
   if (i < 0) return { ok: false, reason: "unknown_player" };
   const player = s.players[i];
@@ -72,16 +73,16 @@ export function submitAnswer(
   const players = s.players.slice();
   players[i] = updated;
   return { ok: true, state: { ...s, players }, events: [{ type: "answer_recorded", playerId }] };
-}
+};
 
-export function advance(s: GameState, fromKey: string): Transition<"stale_phase" | "no_next_stage"> {
+export const advance = (s: GameState, fromKey: PhaseKey): Transition<"stale_phase" | "no_next_stage"> => {
   if (fromKey !== phaseKey(s.phase)) return { ok: false, reason: "stale_phase" };
   const next = nextPhase(s);
   if (!next) return { ok: false, reason: "no_next_stage" };
   return { ok: true, state: { ...s, phase: next }, events: [{ type: "phase_changed" }] };
-}
+};
 
-function nextPhase(s: GameState): Phase | null {
+const nextPhase = (s: GameState): Phase | null => {
   const phase = s.phase;
   switch (phase.type) {
     case "lobby":
@@ -97,10 +98,10 @@ function nextPhase(s: GameState): Phase | null {
       if (stage.kind === "podium" && !stage.revealed) {
         return { type: "results", stage: { ...stage, revealed: true } };
       }
-      const below = stage.kind === "list" ? 4 : stage.rank;
-      const rank = nextPodiumRank(rankPlayers(s), below);
+      const current = stage.kind === "list" ? null : stage.rank;
+      const rank = nextPodiumRank(rankPlayers(s), current);
       if (rank !== null) return { type: "results", stage: { kind: "podium", rank, revealed: false } };
       return null;
     }
   }
-}
+};

@@ -4,22 +4,22 @@ import { describe, expect, it } from "vitest";
 import { SessionRoom } from "../../src/worker/session-room";
 import { connectGuest, connectHost, createSession, newSessionId, rankingOf } from "./helpers";
 
-async function setup() {
+const setup = async () => {
   const id = newSessionId();
   await createSession(id);
   const host = await connectHost(id);
   await host.next("host_view");
   return { id, host };
-}
+};
 
-async function joinGuest(id: string, nickname: string) {
+const joinGuest = async (id: string, nickname: string) => {
   const guest = await connectGuest(id);
   await guest.next("need_join");
   guest.send({ type: "join", nickname });
   const joined = await guest.next("joined");
   await guest.next("guest_view");
   return { guest, token: joined.playerToken };
-}
+};
 
 describe("role forwarding", () => {
   it("ignores a client-supplied role header on a guest URL", async () => {

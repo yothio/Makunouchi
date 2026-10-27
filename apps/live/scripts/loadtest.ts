@@ -20,7 +20,7 @@ if (!sessionId || !Number.isInteger(clients) || clients < 1) {
 const wsBase = new URL(base);
 wsBase.protocol = base.protocol === "https:" ? "wss:" : "ws:";
 
-function open(path: string): Promise<Sock> {
+const open = (path: string): Promise<Sock> => {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(new URL(path, wsBase));
     const early: string[] = [];
@@ -42,7 +42,7 @@ function open(path: string): Promise<Sock> {
       }),
     );
   });
-}
+};
 
 const token = await hostTokenFor(secret, sessionId);
 const host = await open(`/ws/${sessionId}/host?token=${token}`);

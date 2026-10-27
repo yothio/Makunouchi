@@ -26,7 +26,7 @@ export type ReconnectingSocket = {
   close(): void;
 };
 
-export function createReconnectingSocket(opts: ReconnectingSocketOptions): ReconnectingSocket {
+export const createReconnectingSocket = (opts: ReconnectingSocketOptions): ReconnectingSocket => {
   const Impl = opts.WebSocketImpl ?? WebSocket;
   let ws: WebSocket | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -37,15 +37,15 @@ export function createReconnectingSocket(opts: ReconnectingSocketOptions): Recon
   let delay = MIN_DELAY;
   let closed = false;
 
-  function clearConnTimers() {
+  const clearConnTimers = () => {
     if (connectTimer) clearTimeout(connectTimer);
     if (staleTimer) clearTimeout(staleTimer);
     if (pingTimer) clearInterval(pingTimer);
     connectTimer = staleTimer = pingTimer = null;
-  }
+  };
 
   /** Tear down `sock` without waiting for its (possibly never-arriving) close event. */
-  function drop(sock: WebSocket, reconnectAfter: number | null) {
+  const drop = (sock: WebSocket, reconnectAfter: number | null) => {
     if (ws !== sock) return;
     ws = null;
     clearConnTimers();
@@ -63,14 +63,14 @@ export function createReconnectingSocket(opts: ReconnectingSocketOptions): Recon
       timer = setTimeout(connect, reconnectAfter);
       delay = Math.min(delay * 2, MAX_DELAY);
     }
-  }
+  };
 
-  function armStale(sock: WebSocket) {
+  const armStale = (sock: WebSocket) => {
     if (staleTimer) clearTimeout(staleTimer);
     staleTimer = setTimeout(() => drop(sock, delay), STALE_AFTER);
-  }
+  };
 
-  function connect() {
+  const connect = () => {
     timer = null;
     if (closed) return;
     const sock = new Impl(opts.getUrl());
@@ -105,7 +105,7 @@ export function createReconnectingSocket(opts: ReconnectingSocketOptions): Recon
       }
     };
     sock.onclose = () => drop(sock, delay);
-  }
+  };
 
   connect();
 
@@ -143,4 +143,4 @@ export function createReconnectingSocket(opts: ReconnectingSocketOptions): Recon
       }
     },
   };
-}
+};

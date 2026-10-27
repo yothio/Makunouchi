@@ -13,21 +13,21 @@ const quiz: QuizPayload = {
   ],
 };
 
-function ok(r: Transition<string>): GameState {
+const ok = (r: Transition<string>): GameState => {
   if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
   return r.state;
-}
-function join(s: GameState, name: string, id: string): GameState {
+};
+const join = (s: GameState, name: string, id: string): GameState => {
   const r = joinPlayer(s, name, { id, token: "t" + id });
   if (!r.ok) throw new Error("join failed");
   return r.state;
-}
-function step(s: GameState, n = 1): GameState {
+};
+const step = (s: GameState, n = 1): GameState => {
   for (let i = 0; i < n; i++) s = ok(advance(s, phaseKey(s.phase)));
   return s;
-}
+};
 /** Players with scores injected via answers; phase set to results list. */
-function results(scores: number[], topN = 10): GameState {
+const results = (scores: number[], topN = 10): GameState => {
   const questions = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
     title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
   }));
@@ -38,7 +38,7 @@ function results(scores: number[], topN = 10): GameState {
     phase: { type: "results", stage: { kind: "list" } },
     players: s.players.map((p, i) => ({ ...p, answers: Object.fromEntries(Array.from({ length: scores[i] }, (_, k) => [k, 0])) })),
   };
-}
+};
 const at = (s: GameState, stage: ResultsStage): GameState => ({ ...s, phase: { type: "results", stage } });
 
 describe("answer leakage", () => {

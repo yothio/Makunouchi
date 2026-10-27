@@ -6,9 +6,9 @@ import { ROLE_HEADER } from "./role";
 export { SessionRoom } from "./session-room";
 
 /** Weddings are in Japan; pin the DO near there even if Rails (Cloud Run) happens to call first from elsewhere. */
-function roomFor(env: Env, sessionId: string) {
+const roomFor = (env: Env, sessionId: string) => {
   return env.SESSION_ROOM.getByName(sessionId, { locationHint: "apac-ne" });
-}
+};
 
 const app = new Hono<{ Bindings: Env }>();
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { quizPayloadSchema } from "../../src/worker/payload";
 
-function question(over: Record<string, unknown> = {}) {
+const question = (over: Record<string, unknown> = {}) => {
   return {
     title: "Q",
     imageUrl: null,
@@ -10,15 +10,15 @@ function question(over: Record<string, unknown> = {}) {
     points: 10,
     ...over,
   };
-}
-function payload(over: Record<string, unknown> = {}, n = 5) {
+};
+const payload = (over: Record<string, unknown> = {}, n = 5) => {
   return {
     title: "T",
     topN: 10,
     questions: Array.from({ length: n }, () => question()),
     ...over,
   };
-}
+};
 const withChoices = (n: number) =>
   payload({ questions: Array.from({ length: 5 }, () => question({ choices: Array(n).fill("x") })) });
 

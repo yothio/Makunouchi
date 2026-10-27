@@ -1,7 +1,7 @@
 import type { GameState, Player } from "./types";
 
 /** Only questions whose answer has been revealed (or are already past) are scored. */
-export function scoreOf(s: GameState, player: Player): number {
+export const scoreOf = (s: GameState, player: Player): number => {
   const phase = s.phase;
   let scoredUpTo: number; // exclusive
   if (phase.type === "lobby") scoredUpTo = 0;
@@ -13,4 +13,4 @@ export function scoreOf(s: GameState, player: Player): number {
     if (player.answers[i] === q.correctIndex) total += q.points;
   }
   return total;
-}
+};

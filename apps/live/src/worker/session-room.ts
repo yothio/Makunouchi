@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import type { ClientMessage, QuizPayload, ServerMessage } from "../shared/types";
+import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
 import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
@@ -12,7 +12,7 @@ type Attachment = { role: "host" } | GuestAttachment;
 
 const attachmentOf = (ws: WebSocket): Attachment | null => ws.deserializeAttachment() as Attachment | null;
 
-export type RankingResult = { phaseKey: string; final: boolean; players: RankedPlayer[] };
+export type RankingResult = { phaseKey: PhaseKey; final: boolean; players: RankedPlayer[] };
 
 export class SessionRoom extends DurableObject<Env> {
   private state: GameState | null;

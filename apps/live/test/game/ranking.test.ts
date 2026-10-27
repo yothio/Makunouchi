@@ -4,7 +4,7 @@ import { createGameState, joinPlayer } from "../../src/worker/game/state";
 import type { GameState } from "../../src/worker/game/types";
 import { isFinal, listEntries, podiumHasPlayers, podiumPlayers, rankPlayers } from "../../src/worker/game/ranking";
 
-function make(scores: number[], topN = 10): GameState {
+const make = (scores: number[], topN = 10): GameState => {
   const quiz: QuizPayload = {
     title: "T",
     topN,
@@ -30,7 +30,7 @@ function make(scores: number[], topN = 10): GameState {
       answers: Object.fromEntries(Array.from({ length: scores[i] }, (_, k) => [k, 0])),
     })),
   };
-}
+};
 
 const isFinalOf = (s: GameState) => isFinal(s.phase, rankPlayers(s));
 

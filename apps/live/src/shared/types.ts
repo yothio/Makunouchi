@@ -1,5 +1,16 @@
 export type Choice = 0 | 1 | 2 | 3;
 
+/** A podium slot: 1st, 2nd or 3rd place. */
+export type PodiumRank = 1 | 2 | 3;
+
+/**
+ * Identifies a game phase as a string. Formats: `lobby`, `q:<index>:<open|closed|revealed>`,
+ * `r:list`, `r:<rank>:<hidden|shown>`.
+ * Two roles: the wire value the host client echoes back as `advance.from`, and the key the server
+ * compares against the current phase to make advance idempotent. Do not change the encoding.
+ */
+export type PhaseKey = string;
+
 export type QuizQuestion = {
   title: string;
   imageUrl: string | null;
@@ -16,7 +27,7 @@ export type QuizPayload = {
 
 export type ResultsStage =
   | { kind: "list" }
-  | { kind: "podium"; rank: 1 | 2 | 3; revealed: boolean };
+  | { kind: "podium"; rank: PodiumRank; revealed: boolean };
 
 export type Phase =
   | { type: "lobby" }
@@ -33,21 +44,21 @@ export type PublicQuestion = {
 
 export type HostView = {
   title: string;
-  phaseKey: string;
+  phaseKey: PhaseKey;
   playerCount: number;
   screen:
     | { kind: "lobby" }
     | { kind: "question"; question: PublicQuestion; status: "open" | "closed"; answeredCount: number }
     | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number]; isLast: boolean }
-    | { kind: "list"; entries: { rank: number; nickname: string; score: number }[]; nextRank: 1 | 2 | 3 | null }
+    | { kind: "list"; entries: { rank: number; nickname: string; score: number }[]; nextRank: PodiumRank | null }
     | {
         kind: "podium";
-        rank: 1 | 2 | 3;
+        rank: PodiumRank;
         revealed: boolean;
         /** empty while revealed=false */
         players: { nickname: string; score: number }[];
         /** next non-empty slot to announce, or null */
-        nextRank: 1 | 2 | 3 | null;
+        nextRank: PodiumRank | null;
       };
 };
 
@@ -61,7 +72,7 @@ export type GuestView =
 export type ClientMessage =
   | { type: "join"; nickname: string }
   | { type: "answer"; questionIndex: number; choice: number }
-  | { type: "advance"; from: string };
+  | { type: "advance"; from: PhaseKey };
 
 export type ServerMessage =
   | { type: "host_view"; view: HostView }

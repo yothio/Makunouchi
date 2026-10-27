@@ -14,19 +14,19 @@ const quiz: QuizPayload = {
   ],
 };
 
-function ok(r: Transition<string>): GameState {
+const ok = (r: Transition<string>): GameState => {
   if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
   return r.state;
-}
-function walk(s: GameState, n: number): GameState {
+};
+const walk = (s: GameState, n: number): GameState => {
   for (let i = 0; i < n; i++) s = ok(advance(s, phaseKey(s.phase)));
   return s;
-}
-function withPlayer(name = "taro", id = "p1") {
+};
+const withPlayer = (name = "taro", id = "p1") => {
   const r = joinPlayer(createGameState(quiz), name, { id, token: "t" + id });
   if (!r.ok) throw new Error("join failed");
   return r.state;
-}
+};
 
 describe("advance", () => {
   test("lobby → q:0:open → q:0:closed → q:0:revealed → q:1:open", () => {
@@ -166,7 +166,7 @@ describe("scoreOf", () => {
 });
 
 describe("results progression", () => {
-  function resultsState(scores: number[]): GameState {
+  const resultsState = (scores: number[]): GameState => {
     const qs = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
       title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
     }));
@@ -178,7 +178,7 @@ describe("results progression", () => {
         answers: Object.fromEntries(Array.from({ length: sc }, (_, k) => [k, 0])),
       })),
     };
-  }
+  };
   const keys = (s: GameState, n: number) => {
     const out = [phaseKey(s.phase)];
     for (let i = 0; i < n; i++) { s = ok(advance(s, phaseKey(s.phase))); out.push(phaseKey(s.phase)); }
