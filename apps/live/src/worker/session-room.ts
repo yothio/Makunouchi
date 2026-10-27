@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, QuizPayload, ServerMessage } from "../shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameState } from "./game/state";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type GameState, type Transition } from "./game/state";
 import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
 import { guestView, hostView } from "./game/views";
 
@@ -62,10 +62,7 @@ export class SessionRoom extends DurableObject<Env> {
 
     if (att.role === "host") {
       if (msg.type !== "advance") return;
-      const next = advance(s, msg.from);
-      if (next === s) return;
-      this.commit(next);
-      this.broadcastAll();
+      this.apply(advance(s, msg.from));
       return;
     }
 
@@ -78,19 +75,15 @@ export class SessionRoom extends DurableObject<Env> {
       }
       this.commit(result.state);
       ws.serializeAttachment({ role: "guest", playerId: result.player.id } satisfies Attachment);
+      // `joined` (with the token) must precede the joiner's guest_view.
       this.send(ws, { type: "joined", playerToken: result.player.token });
-      this.send(ws, { type: "guest_view", view: guestView(result.state, result.player.id) });
-      this.broadcastHosts();
+      this.deliver(result.events);
       return;
     }
 
     if (msg.type === "answer") {
       if (!att.playerId) return;
-      const next = submitAnswer(s, att.playerId, msg.questionIndex, msg.choice);
-      if (next === s) return;
-      this.commit(next);
-      this.broadcastGuest(att.playerId);
-      this.broadcastHosts();
+      this.apply(submitAnswer(s, att.playerId, msg.questionIndex, msg.choice));
     }
   }
 
@@ -123,34 +116,59 @@ export class SessionRoom extends DurableObject<Env> {
     }
   }
 
-  private broadcastHosts(): void {
-    const s = this.state;
-    if (!s) return;
-    const msg: ServerMessage = { type: "host_view", view: hostView(s) };
-    for (const ws of this.ctx.getWebSockets()) {
-      if ((ws.deserializeAttachment() as Attachment | null)?.role === "host") this.send(ws, msg);
-    }
+  /** Commit a successful transition and deliver its events; returns false when rejected. */
+  private apply(result: Transition<string>): boolean {
+    if (!result.ok) return false;
+    this.commit(result.state);
+    this.deliver(result.events);
+    return true;
   }
 
-  private broadcastGuest(onlyPlayerId?: string): void {
+  /**
+   * Single place deciding who is told what. Targets are collected first so each
+   * socket receives at most one message per call.
+   *
+   *   event            | hosts     | guests
+   *   -----------------|-----------|---------------------------
+   *   phase_changed    | host_view | guest_view to every joined guest
+   *   player_joined    | host_view | guest_view to that player
+   *   answer_recorded  | host_view | guest_view to that player
+   */
+  private deliver(events: GameEvent[]): void {
     const s = this.state;
-    if (!s) return;
+    if (!s || events.length === 0) return;
+    let hosts = false;
+    let allGuests = false;
+    const guestIds = new Set<string>();
+    for (const event of events) {
+      switch (event.type) {
+        case "phase_changed":
+          hosts = true;
+          allGuests = true;
+          break;
+        case "player_joined":
+        case "answer_recorded":
+          hosts = true;
+          guestIds.add(event.playerId);
+          break;
+      }
+    }
+    const hostMsg: ServerMessage | null = hosts ? { type: "host_view", view: hostView(s) } : null;
     for (const ws of this.ctx.getWebSockets()) {
       const att = ws.deserializeAttachment() as Attachment | null;
+      if (att?.role === "host") {
+        if (hostMsg) this.send(ws, hostMsg);
+        continue;
+      }
       if (att?.role !== "guest" || !att.playerId) continue;
-      if (onlyPlayerId && att.playerId !== onlyPlayerId) continue;
-      // One bad attachment must not abort the broadcast to everyone else after the commit.
+      if (!allGuests && !guestIds.has(att.playerId)) continue;
+      // One bad attachment must not abort delivery to everyone else after the commit.
       try {
         this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
       } catch {
         // skip this socket
       }
     }
-  }
-
-  private broadcastAll(): void {
-    this.broadcastHosts();
-    this.broadcastGuest();
   }
 }
 
