@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload, ResultsStage } from "../../src/shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameState, type Transition } from "../../src/worker/game/state";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "../../src/worker/game/state";
+import type { GameState } from "../../src/worker/game/types";
 import { guestView, hostView } from "../../src/worker/game/views";
 
 const quiz: QuizPayload = {

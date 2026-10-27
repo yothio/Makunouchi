@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload } from "../../src/shared/types";
-import { createGameState, joinPlayer, type GameState } from "../../src/worker/game/state";
+import { createGameState, joinPlayer } from "../../src/worker/game/state";
+import type { GameState } from "../../src/worker/game/types";
 import { isFinal, listEntries, podiumHasPlayers, podiumPlayers, rankPlayers } from "../../src/worker/game/ranking";
 
 function make(scores: number[], topN = 10): GameState {
@@ -31,11 +32,22 @@ function make(scores: number[], topN = 10): GameState {
   };
 }
 
+const isFinalOf = (s: GameState) => isFinal(s.phase, rankPlayers(s));
+
 describe("rankPlayers", () => {
   test("90,90,80,70 → rank 1,1,3,4", () => {
     const r = rankPlayers(make([90, 90, 80, 70]));
     expect(r.map((x) => x.rank)).toEqual([1, 1, 3, 4]);
     expect(r.map((x) => x.score)).toEqual([90, 90, 80, 70]);
+  });
+  test("100,90,90,90,80,80,70 → 1,2,2,2,5,5,7 で同点は参加順", () => {
+    const r = rankPlayers(make([100, 90, 90, 90, 80, 80, 70]));
+    expect(r.map((x) => x.rank)).toEqual([1, 2, 2, 2, 5, 5, 7]);
+    expect(r.map((x) => x.nickname)).toEqual(["p0", "p1", "p2", "p3", "p4", "p5", "p6"]);
+    const shuffled = rankPlayers(make([80, 90, 70, 100, 90, 80, 90]));
+    expect(shuffled.map((x) => [x.nickname, x.rank])).toEqual([
+      ["p3", 1], ["p1", 2], ["p4", 2], ["p6", 2], ["p0", 5], ["p5", 5], ["p2", 7],
+    ]);
   });
   test("同点は参加順", () => {
     const r = rankPlayers(make([5, 9, 9]));
@@ -43,17 +55,17 @@ describe("rankPlayers", () => {
   });
   test("listEntries は 4 位〜topN 位。topN=5 で rank 6 の人は含まない", () => {
     const s = make([7, 6, 5, 4, 3, 2, 1], 5);
-    expect(listEntries(s).map((x) => x.rank)).toEqual([4, 5]);
+    expect(listEntries(rankPlayers(s), s.quiz.topN).map((x) => x.rank)).toEqual([4, 5]);
   });
   test("同点で rank が 1 位から 4 位に飛ぶと、2 位・3 位の枠は空", () => {
     const s = make([9, 9, 9, 7]);
-    expect(podiumHasPlayers(s, 1)).toBe(true);
-    expect(podiumHasPlayers(s, 2)).toBe(false);
-    expect(podiumHasPlayers(s, 3)).toBe(false);
-    expect(podiumPlayers(s, 1)).toHaveLength(3);
+    expect(podiumHasPlayers(rankPlayers(s), 1)).toBe(true);
+    expect(podiumHasPlayers(rankPlayers(s), 2)).toBe(false);
+    expect(podiumHasPlayers(rankPlayers(s), 3)).toBe(false);
+    expect(podiumPlayers(rankPlayers(s), 1)).toHaveLength(3);
   });
   test("isFinal: 0 人の list は true、1 人の list は false", () => {
-    expect(isFinal(make([]))).toBe(true);
-    expect(isFinal(make([3]))).toBe(false);
+    expect(isFinalOf(make([]))).toBe(true);
+    expect(isFinalOf(make([3]))).toBe(false);
   });
 });

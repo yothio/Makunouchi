@@ -1,15 +1,6 @@
-import { nextPodiumRank } from "./ranking";
 import type { Choice, Phase, QuizPayload } from "../../shared/types";
-
-export type Player = {
-  id: string;
-  token: string;
-  nickname: string;
-  /** keyed by question index */
-  answers: Record<number, Choice>;
-};
-
-export type GameState = { quiz: QuizPayload; phase: Phase; players: Player[] };
+import { nextPodiumRank, rankPlayers } from "./ranking";
+import type { GameState, Player } from "./types";
 
 export function createGameState(quiz: QuizPayload): GameState {
   return { quiz, phase: { type: "lobby" }, players: [] };
@@ -107,24 +98,9 @@ function nextPhase(s: GameState): Phase | null {
         return { type: "results", stage: { ...stage, revealed: true } };
       }
       const below = stage.kind === "list" ? 4 : stage.rank;
-      const rank = nextPodiumRank(s, below);
+      const rank = nextPodiumRank(rankPlayers(s), below);
       if (rank !== null) return { type: "results", stage: { kind: "podium", rank, revealed: false } };
       return null;
     }
   }
-}
-
-/** Only questions whose answer has been revealed (or are already past) are scored. */
-export function scoreOf(s: GameState, player: Player): number {
-  const phase = s.phase;
-  let scoredUpTo: number; // exclusive
-  if (phase.type === "lobby") scoredUpTo = 0;
-  else if (phase.type === "results") scoredUpTo = s.quiz.questions.length;
-  else scoredUpTo = phase.status === "revealed" ? phase.index + 1 : phase.index;
-  let total = 0;
-  for (let i = 0; i < scoredUpTo; i++) {
-    const q = s.quiz.questions[i];
-    if (player.answers[i] === q.correctIndex) total += q.points;
-  }
-  return total;
 }

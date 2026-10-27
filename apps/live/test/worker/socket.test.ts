@@ -21,6 +21,33 @@ async function joinGuest(id: string, nickname: string) {
   return { guest, token: joined.playerToken };
 }
 
+describe("role forwarding", () => {
+  it("ignores a client-supplied role header on a guest URL", async () => {
+    const { id, host } = await setup();
+    const res = await exports.default.fetch(`https://x/ws/${id}/guest`, {
+      headers: { Upgrade: "websocket", "X-Makunouchi-Role": "host" },
+    });
+    const ws = res.webSocket!;
+    const frames: string[] = [];
+    ws.addEventListener("message", (e) => void frames.push(e.data as string));
+    ws.accept();
+    const deadline = Date.now() + 3000;
+    while (frames.length === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
+    expect(JSON.parse(frames[0]).type).toBe("need_join");
+    // a guest cannot advance the game even though it sent a host header
+    ws.send(JSON.stringify({ type: "advance", from: "lobby" }));
+    await new Promise((r) => setTimeout(r, 200));
+    expect(host.messages.filter((m) => m.type === "host_view")).toHaveLength(1);
+  });
+
+  it("rejects a request reaching the room without a role", async () => {
+    const { id } = await setup();
+    const room = env.SESSION_ROOM.getByName(id, { locationHint: "apac-ne" });
+    const res = await room.fetch(`https://x/ws/${id}/host`, { headers: { Upgrade: "websocket" } });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("SessionRoom heartbeat", () => {
   it("answers a raw ping with pong and the socket keeps working", async () => {
     const { id } = await setup();

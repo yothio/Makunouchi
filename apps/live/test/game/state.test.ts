@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload } from "../../src/shared/types";
-import { isFinal } from "../../src/worker/game/ranking";
-import { advance, createGameState, joinPlayer, phaseKey, scoreOf, submitAnswer, type GameState, type Transition } from "../../src/worker/game/state";
+import { isFinal, rankPlayers } from "../../src/worker/game/ranking";
+import { scoreOf } from "../../src/worker/game/scoring";
+import type { GameState } from "../../src/worker/game/types";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "../../src/worker/game/state";
 
 const quiz: QuizPayload = {
   title: "T",
@@ -191,12 +193,12 @@ describe("results progression", () => {
   test("1 位(表) からの advance は何もしない。isFinal は true", () => {
     const s = walk(resultsState([9, 8, 7]), 6);
     expect(phaseKey(s.phase)).toBe("r:1:shown");
-    expect(isFinal(s)).toBe(true);
+    expect(isFinal(s.phase, rankPlayers(s))).toBe(true);
     expect(advance(s, "r:1:shown")).toEqual({ ok: false, reason: "no_next_stage" });
   });
   test("参加者 0 人でも最後まで進められる（list で isFinal）", () => {
     const s = resultsState([]);
-    expect(isFinal(s)).toBe(true);
+    expect(isFinal(s.phase, rankPlayers(s))).toBe(true);
     expect(advance(s, "r:list")).toEqual({ ok: false, reason: "no_next_stage" });
   });
   test("results 中の古い fromKey は stale_phase", () => {

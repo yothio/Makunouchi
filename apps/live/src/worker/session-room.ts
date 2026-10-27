@@ -1,8 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, QuizPayload, ServerMessage } from "../shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type GameState, type Transition } from "./game/state";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type Transition } from "./game/state";
+import type { GameState } from "./game/types";
 import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
 import { parseClientMessage } from "./messages";
+import { ROLE_HEADER } from "./role";
 import { guestView, hostView } from "./game/views";
 
 type GuestAttachment = { role: "guest"; playerId: string | null };
@@ -31,14 +33,16 @@ export class SessionRoom extends DurableObject<Env> {
   async ranking(): Promise<RankingResult | null> {
     const s = this.state;
     if (!s) return null;
-    return { phaseKey: phaseKey(s.phase), final: isFinal(s), players: rankPlayers(s) };
+    const players = rankPlayers(s);
+    return { phaseKey: phaseKey(s.phase), final: isFinal(s.phase, players), players };
   }
 
   async fetch(request: Request): Promise<Response> {
     if (!this.state) return new Response("not found", { status: 404 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     const url = new URL(request.url);
-    const role = url.pathname.endsWith("/host") ? "host" : "guest";
+    const role = request.headers.get(ROLE_HEADER);
+    if (role !== "host" && role !== "guest") return new Response("bad role", { status: 400 });
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -166,6 +170,8 @@ export class SessionRoom extends DurableObject<Env> {
           break;
       }
     }
+    // Results stages rank every guest's view from the same state; rank once for all of them.
+    const ranked = s.phase.type === "results" && allGuests ? rankPlayers(s) : undefined;
     const hostMsg: ServerMessage | null = hosts ? { type: "host_view", view: hostView(s) } : null;
     for (const ws of this.ctx.getWebSockets()) {
       const att = attachmentOf(ws);
@@ -177,7 +183,7 @@ export class SessionRoom extends DurableObject<Env> {
       if (!allGuests && !guestIds.has(att.playerId)) continue;
       // One bad attachment must not abort delivery to everyone else after the commit.
       try {
-        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
+        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId, ranked) });
       } catch {
         // skip this socket
       }
