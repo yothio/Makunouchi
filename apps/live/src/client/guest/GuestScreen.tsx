@@ -2,7 +2,6 @@ import type { Choice, GuestView } from "../../shared/types";
 import { JoinForm } from "./JoinForm";
 import type { JoinError, PendingAnswer } from "./types";
 import { QuestionView } from "./views/QuestionView";
-import { RevealView } from "./views/RevealView";
 
 type Props = {
   view: GuestView | null;
@@ -28,7 +27,14 @@ export const GuestScreen = ({ view, needJoin, joinError, pending, disabled, onAn
       case "question":
         return <QuestionView view={view} pending={pending} disabled={disabled} onAnswer={onAnswer} />;
       case "reveal":
-        return <RevealView view={view} />;
+        return (
+          <section className="center">
+            <div className={`mark ${view.correct ? "ok" : "ng"}`} aria-label={view.correct ? "正解" : "不正解"}>
+              {view.correct ? "⭕" : "❌"}
+            </div>
+            <p className="score">{view.score} 点</p>
+          </section>
+        );
       case "results_pending":
         return (
           <section className="center">
