@@ -26,6 +26,7 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
 - `pnpm --filter live test`: Node 環境のテストと Workers 環境のテスト。
 - `test/worker/load.test.ts`: 同一プロセス内で 150 ゲスト + 1 ホストを接続し、サンプルクイズを進行させる自動テスト。advance ごとに、150 人全員へ新しい `guest_view` が 2000 ms 以内に届くこと（取りこぼし 0）を確認する。
 - `pnpm --filter live typecheck`, `pnpm --filter live build`
+- `pnpm --filter live lint`: oxlint（設定は `.oxlintrc.json`）。`lint:fix` で自動修正できるものを直す。
 
 ## デプロイ
 
