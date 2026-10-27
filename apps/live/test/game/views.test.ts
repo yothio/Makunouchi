@@ -129,6 +129,6 @@ describe("guestView", () => {
     });
   });
   test("未知の playerId は例外", () => {
-    expect(() => guestView(createGameState(quiz), "nope")).toThrow();
+    expect(() => guestView(createGameState(quiz), "nope")).toThrow("unknown player: nope");
   });
 });
