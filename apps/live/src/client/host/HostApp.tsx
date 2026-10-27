@@ -6,7 +6,7 @@ import { AdvanceGate, buildHostUrl, hostActionLabel, listHeader } from "./host-a
 
 const LABELS = ["A", "B", "C", "D"] as const;
 
-export function HostApp({ sessionId, token }: { sessionId: string; token: string }) {
+export const HostApp = ({ sessionId, token }: { sessionId: string; token: string }) => {
   const [view, setView] = useState<HostView | null>(null);
   // Cooldown after a phase change + lock after a click; all timing lives in the gate.
   const [gate] = useState(() => new AdvanceGate());
@@ -67,9 +67,9 @@ export function HostApp({ sessionId, token }: { sessionId: string; token: string
       )}
     </div>
   );
-}
+};
 
-function Screen({ view, sessionId }: { view: HostView; sessionId: string }) {
+const Screen = ({ view, sessionId }: { view: HostView; sessionId: string }) => {
   const s = view.screen;
   switch (s.kind) {
     case "lobby": {
@@ -147,7 +147,7 @@ function Screen({ view, sessionId }: { view: HostView; sessionId: string }) {
         </div>
       );
   }
-}
+};
 
 const FIT_MAX_PX = 40;
 const FIT_MIN_PX = 12;
@@ -157,7 +157,7 @@ const FIT_MAX_COLS = 4;
  * Ranking list that never silently clips: measure, trying the largest font first and the fewest
  * columns for it, and only if nothing fits at the floor font size fall back to a visible scroll.
  */
-function FittedList({ entries }: { entries: Extract<HostView["screen"], { kind: "list" }>["entries"] }) {
+const FittedList = ({ entries }: { entries: Extract<HostView["screen"], { kind: "list" }>["entries"] }) => {
   const ref = useRef<HTMLOListElement>(null);
 
   useLayoutEffect(() => {
@@ -193,9 +193,9 @@ function FittedList({ entries }: { entries: Extract<HostView["screen"], { kind: 
       ))}
     </ol>
   );
-}
+};
 
-function QuestionBlock({ q }: { q: PublicQuestion }) {
+const QuestionBlock = ({ q }: { q: PublicQuestion }) => {
   return (
     <>
       <p className="host-progress">第 {q.index + 1} 問 / 全 {q.total} 問</p>
@@ -203,4 +203,4 @@ function QuestionBlock({ q }: { q: PublicQuestion }) {
       {q.imageUrl && <img className="host-q-image" src={q.imageUrl} alt="" />}
     </>
   );
-}
+};
