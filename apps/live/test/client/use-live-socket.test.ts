@@ -43,7 +43,7 @@ class FakeWebSocket {
   }
 }
 
-function memoryStore(): TokenStore & { map: Map<string, string> } {
+const memoryStore = (): TokenStore & { map: Map<string, string> } => {
   const map = new Map<string, string>();
   return {
     map,
@@ -51,7 +51,7 @@ function memoryStore(): TokenStore & { map: Map<string, string> } {
     set: (k, v) => void map.set(k, v),
     remove: (k) => void map.delete(k),
   };
-}
+};
 
 beforeEach(() => {
   vi.useFakeTimers();

@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 import { hostTokenFor, safeEqual, verifyBearer } from "./auth";
 import { quizPayloadSchema } from "./payload";
+import { ROLE_HEADER } from "./role";
 
 export { SessionRoom } from "./session-room";
 
 /** Weddings are in Japan; pin the DO near there even if Rails (Cloud Run) happens to call first from elsewhere. */
-function roomFor(env: Env, sessionId: string) {
+const roomFor = (env: Env, sessionId: string) => {
   return env.SESSION_ROOM.getByName(sessionId, { locationHint: "apac-ne" });
-}
+};
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -46,7 +47,10 @@ app.get("/ws/:sessionId/:role", async (c) => {
     if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
   }
   // SessionRoom.fetch returns 404 itself when the session was never initialised.
-  return roomFor(c.env, sessionId).fetch(c.req.raw);
+  // The role is decided here; the DO only reads this header (overwriting any client-supplied value).
+  const forwarded = new Request(c.req.raw);
+  forwarded.headers.set(ROLE_HEADER, role);
+  return roomFor(c.env, sessionId).fetch(forwarded);
 });
 
 export default app;

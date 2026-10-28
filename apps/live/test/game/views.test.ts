@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload, ResultsStage } from "../../src/shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameState } from "../../src/worker/game/state";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "../../src/worker/game/state";
+import type { GameState } from "../../src/worker/game/types";
 import { guestView, hostView } from "../../src/worker/game/views";
 
 const quiz: QuizPayload = {
@@ -12,17 +13,21 @@ const quiz: QuizPayload = {
   ],
 };
 
-function join(s: GameState, name: string, id: string): GameState {
+const ok = (r: Transition<string>): GameState => {
+  if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
+  return r.state;
+};
+const join = (s: GameState, name: string, id: string): GameState => {
   const r = joinPlayer(s, name, { id, token: "t" + id });
   if (!r.ok) throw new Error("join failed");
   return r.state;
-}
-function step(s: GameState, n = 1): GameState {
-  for (let i = 0; i < n; i++) s = advance(s, phaseKey(s.phase));
+};
+const step = (s: GameState, n = 1): GameState => {
+  for (let i = 0; i < n; i++) s = ok(advance(s, phaseKey(s.phase)));
   return s;
-}
+};
 /** Players with scores injected via answers; phase set to results list. */
-function results(scores: number[], topN = 10): GameState {
+const results = (scores: number[], topN = 10): GameState => {
   const questions = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
     title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
   }));
@@ -33,14 +38,14 @@ function results(scores: number[], topN = 10): GameState {
     phase: { type: "results", stage: { kind: "list" } },
     players: s.players.map((p, i) => ({ ...p, answers: Object.fromEntries(Array.from({ length: scores[i] }, (_, k) => [k, 0])) })),
   };
-}
+};
 const at = (s: GameState, stage: ResultsStage): GameState => ({ ...s, phase: { type: "results", stage } });
 
 describe("answer leakage", () => {
   test("open・closed の段階では、guestView と hostView の JSON に correctIndex が含まれない", () => {
     let s = join(join(createGameState(quiz), "a", "p1"), "b", "p2");
     s = step(s); // open
-    s = submitAnswer(s, "p1", 0, 1);
+    s = ok(submitAnswer(s, "p1", 0, 1));
     for (const st of [s, step(s)]) {
       expect(JSON.stringify(guestView(st, "p1"))).not.toContain("correctIndex");
       expect(JSON.stringify(hostView(st))).not.toContain("correctIndex");
@@ -49,7 +54,7 @@ describe("answer leakage", () => {
   });
   test("guestView に他人のニックネームや回答が含まれない（final 以外）", () => {
     let s = join(join(createGameState(quiz), "alice", "p1"), "bobby", "p2");
-    s = submitAnswer(step(s), "p2", 0, 3);
+    s = ok(submitAnswer(step(s), "p2", 0, 3));
     for (const st of [s, step(s), step(s, 2)]) {
       const json = JSON.stringify(guestView(st, "p1"));
       expect(json).not.toContain("bobby");
@@ -65,7 +70,7 @@ describe("hostView", () => {
   });
   test("question: answeredCount は現在の問題に回答した人数", () => {
     let s = join(join(createGameState(quiz), "a", "p1"), "b", "p2");
-    s = submitAnswer(step(s), "p1", 0, 0);
+    s = ok(submitAnswer(step(s), "p1", 0, 0));
     const v = hostView(s);
     expect(v.screen).toMatchObject({ kind: "question", status: "open", answeredCount: 1 });
     expect(v.phaseKey).toBe("q:0:open");
@@ -74,7 +79,7 @@ describe("hostView", () => {
   test("reveal の counts は選択肢ごとの回答数、isLast は最後の問題のとき true", () => {
     let s = ["a", "b", "c"].reduce((acc, n, i) => join(acc, n, `p${i}`), createGameState(quiz));
     s = step(s); // q0 open
-    s = submitAnswer(submitAnswer(submitAnswer(s, "p0", 0, 1), "p1", 0, 1), "p2", 0, 3);
+    s = ok(submitAnswer(ok(submitAnswer(ok(submitAnswer(s, "p0", 0, 1)), "p1", 0, 1)), "p2", 0, 3));
     const r0 = hostView(step(s, 2));
     expect(r0.screen).toMatchObject({ kind: "reveal", correctIndex: 1, counts: [0, 2, 0, 1], isLast: false });
     const last = hostView(step(s, 5)); // q1 revealed
@@ -111,11 +116,11 @@ describe("guestView", () => {
     let s = join(createGameState(quiz), "a", "p1");
     s = step(s);
     expect(guestView(s, "p1")).toMatchObject({ kind: "question", status: "open", myChoice: null });
-    expect(guestView(submitAnswer(s, "p1", 0, 2), "p1")).toMatchObject({ myChoice: 2 });
+    expect(guestView(ok(submitAnswer(s, "p1", 0, 2)), "p1")).toMatchObject({ myChoice: 2 });
   });
   test("reveal: correct と score", () => {
     let s = join(join(createGameState(quiz), "a", "p1"), "b", "p2");
-    s = submitAnswer(step(s), "p1", 0, 1);
+    s = ok(submitAnswer(step(s), "p1", 0, 1));
     s = step(s, 2);
     expect(guestView(s, "p1")).toMatchObject({ kind: "reveal", correctIndex: 1, myChoice: 1, correct: true, score: 10 });
     expect(guestView(s, "p2")).toMatchObject({ kind: "reveal", myChoice: null, correct: false, score: 0 });

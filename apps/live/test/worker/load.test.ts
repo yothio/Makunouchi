@@ -4,13 +4,13 @@ import sample from "../../fixtures/sample-quiz.json";
 import { authHeaders, connectGuest, connectHost, newSessionId } from "./helpers";
 import { exports } from "cloudflare:workers";
 
-function toSock(c: Awaited<ReturnType<typeof connectHost>>): Sock {
+const toSock = (c: Awaited<ReturnType<typeof connectHost>>): Sock => {
   return {
     send: (d) => c.ws.send(d),
     onMessage: (cb) => c.ws.addEventListener("message", (e) => cb(e.data as string)),
     close: () => c.ws.close(),
   };
-}
+};
 
 describe("load: 150 guests", () => {
   it("every advance reaches all 150 guests within 2000 ms", async () => {

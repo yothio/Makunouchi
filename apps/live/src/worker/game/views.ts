@@ -1,13 +1,15 @@
 import type { Choice, GuestView, HostView, PublicQuestion } from "../../shared/types";
-import { isFinal, listEntries, nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
-import { phaseKey, scoreOf, type GameState } from "./state";
+import { isFinal, listEntries, nextPodiumRank, podiumPlayers, rankPlayers, type RankedPlayer } from "./ranking";
+import { scoreOf } from "./scoring";
+import { phaseKey } from "./state";
+import type { GameState } from "./types";
 
-function publicQuestion(s: GameState, index: number): PublicQuestion {
+const publicQuestion = (s: GameState, index: number): PublicQuestion => {
   const q = s.quiz.questions[index];
   return { index, total: s.quiz.questions.length, title: q.title, imageUrl: q.imageUrl, choices: q.choices };
-}
+};
 
-export function hostView(s: GameState): HostView {
+export const hostView = (s: GameState): HostView => {
   const base = { title: s.quiz.title, phaseKey: phaseKey(s.phase), playerCount: s.players.length };
   const phase = s.phase;
   switch (phase.type) {
@@ -37,22 +39,24 @@ export function hostView(s: GameState): HostView {
     }
     case "results": {
       const stage = phase.stage;
+      const ranked = rankPlayers(s);
       if (stage.kind === "list") {
-        const entries = listEntries(s).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
-        return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(s, 4) } };
+        const entries = listEntries(ranked, s.quiz.topN).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
+        return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null) } };
       }
       const players = stage.revealed
-        ? podiumPlayers(s, stage.rank).map(({ nickname, score }) => ({ nickname, score }))
+        ? podiumPlayers(ranked, stage.rank).map(({ nickname, score }) => ({ nickname, score }))
         : [];
       return {
         ...base,
-        screen: { kind: "podium", rank: stage.rank, revealed: stage.revealed, players, nextRank: nextPodiumRank(s, stage.rank) },
+        screen: { kind: "podium", rank: stage.rank, revealed: stage.revealed, players, nextRank: nextPodiumRank(ranked, stage.rank) },
       };
     }
   }
-}
+};
 
-export function guestView(s: GameState, playerId: string): GuestView {
+/** `ranked` may be passed by callers rendering many guests from one state (results stages only use it). */
+export const guestView = (s: GameState, playerId: string, ranked?: RankedPlayer[]): GuestView => {
   const player = s.players.find((p) => p.id === playerId);
   if (!player) throw new Error(`unknown player: ${playerId}`);
   const phase = s.phase;
@@ -67,9 +71,10 @@ export function guestView(s: GameState, playerId: string): GuestView {
       return { kind: "reveal", question, correctIndex, myChoice, correct: myChoice === correctIndex, score: scoreOf(s, player) };
     }
     case "results": {
-      if (!isFinal(s)) return { kind: "results_pending", nickname: player.nickname };
-      const me = rankPlayers(s).find((r) => r.playerId === playerId)!;
+      const all = ranked ?? rankPlayers(s);
+      if (!isFinal(phase, all)) return { kind: "results_pending", nickname: player.nickname };
+      const me = all.find((r) => r.playerId === playerId)!;
       return { kind: "final", nickname: player.nickname, rank: me.rank, score: me.score, playerCount: s.players.length };
     }
   }
-}
+};

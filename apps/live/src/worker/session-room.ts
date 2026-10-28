@@ -1,12 +1,18 @@
 import { DurableObject } from "cloudflare:workers";
-import type { ClientMessage, QuizPayload, ServerMessage } from "../shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameState } from "./game/state";
+import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type Transition } from "./game/state";
+import type { GameState } from "./game/types";
 import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
+import { parseClientMessage } from "./messages";
+import { ROLE_HEADER } from "./role";
 import { guestView, hostView } from "./game/views";
 
-type Attachment = { role: "host" } | { role: "guest"; playerId: string | null };
+type GuestAttachment = { role: "guest"; playerId: string | null };
+type Attachment = { role: "host" } | GuestAttachment;
 
-export type RankingResult = { phaseKey: string; final: boolean; players: RankedPlayer[] };
+const attachmentOf = (ws: WebSocket): Attachment | null => ws.deserializeAttachment() as Attachment | null;
+
+export type RankingResult = { phaseKey: PhaseKey; final: boolean; players: RankedPlayer[] };
 
 export class SessionRoom extends DurableObject<Env> {
   private state: GameState | null;
@@ -27,14 +33,16 @@ export class SessionRoom extends DurableObject<Env> {
   async ranking(): Promise<RankingResult | null> {
     const s = this.state;
     if (!s) return null;
-    return { phaseKey: phaseKey(s.phase), final: isFinal(s), players: rankPlayers(s) };
+    const players = rankPlayers(s);
+    return { phaseKey: phaseKey(s.phase), final: isFinal(s.phase, players), players };
   }
 
   async fetch(request: Request): Promise<Response> {
     if (!this.state) return new Response("not found", { status: 404 });
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     const url = new URL(request.url);
-    const role = url.pathname.endsWith("/host") ? "host" : "guest";
+    const role = request.headers.get(ROLE_HEADER);
+    if (role !== "host" && role !== "guest") return new Response("bad role", { status: 400 });
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -54,44 +62,46 @@ export class SessionRoom extends DurableObject<Env> {
   }
 
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
-    const s = this.state;
-    if (!s || typeof raw !== "string") return;
-    const msg = parseMessage(raw);
-    const att = ws.deserializeAttachment() as Attachment | null;
+    if (!this.state || typeof raw !== "string") return;
+    const msg = parseClientMessage(raw);
+    const att = attachmentOf(ws);
     if (!msg || !att) return;
 
-    if (att.role === "host") {
-      if (msg.type !== "advance") return;
-      const next = advance(s, msg.from);
-      if (next === s) return;
-      this.commit(next);
-      this.broadcastAll();
+    switch (msg.type) {
+      case "advance":
+        if (att.role === "host") this.onAdvance(msg);
+        break;
+      case "join":
+        if (att.role === "guest") this.onJoin(ws, att, msg);
+        break;
+      case "answer":
+        if (att.role === "guest") this.onAnswer(att, msg);
+        break;
+    }
+  }
+
+  private onAdvance(msg: Extract<ClientMessage, { type: "advance" }>): void {
+    if (!this.state) return;
+    this.apply(advance(this.state, msg.from));
+  }
+
+  private onJoin(ws: WebSocket, att: GuestAttachment, msg: Extract<ClientMessage, { type: "join" }>): void {
+    if (!this.state || att.playerId) return;
+    const result = joinPlayer(this.state, msg.nickname, { id: crypto.randomUUID(), token: crypto.randomUUID() });
+    if (!result.ok) {
+      this.send(ws, { type: "join_error", reason: result.reason });
       return;
     }
+    this.commit(result.state);
+    ws.serializeAttachment({ role: "guest", playerId: result.player.id } satisfies Attachment);
+    // `joined` (with the token) must precede the joiner's guest_view.
+    this.send(ws, { type: "joined", playerToken: result.player.token });
+    this.deliver(result.events);
+  }
 
-    if (msg.type === "join") {
-      if (att.playerId) return;
-      const result = joinPlayer(s, msg.nickname, { id: crypto.randomUUID(), token: crypto.randomUUID() });
-      if (!result.ok) {
-        this.send(ws, { type: "join_error", reason: result.reason });
-        return;
-      }
-      this.commit(result.state);
-      ws.serializeAttachment({ role: "guest", playerId: result.player.id } satisfies Attachment);
-      this.send(ws, { type: "joined", playerToken: result.player.token });
-      this.send(ws, { type: "guest_view", view: guestView(result.state, result.player.id) });
-      this.broadcastHosts();
-      return;
-    }
-
-    if (msg.type === "answer") {
-      if (!att.playerId) return;
-      const next = submitAnswer(s, att.playerId, msg.questionIndex, msg.choice);
-      if (next === s) return;
-      this.commit(next);
-      this.broadcastGuest(att.playerId);
-      this.broadcastHosts();
-    }
+  private onAnswer(att: GuestAttachment, msg: Extract<ClientMessage, { type: "answer" }>): void {
+    if (!this.state || !att.playerId) return;
+    this.apply(submitAnswer(this.state, att.playerId, msg.questionIndex, msg.choice));
   }
 
   webSocketClose(ws: WebSocket, code: number, reason: string): void {
@@ -123,49 +133,60 @@ export class SessionRoom extends DurableObject<Env> {
     }
   }
 
-  private broadcastHosts(): void {
-    const s = this.state;
-    if (!s) return;
-    const msg: ServerMessage = { type: "host_view", view: hostView(s) };
-    for (const ws of this.ctx.getWebSockets()) {
-      if ((ws.deserializeAttachment() as Attachment | null)?.role === "host") this.send(ws, msg);
-    }
+  /** Commit a successful transition and deliver its events; returns false when rejected. */
+  private apply(result: Transition<string>): boolean {
+    if (!result.ok) return false;
+    this.commit(result.state);
+    this.deliver(result.events);
+    return true;
   }
 
-  private broadcastGuest(onlyPlayerId?: string): void {
+  /**
+   * Single place deciding who is told what. Targets are collected first so each
+   * socket receives at most one message per call.
+   *
+   *   event            | hosts     | guests
+   *   -----------------|-----------|---------------------------
+   *   phase_changed    | host_view | guest_view to every joined guest
+   *   player_joined    | host_view | guest_view to that player
+   *   answer_recorded  | host_view | guest_view to that player
+   */
+  private deliver(events: GameEvent[]): void {
     const s = this.state;
-    if (!s) return;
+    if (!s || events.length === 0) return;
+    let hosts = false;
+    let allGuests = false;
+    const guestIds = new Set<string>();
+    for (const event of events) {
+      switch (event.type) {
+        case "phase_changed":
+          hosts = true;
+          allGuests = true;
+          break;
+        case "player_joined":
+        case "answer_recorded":
+          hosts = true;
+          guestIds.add(event.playerId);
+          break;
+      }
+    }
+    // Results stages rank every guest's view from the same state; rank once for all of them.
+    const ranked = s.phase.type === "results" && allGuests ? rankPlayers(s) : undefined;
+    const hostMsg: ServerMessage | null = hosts ? { type: "host_view", view: hostView(s) } : null;
     for (const ws of this.ctx.getWebSockets()) {
-      const att = ws.deserializeAttachment() as Attachment | null;
+      const att = attachmentOf(ws);
+      if (att?.role === "host") {
+        if (hostMsg) this.send(ws, hostMsg);
+        continue;
+      }
       if (att?.role !== "guest" || !att.playerId) continue;
-      if (onlyPlayerId && att.playerId !== onlyPlayerId) continue;
-      // One bad attachment must not abort the broadcast to everyone else after the commit.
+      if (!allGuests && !guestIds.has(att.playerId)) continue;
+      // One bad attachment must not abort delivery to everyone else after the commit.
       try {
-        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
+        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId, ranked) });
       } catch {
         // skip this socket
       }
     }
   }
-
-  private broadcastAll(): void {
-    this.broadcastHosts();
-    this.broadcastGuest();
-  }
-}
-
-function parseMessage(raw: string): ClientMessage | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null) return null;
-  const m = data as Record<string, unknown>;
-  if (m.type === "join" && typeof m.nickname === "string") return { type: "join", nickname: m.nickname };
-  if (m.type === "answer" && typeof m.questionIndex === "number" && typeof m.choice === "number")
-    return { type: "answer", questionIndex: m.questionIndex, choice: m.choice };
-  if (m.type === "advance" && typeof m.from === "string") return { type: "advance", from: m.from };
-  return null;
 }

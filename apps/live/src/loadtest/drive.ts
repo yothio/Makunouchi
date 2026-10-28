@@ -38,7 +38,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const now = () => performance.now();
 
 /** Which guest_view proves that the guest saw the transition out of `from`. */
-function expectedView(from: string): (v: GuestView) => boolean {
+const expectedView = (from: string): ((v: GuestView) => boolean) => {
   if (from === "lobby") return (v) => v.kind === "question" && v.status === "open" && v.question.index === 0;
   const m = /^q:(\d+):(open|closed|revealed)$/.exec(from);
   if (!m) throw new Error(`unexpected phase ${from}`);
@@ -47,7 +47,7 @@ function expectedView(from: string): (v: GuestView) => boolean {
   if (m[2] === "closed") return (v) => v.kind === "reveal" && v.question.index === i;
   return (v) =>
     (v.kind === "question" && v.status === "open" && v.question.index === i + 1) || v.kind === "results_pending";
-}
+};
 
 /**
  * Joins all guests, then drives the quiz from lobby through the last reveal
@@ -56,7 +56,7 @@ function expectedView(from: string): (v: GuestView) => boolean {
  * every open phase. For every advance, measures how long until every guest has
  * received the matching new guest_view.
  */
-export async function driveQuiz(opts: DriveOptions): Promise<LoadResult> {
+export const driveQuiz = async (opts: DriveOptions): Promise<LoadResult> => {
   const { host, guests } = opts;
   const limitMs = opts.limitMs ?? 2000;
   const graceMs = opts.graceMs ?? 10000;
@@ -108,13 +108,13 @@ export async function driveQuiz(opts: DriveOptions): Promise<LoadResult> {
     });
   });
 
-  async function waitUntil(cond: () => boolean, timeoutMs: number, what: string) {
+  const waitUntil = async (cond: () => boolean, timeoutMs: number, what: string) => {
     const deadline = now() + timeoutMs;
     while (!cond()) {
       if (now() > deadline) throw new Error(`timeout waiting for ${what}`);
       await sleep(5);
     }
-  }
+  };
 
   await waitUntil(() => hostView !== null, 10000, "first host_view");
   await waitUntil(() => lobbyCount === n, 30000, `all ${n} guests in lobby (got ${lobbyCount})`);
@@ -156,4 +156,4 @@ export async function driveQuiz(opts: DriveOptions): Promise<LoadResult> {
   const totalMissing = advances.reduce((s, a) => s + a.missing, 0);
   const pass = advances.every((a) => a.maxMs <= limitMs && a.missing === 0);
   return { guests: n, advances, worstMs, totalMissing, pass };
-}
+};

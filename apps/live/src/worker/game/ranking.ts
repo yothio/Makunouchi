@@ -1,42 +1,50 @@
-import { scoreOf, type GameState } from "./state";
+import type { Phase, PodiumRank } from "../../shared/types";
+import { LIST_FIRST_RANK, PODIUM_RANKS } from "./rules";
+import { scoreOf } from "./scoring";
+import type { GameState } from "./types";
 
 export type RankedPlayer = { playerId: string; nickname: string; score: number; rank: number };
 
-/** Descending score; ties keep join order. Competition ranking (90, 90, 80 → 1, 1, 3). */
-export function rankPlayers(s: GameState): RankedPlayer[] {
+/**
+ * The only place ranks are computed. Callers compute it once per message/view
+ * and pass the result to the helpers below.
+ * Descending score; ties keep join order. Competition ranking (90, 90, 80 → 1, 1, 3).
+ */
+export const rankPlayers = (s: GameState): RankedPlayer[] => {
   const scored = s.players.map((p, i) => ({ playerId: p.id, nickname: p.nickname, score: scoreOf(s, p), i }));
   scored.sort((a, b) => b.score - a.score || a.i - b.i);
-  return scored.map(({ i: _i, ...p }) => ({
-    ...p,
-    rank: scored.filter((o) => o.score > p.score).length + 1,
-  }));
-}
+  const ranked: RankedPlayer[] = [];
+  scored.forEach(({ i: _i, ...p }, index) => {
+    const prev = ranked[index - 1];
+    ranked.push({ ...p, rank: prev && prev.score === p.score ? prev.rank : index + 1 });
+  });
+  return ranked;
+};
 
-export function listEntries(s: GameState): RankedPlayer[] {
-  return rankPlayers(s).filter((p) => p.rank >= 4 && p.rank <= s.quiz.topN);
-}
+export const listEntries = (ranked: RankedPlayer[], topN: number): RankedPlayer[] => {
+  return ranked.filter((p) => p.rank >= LIST_FIRST_RANK && p.rank <= topN);
+};
 
-export function podiumPlayers(s: GameState, rank: 1 | 2 | 3): RankedPlayer[] {
-  return rankPlayers(s).filter((p) => p.rank === rank);
-}
+export const podiumPlayers = (ranked: RankedPlayer[], rank: PodiumRank): RankedPlayer[] => {
+  return ranked.filter((p) => p.rank === rank);
+};
 
-export function podiumHasPlayers(s: GameState, rank: 1 | 2 | 3): boolean {
-  return podiumPlayers(s, rank).length > 0;
-}
+export const podiumHasPlayers = (ranked: RankedPlayer[], rank: PodiumRank): boolean => {
+  return ranked.some((p) => p.rank === rank);
+};
 
-/** Next non-empty podium slot strictly below `below` (scanning 3, 2, 1), or null. `below` is 4 for the list stage. */
-export function nextPodiumRank(s: GameState, below: number): 1 | 2 | 3 | null {
-  for (let r = Math.min(below, 4) - 1; r >= 1; r--) {
-    const rank = r as 1 | 2 | 3;
-    if (podiumHasPlayers(s, rank)) return rank;
-  }
-  return null;
-}
+/**
+ * Next non-empty podium slot announced after `current` (scanning 3, 2, 1), or null.
+ * `current` is the slot announced last; null means the list stage (nothing on the podium announced yet).
+ */
+export const nextPodiumRank = (ranked: RankedPlayer[], current: PodiumRank | null): PodiumRank | null => {
+  const before = current ?? LIST_FIRST_RANK;
+  return PODIUM_RANKS.find((rank) => rank < before && podiumHasPlayers(ranked, rank)) ?? null;
+};
 
-export function isFinal(s: GameState): boolean {
-  const phase = s.phase;
+export const isFinal = (phase: Phase, ranked: RankedPlayer[]): boolean => {
   if (phase.type !== "results") return false;
   const stage = phase.stage;
   if (stage.kind === "podium") return stage.rank === 1 && stage.revealed;
-  return !([3, 2, 1] as const).some((r) => podiumHasPlayers(s, r));
-}
+  return !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
+};

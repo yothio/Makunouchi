@@ -17,17 +17,17 @@ export const quiz: QuizPayload = {
 export const authHeaders = { Authorization: "Bearer test-secret", "Content-Type": "application/json" };
 
 let counter = 0;
-export function newSessionId(): string {
+export const newSessionId = (): string => {
   return `session-${Date.now()}-${counter++}-${crypto.randomUUID()}`;
-}
+};
 
-export async function createSession(sessionId: string): Promise<Response> {
+export const createSession = async (sessionId: string): Promise<Response> => {
   return exports.default.fetch(`https://x/api/sessions/${sessionId}`, {
     method: "PUT",
     headers: authHeaders,
     body: JSON.stringify(quiz),
   });
-}
+};
 
 export type Client = {
   ws: WebSocket;
@@ -39,7 +39,7 @@ export type Client = {
   ): Promise<Extract<ServerMessage, { type: T }>>;
 };
 
-export async function connect(path: string): Promise<Client> {
+export const connect = async (path: string): Promise<Client> => {
   const res = await exports.default.fetch(`https://x${path}`, { headers: { Upgrade: "websocket" } });
   if (res.status !== 101 || !res.webSocket) throw new Error(`upgrade failed: ${res.status}`);
   const ws = res.webSocket;
@@ -77,19 +77,19 @@ export async function connect(path: string): Promise<Client> {
       }
     },
   };
-}
+};
 
-export async function connectHost(sessionId: string): Promise<Client> {
+export const connectHost = async (sessionId: string): Promise<Client> => {
   const token = await hostTokenFor(env.ADMIN_API_SECRET, sessionId);
   return connect(`/ws/${sessionId}/host?token=${token}`);
-}
+};
 
 export const connectGuest = (sessionId: string, playerToken?: string) =>
   connect(`/ws/${sessionId}/guest${playerToken ? `?playerToken=${playerToken}` : ""}`);
 
-export async function rankingOf(sessionId: string) {
+export const rankingOf = async (sessionId: string) => {
   const res = await exports.default.fetch(`https://x/api/sessions/${sessionId}/ranking`, {
     headers: authHeaders,
   });
   return { status: res.status, body: (await res.json()) as any };
-}
+};
