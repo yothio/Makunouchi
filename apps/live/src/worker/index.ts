@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { hostTokenFor, safeEqual, verifyBearer } from "./auth";
+import { createMiddleware } from "hono/factory";
+import { hostTokenFor, isUsableSecret, safeEqual, verifyBearer } from "./auth";
 import { quizPayloadSchema } from "./payload";
 import { ROLE_HEADER } from "./role";
 
@@ -14,7 +15,16 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 
-app.use("/api/sessions/*", async (c, next) => {
+/** Fail closed: refuse to authenticate anything while ADMIN_API_SECRET is missing or too short. */
+const requireAdminSecret = createMiddleware<{ Bindings: Env }>(async (c, next) => {
+  if (!isUsableSecret(c.env.ADMIN_API_SECRET)) {
+    console.error("ADMIN_API_SECRET is missing or shorter than the minimum length; refusing request");
+    return c.json({ error: "misconfigured" }, 500);
+  }
+  await next();
+});
+
+app.use("/api/sessions/*", requireAdminSecret, async (c, next) => {
   if (!verifyBearer(c.req.raw, c.env.ADMIN_API_SECRET)) return c.json({ error: "unauthorized" }, 401);
   await next();
 });
@@ -38,19 +48,26 @@ app.get("/api/sessions/:sessionId/ranking", async (c) => {
   return c.json(ranking);
 });
 
-app.get("/ws/:sessionId/:role", async (c) => {
-  const { sessionId, role } = c.req.param();
-  if (role !== "host" && role !== "guest") return c.json({ error: "not_found" }, 404);
-  if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
-  if (role === "host") {
-    const expected = await hostTokenFor(c.env.ADMIN_API_SECRET, sessionId);
-    if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
-  }
-  // SessionRoom.fetch returns 404 itself when the session was never initialised.
-  // The role is decided here; the DO only reads this header (overwriting any client-supplied value).
-  const forwarded = new Request(c.req.raw);
-  forwarded.headers.set(ROLE_HEADER, role);
-  return roomFor(c.env, sessionId).fetch(forwarded);
-});
+app.get(
+  "/ws/:sessionId/:role",
+  async (c, next) => {
+    if (c.req.param("role") === "host") return requireAdminSecret(c, next);
+    await next();
+  },
+  async (c) => {
+    const { sessionId, role } = c.req.param();
+    if (role !== "host" && role !== "guest") return c.json({ error: "not_found" }, 404);
+    if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
+    if (role === "host") {
+      const expected = await hostTokenFor(c.env.ADMIN_API_SECRET, sessionId);
+      if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
+    }
+    // SessionRoom.fetch returns 404 itself when the session was never initialised.
+    // The role is decided here; the DO only reads this header (overwriting any client-supplied value).
+    const forwarded = new Request(c.req.raw);
+    forwarded.headers.set(ROLE_HEADER, role);
+    return roomFor(c.env, sessionId).fetch(forwarded);
+  },
+);
 
 export default app;
