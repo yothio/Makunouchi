@@ -13,7 +13,7 @@ const JOIN_ERROR_TEXT: Record<JoinError, string> = {
 
 const LABELS = ["A", "B", "C", "D"] as const;
 
-export function GuestApp({ sessionId }: { sessionId: string }) {
+export const GuestApp = ({ sessionId }: { sessionId: string }) => {
   const [view, setView] = useState<GuestView | null>(null);
   const [needJoin, setNeedJoin] = useState(false);
   const [joinError, setJoinError] = useState<JoinError | null>(null);
@@ -72,9 +72,9 @@ export function GuestApp({ sessionId }: { sessionId: string }) {
       <main className="guest-main">{body}</main>
     </div>
   );
-}
+};
 
-function JoinForm({
+const JoinForm = ({
   error,
   disabled,
   onSubmit,
@@ -82,7 +82,7 @@ function JoinForm({
   error: JoinError | null;
   disabled: boolean;
   onSubmit(nickname: string): void;
-}) {
+}) => {
   const [name, setName] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -110,9 +110,9 @@ function JoinForm({
       </button>
     </form>
   );
-}
+};
 
-function ViewBody({
+const ViewBody = ({
   view,
   pending,
   disabled,
@@ -122,7 +122,7 @@ function ViewBody({
   pending: { index: number; choice: Choice } | null;
   disabled: boolean;
   onAnswer(questionIndex: number, choice: Choice): void;
-}) {
+}) => {
   switch (view.kind) {
     case "lobby":
       return (
@@ -201,4 +201,4 @@ function ViewBody({
         </section>
       );
   }
-}
+};

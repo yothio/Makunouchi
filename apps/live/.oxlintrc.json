@@ -32,6 +32,13 @@
   },
   "overrides": [
     {
+      "files": ["src/**/*.tsx"],
+      "rules": {
+        // Components and helpers in .tsx are written as const arrow functions.
+        "func-style": ["error", "expression"]
+      }
+    },
+    {
       "files": ["test/worker/**/*.ts"],
       "rules": {
         // Worker socket tests assert via `guest.next(...)` / `host.next(...)`, which reject on timeout.
