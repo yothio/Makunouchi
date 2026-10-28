@@ -28,6 +28,15 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
 - `pnpm --filter live typecheck`, `pnpm --filter live build`
 - `pnpm --filter live lint`: oxlint（設定は `.oxlintrc.json`）。`lint:fix` で自動修正できるものを直す。
 
+## コンポーネントの書き方
+
+- 分岐やロジックを持つコンポーネントは 1 ファイル 1 コンポーネントにし、ファイル名はコンポーネント名（PascalCase）に合わせる。App 系のファイルは「どの画面を出すか」だけを決める。
+- 分岐もロジックも持たない表示だけの部品は切り出さず、呼び出し元の `return` に直接書く。
+- JSX は `return` の中にだけ書く。変数への代入、`useMemo`、ヘルパー関数の中で JSX を組み立てない（`switch` で画面を選ぶ複数の `return <X />` は可）。
+- `return` より前に書くのは hook 呼び出しと単純な派生値だけにする。状態・ソケット処理・タイマー・キーボード・DOM 計測などのロジックは `useXxx.ts` のカスタムフックか `.ts` の純関数に出す。
+- 三項演算子のネストは 1 段まで。それ以上になるときは、`switch` で選ぶ小さなコンポーネントに分ける。
+- コンポーネントとヘルパーは `const` のアロー関数で書く（oxlint の `func-style` が検査する）。JSX を `return` の中に限る規則は oxlint では検査できないので、レビューで確認する。
+
 ## デプロイ
 
 ```
