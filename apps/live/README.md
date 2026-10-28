@@ -16,7 +16,7 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
 3. 開催回を作る。
 
    ```
-   ADMIN_API_SECRET=dev-secret pnpm --filter live seed http://localhost:5173
+   ADMIN_API_SECRET=dev-secret-change-me-0123456789abcdef pnpm --filter live seed http://localhost:5173
    ```
 
    `fixtures/sample-quiz.json`（5 問、topN 10）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、投影画面 URL（`/host/:id?token=...`）を表示する。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
@@ -41,7 +41,7 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
 
 ```
 cd apps/live
-pnpm exec wrangler secret put ADMIN_API_SECRET   # 本番の秘密値を入力
+pnpm exec wrangler secret put ADMIN_API_SECRET   # 本番の秘密値を入力（32 文字以上。例: openssl rand -hex 32 で生成）
 pnpm --filter live deploy
 ```
 

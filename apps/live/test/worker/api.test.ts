@@ -83,9 +83,10 @@ describe("sessions API", () => {
   });
 
   it("hostTokenFor is deterministic hex of 64 chars", async () => {
-    const a = await hostTokenFor("s", "id");
+    const secret = "s".repeat(32);
+    const a = await hostTokenFor(secret, "id");
     expect(a).toMatch(/^[0-9a-f]{64}$/);
-    expect(await hostTokenFor("s", "id")).toBe(a);
-    expect(await hostTokenFor("s", "id2")).not.toBe(a);
+    expect(await hostTokenFor(secret, "id")).toBe(a);
+    expect(await hostTokenFor(secret, "id2")).not.toBe(a);
   });
 });

@@ -14,7 +14,7 @@ export const quiz: QuizPayload = {
   })),
 };
 
-export const authHeaders = { Authorization: "Bearer test-secret", "Content-Type": "application/json" };
+export const authHeaders = { Authorization: `Bearer ${env.ADMIN_API_SECRET}`, "Content-Type": "application/json" };
 
 let counter = 0;
 export const newSessionId = (): string => {
