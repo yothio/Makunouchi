@@ -1,0 +1,66 @@
+{
+  "title": "サンプル結婚式クイズ",
+  "topN": 10,
+  "questions": [
+    {
+      "title": "二人が出会ったのはどこ？",
+      "imageUrl": null,
+      "choices": [
+        "大学",
+        "職場",
+        "旅行先",
+        "友人の紹介"
+      ],
+      "correctIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "プロポーズの場所は？",
+      "imageUrl": null,
+      "choices": [
+        "レストラン",
+        "海辺",
+        "自宅",
+        "遊園地"
+      ],
+      "correctIndex": 0,
+      "points": 10
+    },
+    {
+      "title": "新郎の好きな食べ物は？",
+      "imageUrl": null,
+      "choices": [
+        "寿司",
+        "カレー",
+        "ラーメン",
+        "焼肉"
+      ],
+      "correctIndex": 2,
+      "points": 10
+    },
+    {
+      "title": "新婦の趣味は？",
+      "imageUrl": null,
+      "choices": [
+        "登山",
+        "読書",
+        "ガーデニング",
+        "映画鑑賞"
+      ],
+      "correctIndex": 3,
+      "points": 10
+    },
+    {
+      "title": "新婚旅行の行き先は？（最終問題・30点）",
+      "imageUrl": null,
+      "choices": [
+        "ハワイ",
+        "北海道",
+        "イタリア",
+        "沖縄"
+      ],
+      "correctIndex": 0,
+      "points": 30
+    }
+  ]
+}

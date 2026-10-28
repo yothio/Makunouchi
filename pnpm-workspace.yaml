@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+allowBuilds:
+  esbuild: true
+  workerd: true
+# 公開から 7 日（10080 分）未満のバージョンはインストールしない
+minimumReleaseAge: 10080

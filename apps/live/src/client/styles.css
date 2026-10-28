@@ -1,0 +1,69 @@
+:root { color-scheme: light; --accent: #d9534f; --ink: #222; --bg: #fffaf3; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; color: var(--ink); background: var(--bg); }
+.guest { min-height: 100dvh; display: flex; flex-direction: column; }
+.guest-main { flex: 1; padding: 16px; max-width: 480px; width: 100%; margin: 0 auto; }
+.banner { position: sticky; top: 0; z-index: 10; background: #333; color: #fff; text-align: center; padding: 8px; font-size: 14px; }
+h1 { font-size: 22px; margin: 0 0 16px; }
+.center { text-align: center; padding-top: 18vh; }
+.nick { font-size: 18px; color: #666; margin: 0 0 8px; }
+.note, .progress { color: #666; }
+.join { display: flex; flex-direction: column; gap: 16px; padding-top: 12vh; }
+.text-input { font-size: 18px; padding: 16px; border: 2px solid #ccc; border-radius: 12px; width: 100%; }
+.primary { font-size: 18px; font-weight: 700; min-height: 56px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; }
+.primary:disabled, .choice:disabled { opacity: 0.5; }
+.error { color: #b00020; margin: 0; }
+.q-title { font-size: 20px; }
+.q-image { width: 100%; border-radius: 8px; margin-bottom: 12px; }
+.choices { display: flex; flex-direction: column; gap: 12px; }
+.choice { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; font-size: 18px; text-align: left; background: #fff; border: 3px solid #ddd; border-radius: 14px; color: inherit; -webkit-tap-highlight-color: transparent; }
+.choice .label { font-weight: 800; width: 32px; height: 32px; border-radius: 50%; background: #eee; display: grid; place-items: center; flex: none; }
+.choice.selected { border-color: var(--accent); background: #ffeceb; }
+.choice.selected .label { background: var(--accent); color: #fff; }
+.closed { text-align: center; padding-top: 24px; font-size: 18px; }
+.closed-title { font-size: 24px; font-weight: 700; }
+.mark { font-size: 96px; line-height: 1.2; }
+.score { font-size: 28px; font-weight: 700; }
+
+/* Host (projector) screen, designed for 16:9 */
+.host { min-height: 100vh; background: #1d1a17; color: #fff; display: flex; flex-direction: column; font-size: clamp(20px, 2.4vw, 40px); }
+.host-banner { background: #b00020; text-align: center; padding: 8px; font-size: 0.8em; font-weight: 700; }
+.host-main { flex: 1; padding: 3vh 5vw 14vh; }
+.host-title { font-size: 1.6em; margin: 0 0 0.4em; }
+.host-lobby { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.host-lobby svg { background: #fff; border-radius: 12px; max-height: 40vh; width: auto; }
+.host-url { font-size: 0.6em; color: #ccc; margin: 0.4em 0; word-break: break-all; }
+.host-count { font-size: 1em; margin: 0.4em 0; }
+.host-progress { margin: 0; color: #f0b27a; font-weight: 700; }
+.host-q-title { font-size: 1.5em; margin: 0.1em 0 0.3em; }
+.host-q-image { display: block; max-height: 28vh; max-width: 100%; margin: 0 auto 0.4em; border-radius: 8px; }
+.host-choices { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1.2vh 1.5vw; }
+.host-choice { display: flex; align-items: center; gap: 0.5em; background: #2e2a26; border: 4px solid transparent; border-radius: 14px; padding: 0.4em 0.7em; }
+.host-label { flex: none; width: 1.6em; height: 1.6em; display: grid; place-items: center; border-radius: 50%; background: #555; font-weight: 800; }
+.host-choice.correct { border-color: #4caf50; background: #1f3d24; }
+.host-choice.correct .host-label { background: #4caf50; }
+.host-bar-row { flex-wrap: wrap; }
+.host-choice-text { flex: 1 1 60%; }
+.host-bar-track { flex: 1 1 100%; display: block; height: 0.6em; background: #3a3631; border-radius: 6px; }
+.host-bar { display: block; height: 100%; background: #8a8a8a; border-radius: 6px; min-width: 2px; }
+.correct .host-bar { background: #4caf50; }
+.host-bar-count { font-weight: 800; margin-left: auto; }
+.host-answer { font-size: 1.2em; font-weight: 700; color: #8fe08f; margin: 0.5em 0 0; }
+.host-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3em; }
+.host-list li { display: flex; gap: 1em; align-items: baseline; background: #2e2a26; border-radius: 12px; padding: 0.3em 0.8em; }
+.host-rank { width: 3em; font-weight: 800; color: #f0b27a; }
+.host-name { flex: 1; font-weight: 700; }
+.host-score { font-variant-numeric: tabular-nums; }
+.host-podium { text-align: center; }
+.host-podium .host-list li { justify-content: center; font-size: 1.4em; }
+.host-hidden { font-size: 4em; margin: 0.3em 0; letter-spacing: 0.2em; }
+.host-wait { text-align: center; padding-top: 20vh; }
+.host-advance { position: fixed; right: 3vw; bottom: 4vh; font-size: 1em; font-weight: 800; padding: 0.5em 1.2em; border: 0; border-radius: 16px; background: var(--accent); color: #fff; cursor: pointer; }
+.host-advance:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Ranking list: bounded above the fixed button. Font size and column count are chosen by
+   measurement in FittedList; if nothing fits at the minimum font it scrolls (never clips). */
+.host-list-grid { display: grid; gap: 0.2em 1.2vw; align-content: start; max-height: calc(100vh - 34vh); overflow: hidden; }
+.host-list-grid li { line-height: 1.3; min-width: 0; gap: 0.5em; padding: 0.15em 0.5em; }
+.host-list-grid .host-rank { width: 3em; flex: none; }
+.host-list-grid .host-name { min-width: 0; overflow-wrap: anywhere; }

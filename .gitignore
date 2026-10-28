@@ -1,0 +1,6 @@
+.superpowers/
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+.pnpm-store/
