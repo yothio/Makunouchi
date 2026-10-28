@@ -23,6 +23,34 @@
     "node_modules/**"
   ],
   "rules": {
-    "react/react-in-jsx-scope": "off"
-  }
+    "react/react-in-jsx-scope": "off",
+    // reconnecting-socket detaches handlers with `sock.onX = null` in drop(); addEventListener would
+    // need handler bookkeeping for no behaviour gain, and its fake WebSocket tests use on* properties.
+    "unicorn/prefer-add-event-listener": "off",
+    // Side-effect-only imports are legitimate for stylesheets.
+    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }]
+  },
+  "overrides": [
+    {
+      "files": ["test/worker/**/*.ts"],
+      "rules": {
+        // Worker socket tests assert via `guest.next(...)` / `host.next(...)`, which reject on timeout.
+        "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expectTypeOf", "assert", "assertType", "*.next"] }]
+      }
+    },
+    {
+      "files": ["test/**/*.ts", "src/loadtest/**/*.ts", "scripts/**/*.ts"],
+      "rules": {
+        // Small local helpers inside describe/test blocks and drivers read better next to their use.
+        "unicorn/consistent-function-scoping": "off"
+      }
+    },
+    {
+      "files": ["scripts/**/*.ts"],
+      "rules": {
+        // `import WebSocket from "ws"` is the library's documented usage.
+        "import/no-named-as-default": "off"
+      }
+    }
+  ]
 }

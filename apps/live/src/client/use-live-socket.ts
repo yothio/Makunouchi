@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import type { ClientMessage, ServerMessage } from "../shared/types";
 import { createReconnectingSocket, type ReconnectingSocket } from "./reconnecting-socket";
 
@@ -24,16 +24,15 @@ export function useLiveSocket(
   const [last, setLast] = useState<ServerMessage | null>(null);
   const [connected, setConnected] = useState(false);
   const sockRef = useRef<ReconnectingSocket | null>(null);
-  const urlRef = useRef(url);
-  const onMessageRef = useRef(options.onMessage);
-  urlRef.current = url;
-  onMessageRef.current = options.onMessage;
+  // Always call the latest url / onMessage without re-creating the socket when their identity changes.
+  const getUrl = useEffectEvent(() => (typeof url === "function" ? url() : url));
+  const onMessage = useEffectEvent((m: ServerMessage) => options.onMessage?.(m));
 
   useEffect(() => {
     const sock = createReconnectingSocket({
-      getUrl: () => (typeof urlRef.current === "function" ? urlRef.current() : urlRef.current),
+      getUrl: () => getUrl(),
       onMessage: (m) => {
-        onMessageRef.current?.(m);
+        onMessage(m);
         setLast(m);
       },
       onStatus: setConnected,

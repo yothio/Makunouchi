@@ -1,90 +1,59 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { HostView, PublicQuestion } from "../../shared/types";
 import { useLiveSocket } from "../use-live-socket";
-import {
-  ADVANCE_COOLDOWN_MS,
-  ADVANCE_LOCK_MS,
-  buildHostUrl,
-  hostActionLabel,
-  isAdvanceLocked,
-  isInCooldown,
-  listHeader,
-} from "./host-action";
+import { AdvanceGate, buildHostUrl, hostActionLabel, listHeader } from "./host-action";
 
 const LABELS = ["A", "B", "C", "D"] as const;
 
 export function HostApp({ sessionId, token }: { sessionId: string; token: string }) {
   const [view, setView] = useState<HostView | null>(null);
-  // Last advance we sent; locks the button until phase change, disconnect or timeout.
-  const [sent, setSent] = useState<{ from: string; at: number } | null>(null);
-
-  // When the phase last changed (client clock); advance input is ignored briefly after this.
-  const [phaseChangedAt, setPhaseChangedAt] = useState<number | null>(null);
-  const [, setTick] = useState(0);
-  const lastPhaseKey = useRef<string | null>(null);
+  // Cooldown after a phase change + lock after a click; all timing lives in the gate.
+  const [gate] = useState(() => new AdvanceGate());
+  const { cooling, locked } = useSyncExternalStore(gate.subscribe, gate.getSnapshot);
 
   const { send, connected, forceReconnect } = useLiveSocket(
     () => buildHostUrl(window.location, sessionId, token),
     {
       onMessage: (msg) => {
         if (msg.type !== "host_view") return;
-        if (msg.view.phaseKey !== lastPhaseKey.current) {
-          lastPhaseKey.current = msg.view.phaseKey;
-          setPhaseChangedAt(Date.now());
-        }
+        gate.phaseChanged(msg.view.phaseKey);
         setView(msg.view);
       },
     },
   );
 
+  // If the lock times out with no phase change the connection may be half-open: force a reconnect
+  // (the lost advance can then be resent).
+  useEffect(() => {
+    gate.setLockExpiredHandler(forceReconnect);
+    return () => gate.setLockExpiredHandler(null);
+  }, [gate, forceReconnect]);
+  useEffect(() => {
+    gate.setConnected(connected);
+  }, [gate, connected]);
+  useEffect(() => () => gate.dispose(), [gate]);
+
   const label = view ? hostActionLabel(view) : null;
-  const phaseKey = view?.phaseKey ?? null;
-  const locked = phaseKey !== null && isAdvanceLocked(sent, phaseKey, connected, Date.now());
-  const cooling = isInCooldown(phaseChangedAt, Date.now());
   const canAdvance = connected && view !== null && label !== null && !locked && !cooling;
 
-  // Re-render when the cooldown ends so the button re-enables.
-  useEffect(() => {
-    if (phaseChangedAt === null) return;
-    const t = setTimeout(() => setTick((n) => n + 1), Math.max(0, ADVANCE_COOLDOWN_MS - (Date.now() - phaseChangedAt)));
-    return () => clearTimeout(t);
-  }, [phaseChangedAt]);
-
-  // Clear the lock on disconnect / phase change. If the timeout elapses with no phase change the
-  // connection may be half-open, so force a reconnect (the lost advance can then be resent).
-  useEffect(() => {
-    if (!sent) return;
-    if (!connected || sent.from !== phaseKey) {
-      setSent(null);
-      return;
-    }
-    const t = setTimeout(() => {
-      setSent(null);
-      forceReconnect();
-    }, Math.max(0, ADVANCE_LOCK_MS - (Date.now() - sent.at)));
-    return () => clearTimeout(t);
-  }, [sent, connected, phaseKey, forceReconnect]);
-
   const advance = useCallback(() => {
-    if (!view || !canAdvance || isInCooldown(phaseChangedAt, Date.now())) return;
-    setSent({ from: view.phaseKey, at: Date.now() });
+    if (!view || label === null || !gate.tryAdvance()) return;
     send({ type: "advance", from: view.phaseKey });
-  }, [view, canAdvance, phaseChangedAt, send]);
+  }, [view, label, gate, send]);
 
-  const advanceRef = useRef(advance);
-  advanceRef.current = advance;
+  const onKey = useEffectEvent((e: KeyboardEvent) => {
+    if (e.repeat) return;
+    if (e.key !== " " && e.key !== "ArrowRight") return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable)) return;
+    e.preventDefault();
+    advance();
+  });
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return;
-      if (e.key !== " " && e.key !== "ArrowRight") return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable)) return;
-      e.preventDefault();
-      advanceRef.current();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const handler = (e: KeyboardEvent) => onKey(e);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   return (
@@ -209,6 +178,8 @@ function FittedList({ entries }: { entries: Extract<HostView["screen"], { kind: 
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
+    // `entries` is not read in the effect but drives the DOM being measured: re-fit whenever it changes.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [entries]);
 
   return (

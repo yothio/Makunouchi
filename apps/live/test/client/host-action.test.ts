@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { buildHostUrl, hostActionLabel, isAdvanceLocked, isInCooldown, listHeader } from "../../src/client/host/host-action";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { ADVANCE_COOLDOWN_MS, ADVANCE_LOCK_MS, AdvanceGate, buildHostUrl, hostActionLabel, listHeader } from "../../src/client/host/host-action";
 import type { HostView } from "../../src/shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
@@ -42,22 +42,111 @@ describe("buildHostUrl", () => {
   });
 });
 
-describe("isAdvanceLocked", () => {
-  const sent = { from: "k1", at: 1000 };
-  test("not locked before any send", () => expect(isAdvanceLocked(null, "k1", true, 1000)).toBe(false));
-  test("locked after send", () => expect(isAdvanceLocked(sent, "k1", true, 1500)).toBe(true));
-  test("unlocks on phaseKey change", () => expect(isAdvanceLocked(sent, "k2", true, 1500)).toBe(false));
-  test("unlocks on disconnect", () => expect(isAdvanceLocked(sent, "k1", false, 1500)).toBe(false));
-  test("unlocks after 3000ms with same phaseKey", () => {
-    expect(isAdvanceLocked(sent, "k1", true, 3999)).toBe(true);
-    expect(isAdvanceLocked(sent, "k1", true, 4000)).toBe(false);
+describe("AdvanceGate", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
-});
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-describe("isInCooldown", () => {
-  test("no phase change yet", () => expect(isInCooldown(null, 5000)).toBe(false));
-  test("locked at 999ms after phase change, unlocked at 1000ms", () => {
-    expect(isInCooldown(1000, 1999)).toBe(true);
-    expect(isInCooldown(1000, 2000)).toBe(false);
+  const make = () => {
+    const gate = new AdvanceGate();
+    const onExpired = vi.fn<() => void>();
+    gate.setLockExpiredHandler(onExpired);
+    const changes = vi.fn<() => void>();
+    gate.subscribe(changes);
+    return { gate, onExpired, changes };
+  };
+
+  test("starts open before any phase arrives", () => {
+    const { gate } = make();
+    expect(gate.getSnapshot()).toEqual({ cooling: false, locked: false });
+  });
+
+  test("input ignored at 999ms after a phase change, accepted at 1000ms", () => {
+    const { gate } = make();
+    gate.phaseChanged("k1");
+    vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS - 1);
+    expect(gate.tryAdvance()).toBe(false);
+    expect(gate.getSnapshot().cooling).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(gate.getSnapshot().cooling).toBe(false);
+    expect(gate.tryAdvance()).toBe(true);
+  });
+
+  test("regression: cooldown is cleared by its timer, not by comparing clocks", () => {
+    // Old design re-read Date.now() on a re-render after the timer fired; with a clock reading
+    // earlier than phaseChangedAt+1000 it still saw cooling=true and never re-rendered.
+    const { gate, changes } = make();
+    gate.phaseChanged("k1");
+    const realNow = Date.now;
+    try {
+      vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS);
+      Date.now = () => realNow() - 500; // clock reads before phaseChangedAt + 1000
+      expect(gate.getSnapshot().cooling).toBe(false);
+      expect(gate.tryAdvance()).toBe(true);
+    } finally {
+      Date.now = realNow;
+    }
+    // subscribers were notified when the cooldown ended, so a UI would re-render
+    expect(changes).toHaveBeenCalled();
+  });
+
+  test("same phaseKey does not restart the cooldown", () => {
+    const { gate } = make();
+    gate.phaseChanged("k1");
+    vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS);
+    gate.phaseChanged("k1");
+    expect(gate.getSnapshot().cooling).toBe(false);
+  });
+
+  test("lock clears on phase change", () => {
+    const { gate } = make();
+    gate.phaseChanged("k1");
+    vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS);
+    expect(gate.tryAdvance()).toBe(true);
+    expect(gate.tryAdvance()).toBe(false);
+    gate.phaseChanged("k2");
+    expect(gate.getSnapshot()).toEqual({ cooling: true, locked: false });
+    vi.advanceTimersByTime(ADVANCE_LOCK_MS);
+    expect(gate.getSnapshot().locked).toBe(false);
+  });
+
+  test("lock clears on disconnect without reconnecting", () => {
+    const { gate, onExpired } = make();
+    gate.phaseChanged("k1");
+    vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS);
+    gate.tryAdvance();
+    gate.setConnected(false);
+    expect(gate.getSnapshot().locked).toBe(false);
+    expect(gate.tryAdvance()).toBe(false); // disconnected
+    gate.setConnected(true);
+    expect(gate.tryAdvance()).toBe(true);
+    vi.advanceTimersByTime(ADVANCE_LOCK_MS);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+  });
+
+  test("lock clears after 3000ms and triggers the reconnect callback", () => {
+    const { gate, onExpired } = make();
+    gate.phaseChanged("k1");
+    vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS);
+    gate.tryAdvance();
+    vi.advanceTimersByTime(ADVANCE_LOCK_MS - 1);
+    expect(gate.getSnapshot().locked).toBe(true);
+    expect(onExpired).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(gate.getSnapshot().locked).toBe(false);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+  });
+
+  test("dispose stops timers", () => {
+    const { gate, onExpired } = make();
+    gate.phaseChanged("k1");
+    vi.advanceTimersByTime(ADVANCE_COOLDOWN_MS);
+    gate.tryAdvance();
+    gate.dispose();
+    vi.advanceTimersByTime(ADVANCE_LOCK_MS * 2);
+    expect(onExpired).not.toHaveBeenCalled();
   });
 });
