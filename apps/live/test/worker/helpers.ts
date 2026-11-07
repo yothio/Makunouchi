@@ -96,3 +96,25 @@ export const rankingOf = async (sessionId: string) => {
   });
   return { status: res.status, body: (await res.json()) as any };
 };
+
+export const findLast = <T>(items: T[], pred: (item: T) => boolean): T | undefined => {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (pred(items[i])) return items[i];
+  }
+  return undefined;
+};
+
+/** Advance from lobby through every question into the results list. */
+export const driveToResults = async (host: Client, _sessionId: string): Promise<void> => {
+  const n = quiz.questions.length;
+  const steps: [string, string][] = [["lobby", "q:0:open"]];
+  for (let i = 0; i < n; i++) {
+    steps.push([`q:${i}:open`, `q:${i}:closed`], [`q:${i}:closed`, `q:${i}:revealed`]);
+    if (i < n - 1) steps.push([`q:${i}:revealed`, `q:${i + 1}:open`]);
+  }
+  steps.push([`q:${n - 1}:revealed`, "r:list"]);
+  for (const [from, to] of steps) {
+    host.send({ type: "advance", from });
+    await host.next("host_view", (m) => m.view.phaseKey === to);
+  }
+};

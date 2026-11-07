@@ -1,8 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type GameEvent, type Transition } from "./game/state";
+import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
-import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
+import { rankPlayers, type RankedPlayer } from "./game/ranking";
 import { parseClientMessage } from "./messages";
 import { isRole, ROLE_HEADER } from "./role";
 import { guestView, hostView, screenView } from "./game/views";
@@ -34,7 +34,7 @@ export class SessionRoom extends DurableObject<Env> {
     const s = this.state;
     if (!s) return null;
     const players = rankPlayers(s);
-    return { phaseKey: phaseKey(s.phase), final: isFinal(s.phase, players), players };
+    return { phaseKey: phaseKey(s.phase), final: s.phase.type === "results", players };
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -74,6 +74,9 @@ export class SessionRoom extends DurableObject<Env> {
       case "advance":
         if (att.role === "host") this.onAdvance(msg);
         break;
+      case "results_action":
+        if (att.role === "host") this.onResultsAction(msg);
+        break;
       case "join":
         if (att.role === "guest") this.onJoin(ws, att, msg);
         break;
@@ -86,6 +89,11 @@ export class SessionRoom extends DurableObject<Env> {
   private onAdvance(msg: Extract<ClientMessage, { type: "advance" }>): void {
     if (!this.state) return;
     this.apply(advance(this.state, msg.from));
+  }
+
+  private onResultsAction(msg: Extract<ClientMessage, { type: "results_action" }>): void {
+    if (!this.state) return;
+    this.apply(presentResults(this.state, msg.from, msg.action));
   }
 
   private onJoin(ws: WebSocket, att: GuestAttachment, msg: Extract<ClientMessage, { type: "join" }>): void {
@@ -148,14 +156,15 @@ export class SessionRoom extends DurableObject<Env> {
    * Single place deciding who is told what. Targets are collected first so each
    * socket receives at most one message per call.
    *
-   *   event            | hosts     | screens                         | guests
-   *   -----------------|-----------|---------------------------------|---------------------------------
-   *   phase_changed    | host_view | screen_view                     | guest_view to every joined guest
-   *   player_joined    | host_view | screen_view (only while lobby)  | guest_view to that player
-   *   answer_recorded  | host_view | -                               | guest_view to that player
+   *   event               | hosts     | screens                         | guests
+   *   --------------------|-----------|---------------------------------|---------------------------------
+   *   phase_changed       | host_view | screen_view                     | guest_view to every joined guest
+   *   projection_changed  | host_view | screen_view                     | -
+   *   player_joined       | host_view | screen_view (only while lobby)  | guest_view to that player
+   *   answer_recorded     | host_view | -                               | guest_view to that player
    *
    * A screen only needs the participant count while the lobby is shown, and never the answered count,
-   * so joins after the start and answers do not touch it.
+   * so joins after the start and answers do not touch it. Results projection never notifies guests.
    */
   private deliver(events: GameEvent[]): void {
     const s = this.state;
@@ -170,6 +179,10 @@ export class SessionRoom extends DurableObject<Env> {
           hosts = true;
           screens = true;
           allGuests = true;
+          break;
+        case "projection_changed":
+          hosts = true;
+          screens = true;
           break;
         case "player_joined":
           hosts = true;

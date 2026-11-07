@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
-import { authHeaders, createSession, newSessionId, quiz } from "./helpers";
+import { authHeaders, connectHost, createSession, driveToResults, newSessionId, quiz } from "./helpers";
 
 const put = (id: string, body: unknown, headers: Record<string, string> = authHeaders) =>
   exports.default.fetch(`https://x/api/sessions/${id}`, { method: "PUT", headers, body: JSON.stringify(body) });
@@ -69,6 +69,18 @@ describe("sessions API", () => {
     const res = await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ phaseKey: "lobby", final: false, players: [] });
+  });
+
+  it("ranking の final は results に入ってから true。players は順位つき全員", async () => {
+    const id = newSessionId();
+    await createSession(id);
+    const host = await connectHost(id);
+    await host.next("host_view");
+    const mid = await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
+    expect(await mid.json()).toMatchObject({ phaseKey: "lobby", final: false });
+    await driveToResults(host, id);
+    const done = await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
+    expect(await done.json()).toMatchObject({ phaseKey: "r:list", final: true, players: [] });
   });
 
   it("host WebSocket with wrong token is 401", async () => {

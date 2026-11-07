@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { driveQuiz, type Sock } from "../../src/loadtest/drive";
 import sample from "../../fixtures/sample-quiz.json";
-import { authHeaders, connectGuest, connectHost, connectScreen, newSessionId } from "./helpers";
+import { authHeaders, connectGuest, connectHost, connectScreen, findLast, newSessionId } from "./helpers";
 import { exports } from "cloudflare:workers";
 
 const toSock = (c: Awaited<ReturnType<typeof connectHost>>): Sock => {
@@ -51,14 +51,31 @@ describe("load: 150 guests", () => {
       await new Promise((r) => setTimeout(r, 20));
     }
     expect(screenStages()).toHaveLength(result.advances.length);
-    screen.ws.close();
     console.log(`worst advance ${result.worstMs.toFixed(0)} ms, missing ${result.totalMissing}`);
-    guestClients.forEach((c) => c.ws.close());
-    host.ws.close();
 
     expect(result.advances.length).toBe(sample.questions.length * 3 + 1);
     expect(result.totalMissing).toBe(0);
     expect(result.worstMs).toBeLessThanOrEqual(2000);
     expect(result.pass).toBe(true);
+
+    const rankingView = findLast(
+      host.messages,
+      (m) => m.type === "host_view" && m.view.screen.kind === "ranking",
+    );
+    if (!rankingView || rankingView.type !== "host_view" || rankingView.view.screen.kind !== "ranking") {
+      throw new Error("expected ranking host_view after driveQuiz");
+    }
+    const playerId = rankingView.view.screen.entries[0].playerId;
+    const guestCounts = guestClients.map((c) => c.messages.length);
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId } });
+    await host.next("host_view", (m) => m.view.screen.kind === "ranking_detail");
+    host.send({ type: "results_action", from: `r:${playerId}:hidden`, action: { kind: "show_rank" } });
+    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:rank`);
+    await new Promise((r) => setTimeout(r, 300));
+    guestClients.forEach((c, i) => expect(c.messages.length).toBe(guestCounts[i]));
+
+    screen.ws.close();
+    guestClients.forEach((c) => c.ws.close());
+    host.ws.close();
   }, 60_000);
 });
