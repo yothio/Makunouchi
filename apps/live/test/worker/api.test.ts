@@ -78,8 +78,12 @@ describe("sessions API", () => {
     await host.next("host_view");
     const mid = await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
     expect(await mid.json()).toMatchObject({ phaseKey: "lobby", final: false });
-    await driveToResults(host, id);
-    const done = await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
+    host.send({ type: "advance", from: "lobby" });
+    await host.next("host_view", (m) => m.view.phaseKey === "q:0:open");
+    const question = await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
+    expect(await question.json()).toMatchObject({ phaseKey: "q:0:open", final: false });
+    await driveToResults(host, id, "q:0:open");
+    const done =await exports.default.fetch(`https://x/api/sessions/${id}/ranking`, { headers: authHeaders });
     expect(await done.json()).toMatchObject({ phaseKey: "r:list", final: true, players: [] });
   });
 
