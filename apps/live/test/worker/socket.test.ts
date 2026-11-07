@@ -318,3 +318,76 @@ describe("SessionRoom screen", () => {
     expect((await second.next("screen_view")).view).toEqual(before.view);
   });
 });
+
+describe("SessionRoom answer history", () => {
+  /** Drives the host through `from` keys and waits for the last resulting phase. */
+  const advanceTo = async (host: Awaited<ReturnType<typeof setup>>["host"], steps: [from: string, to: string][]) => {
+    for (const [from, to] of steps) {
+      host.send({ type: "advance", from });
+      await host.next("host_view", (m) => m.view.phaseKey === to);
+    }
+  };
+
+  it("sends the player's history after the reveal, and restores it on reconnect", async () => {
+    const { id, host } = await setup();
+    const { guest, token } = await joinGuest(id, "Taro");
+    await advanceTo(host, [["lobby", "q:0:open"]]);
+    guest.send({ type: "answer", questionIndex: 0, choice: 1 });
+    await guest.next("guest_view", (m) => m.view.kind === "question" && m.view.myChoice === 1);
+    await advanceTo(host, [["q:0:open", "q:0:closed"]]);
+    const closed = await guest.next("guest_view", (m) => m.view.kind === "question" && m.view.status === "closed");
+    expect(closed.view).toMatchObject({ history: [] });
+    await advanceTo(host, [["q:0:closed", "q:0:revealed"]]);
+    const revealed = await guest.next("guest_view", (m) => m.view.kind === "reveal");
+    expect(revealed.view).toMatchObject({ history: [{ index: 0, choice: 1, correct: true }] });
+
+    guest.ws.close();
+    const again = await connectGuest(id, token);
+    const restored = await again.next("guest_view");
+    expect(restored.view).toMatchObject({ kind: "reveal", history: [{ index: 0, choice: 1, correct: true }] });
+  });
+
+  it("shows only earlier questions while the next question is open", async () => {
+    const { id, host } = await setup();
+    const { guest } = await joinGuest(id, "Taro");
+    await advanceTo(host, [
+      ["lobby", "q:0:open"],
+      ["q:0:open", "q:0:closed"],
+      ["q:0:closed", "q:0:revealed"],
+      ["q:0:revealed", "q:1:open"],
+    ]);
+    const open = await guest.next("guest_view", (m) => m.view.kind === "question" && m.view.question.index === 1);
+    expect(open.view).toMatchObject({ status: "open", history: [{ index: 0, choice: null, correct: false }] });
+  });
+
+  it("a late joiner sees the questions before joining as unanswered", async () => {
+    const { id, host } = await setup();
+    await advanceTo(host, [
+      ["lobby", "q:0:open"],
+      ["q:0:open", "q:0:closed"],
+      ["q:0:closed", "q:0:revealed"],
+      ["q:0:revealed", "q:1:open"],
+    ]);
+    const late = await connectGuest(id);
+    await late.next("need_join");
+    late.send({ type: "join", nickname: "Late" });
+    await late.next("joined");
+    const view = await late.next("guest_view");
+    expect(view.view).toMatchObject({ kind: "question", history: [{ index: 0, choice: null, correct: false }] });
+  });
+
+  it("never sends a rank to a participant, even at the end of the results", async () => {
+    const { id, host } = await setup();
+    const { guest } = await joinGuest(id, "Taro");
+    const steps: [string, string][] = [["lobby", "q:0:open"]];
+    for (let i = 0; i < 5; i++) {
+      steps.push([`q:${i}:open`, `q:${i}:closed`], [`q:${i}:closed`, `q:${i}:revealed`]);
+      if (i < 4) steps.push([`q:${i}:revealed`, `q:${i + 1}:open`]);
+    }
+    steps.push(["q:4:revealed", "r:list"]);
+    await advanceTo(host, steps);
+    const pending = await guest.next("guest_view", (m) => m.view.kind === "results_pending");
+    expect(pending.view).toMatchObject({ history: expect.any(Array) });
+    expect(JSON.stringify(guest.messages)).not.toContain('"rank"');
+  });
+});
