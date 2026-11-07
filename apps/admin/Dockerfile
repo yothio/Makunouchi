@@ -1,10 +1,14 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# Cloud Run 向け。PORT（既定 8080）で待ち受ける。手元で試すとき:
-# docker build -t admin .
-# docker run -d -p 8080:8080 -e RAILS_MASTER_KEY=<value from config/master.key> -e DATABASE_URL=... \
-#   -e R2_BUCKET=... -e R2_ENDPOINT=... -e R2_ACCESS_KEY_ID=... -e R2_SECRET_ACCESS_KEY=... --name admin admin
+# Cloud Run 向け。PORT（既定 8080）で待ち受ける。起動時に migrate はしない（README）。
+# Probe は Cloud Run 側で HTTP GET /up を設定する（このファイルに HEALTHCHECK は置かない）。
+# 手元で試すとき:
+#   docker build -t admin .
+#   docker run --rm -p 8080:8080 -e RAILS_MASTER_KEY=... -e DATABASE_URL=... \
+#     -e R2_BUCKET=... -e R2_ENDPOINT=... -e R2_ACCESS_KEY_ID=... -e R2_SECRET_ACCESS_KEY=... \
+#     -e ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=... -e ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=... \
+#     -e ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=... --name admin admin
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
