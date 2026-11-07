@@ -8,3 +8,8 @@ organizer:
   email: organizer@example.com
   password_digest: <%= digest %>
   role: organizer
+
+other_organizer:
+  email: other@example.com
+  password_digest: <%= digest %>
+  role: organizer

@@ -1,0 +1,6 @@
+<% content_for :title, "質問解答の作成" %>
+<main>
+  <h1>質問解答の作成</h1>
+  <%= render "form", question: @question, url: organizer_questions_path %>
+  <p><%= link_to "一覧へ戻る", organizer_questions_path %></p>
+</main>

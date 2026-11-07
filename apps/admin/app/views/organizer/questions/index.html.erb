@@ -1,0 +1,23 @@
+<% content_for :title, "質問解答の一覧" %>
+<main>
+  <h1>質問解答の一覧</h1>
+
+  <% if notice %>
+    <p class="notice" role="status"><%= notice %></p>
+  <% end %>
+
+  <p><%= link_to "新規作成", new_organizer_question_path %></p>
+
+  <ol class="questions">
+    <% @questions.each do |question| %>
+      <li class="question">
+        <%= link_to question.title, edit_organizer_question_path(question) %>
+        （正解: <%= %w[A B C D][question.correct_index] %>）
+        <%= button_to "削除", organizer_question_path(question), method: :delete,
+              form: { data: { turbo_confirm: "この問題を削除しますか？" } } %>
+      </li>
+    <% end %>
+  </ol>
+
+  <p><%= link_to "トップへ戻る", root_path %></p>
+</main>

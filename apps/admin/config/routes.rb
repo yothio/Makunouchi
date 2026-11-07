@@ -9,5 +9,9 @@ Rails.application.routes.draw do
     resources :organizers, only: %i[new create]
   end
 
+  namespace :organizer do
+    resources :questions, except: :show
+  end
+
   root "organizer/home#show"
 end

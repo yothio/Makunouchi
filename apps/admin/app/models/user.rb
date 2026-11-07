@@ -1,6 +1,9 @@
 class User < ApplicationRecord
   has_secure_password
 
+  # 主催者 1 人につき問題セットは 1 つ。出題順は作成順（id 昇順）。
+  has_many :questions, -> { order(:id) }, dependent: :destroy
+
   enum :role, { system_admin: "system_admin", organizer: "organizer" }, validate: true
 
   normalizes :email, with: ->(email) { email.strip.downcase }

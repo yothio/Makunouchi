@@ -2,5 +2,9 @@
 <main>
   <h1>管理画面</h1>
   <p><%= current_user.email %> でログイン中です。</p>
+
+  <p class="question-count">質問解答の数: <%= @question_count %> 問</p>
+  <p><%= link_to "質問解答の一覧へ", organizer_questions_path %></p>
+
   <%= button_to "ログアウト", session_path, method: :delete %>
 </main>
