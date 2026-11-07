@@ -75,24 +75,25 @@ apps/live/
 
 ---
 
-### Task 1: 投影画面用のトークン
+### Task 1: 投影画面用のトークンと、開催回 ID の形式検証
 
 **Files:**
-- Modify: `apps/live/src/worker/auth.ts`
-- Test: `apps/live/test/game/auth.test.ts`
+- Modify: `apps/live/src/worker/auth.ts`, `apps/live/src/worker/index.ts`（`PUT /api/sessions/:sessionId` の ID 検証）
+- Test: `apps/live/test/game/auth.test.ts`, `apps/live/test/worker/api.test.ts`
 
 **Interfaces:**
-- Produces: `screenTokenFor(secret: string, sessionId: string): Promise<string>` — `HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)` の hex（64 文字）。`hostTokenFor` と同じく、秘密が短ければ例外を投げる。`"screen:"` を前置するので、`hostTokenFor` の入力（UUID の開催回 ID）とは決して一致しない。Rails も同じ計算をする。
+- Produces:
+  - `screenTokenFor(secret: string, sessionId: string): Promise<string>` — `HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)` の hex（64 文字）。`hostTokenFor` と同じく、秘密が短ければ例外を投げる。Rails も同じ計算をする。
+  - `isValidSessionId(id: string): boolean` — `/^[A-Za-z0-9_-]{1,100}$/` に一致するか。`PUT /api/sessions/:sessionId` で、一致しなければ `400 { error: "invalid_session_id" }`（作成しない）。Rails が発行する UUID と、テストの ID（`session-<ts>-<n>-<uuid>`）は一致する。
+- 取り違えを防ぐ根拠（正確に書く）: `hostTokenFor` の入力は開催回 ID そのもの、`screenTokenFor` の入力は `"screen:" + ID`。**開催回 ID に `:` を許さない**ので、`screen:` で始まる ID の開催回は作れず、ある開催回の幹事トークンが別の開催回の投影画面トークンと一致することはない。これは ID 形式の検証が前提であって、`"screen:"` を前置しただけで成り立つわけではない。
 
 - [ ] **Step 1: 失敗するテストを書く**
-  - 「64 文字の hex で、同じ入力なら同じ値」
-  - 「同じ開催回でも `screenTokenFor(secret, id) !== hostTokenFor(secret, id)`」
-  - 「開催回が違えば値も違う」
-  - 「短い秘密は例外（`hostTokenFor` と同じメッセージ）」
-- [ ] **Step 2: 実行して失敗を確認** — `cd apps/live && pnpm exec vitest run test/game/auth.test.ts`。Expected: FAIL（`screenTokenFor` が未定義）。
-- [ ] **Step 3: 実装** — `auth.ts` に `screenTokenFor` を追加（既存の `hmacHex` と `isUsableSecret` を使う）。
-- [ ] **Step 4: 実行して成功を確認** — 同じコマンド。Expected: PASS。
-- [ ] **Step 5: Commit** — `feat(live): 投影画面用の派生トークンを追加`
+  - `auth.test.ts`: 「64 文字の hex で、同じ入力なら同じ値」「同じ開催回でも `screenTokenFor(secret, id) !== hostTokenFor(secret, id)`」「開催回が違えば値も違う」「短い秘密は例外（`hostTokenFor` と同じメッセージ）」「`isValidSessionId`: UUID・`session-1-2-abc` は真、`screen:abc`・空文字・101 文字・`a/b`・空白入りは偽」
+  - `api.test.ts`: 「`PUT /api/sessions/screen:abc` は 400 `invalid_session_id` で、開催回は作られない（`/ranking` が 404）」「UUID の ID では従来どおり 201」
+- [ ] **Step 2: 実行して失敗を確認** — `cd apps/live && pnpm exec vitest run test/game/auth.test.ts` と `pnpm exec vitest run --config vitest.workers.config.ts test/worker/api.test.ts`。Expected: FAIL（`screenTokenFor` / `isValidSessionId` が未定義、400 にならない）。
+- [ ] **Step 3: 実装** — `auth.ts` に `screenTokenFor` と `isValidSessionId` を追加（既存の `hmacHex` と `isUsableSecret` を使う）。`index.ts` の `PUT` ハンドラの先頭で ID を検証する。
+- [ ] **Step 4: 実行して成功を確認** — 同じ 2 コマンドと `pnpm typecheck`。Expected: PASS。
+- [ ] **Step 5: Commit** — `feat(live): 投影画面用の派生トークンと開催回 ID の形式検証を追加`
 
 ---
 
@@ -141,7 +142,7 @@ apps/live/
 **Interfaces:**
 - Consumes: `screenTokenFor`（Task 1）、`screenView`（Task 2）。
 - Produces:
-  - `role.ts`: `export type Role = "host" | "screen" | "guest"`（`ROLE_HEADER` は今のまま）。
+  - `role.ts`: **`Role` 型を新設**する（今の `role.ts` には `ROLE_HEADER` 定数しかない）: `export type Role = "host" | "screen" | "guest"`。`index.ts` と `session-room.ts` の role の文字列比較をこの型で書く。`ROLE_HEADER` は今のまま。
   - `index.ts`: `GET /ws/:sessionId/screen?token=...` を `host` と同様に `requireAdminSecret` で守り、`screenTokenFor` と比較する。`host` は `hostTokenFor` のまま。role は Worker が決めて `ROLE_HEADER` に入れる（クライアントの値は上書き）。
   - `session-room.ts`: `Attachment = { role: "host" } | { role: "screen" } | GuestAttachment`。接続時に `screen_view` を 1 通送る。`screen` から届くメッセージはすべて無視。
   - `deliver()` の送り先（コメントの表もこれに合わせて更新）:
@@ -178,12 +179,15 @@ apps/live/
 
 ---
 
-### Task 4: 投影画面のクライアント（`/screen/:id`）
+### Task 4: 投影画面（`/screen/:id`）の追加と、幹事画面の作り直し（1 タスク・1 コミット）
+
+> 部品の移動（`host/screens/*` → `screen/`）と `buildHostUrl` の移動は、`HostScreen.tsx` と `useHostSession.ts` の import を同時に直さないと typecheck が落ちる。そのため、投影画面のクライアントと幹事画面の作り直しを**分けずに 1 つのタスク**にし、typecheck と目視の確認は最後にまとめて行う（途中でコミットしない）。
 
 **Files:**
-- Create: `apps/live/src/client/token-store.ts`, `apps/live/src/client/socket-url.ts`, `apps/live/src/client/screen/ScreenApp.tsx`, `apps/live/src/client/screen/ScreenContent.tsx`, `apps/live/src/client/screen/useScreenSession.ts`
+- Create: `apps/live/src/client/token-store.ts`, `apps/live/src/client/socket-url.ts`, `apps/live/src/client/screen/ScreenApp.tsx`, `apps/live/src/client/screen/ScreenContent.tsx`, `apps/live/src/client/screen/useScreenSession.ts`, `apps/live/src/client/host/HostPanel.tsx`
 - Move（`git mv`）: `host/screens/{LobbyScreen,QuestionScreen,RevealScreen,PodiumScreen}.tsx` → `screen/screens/`、`host/{FittedList.tsx,useFitToBox.ts,QuestionBlock.tsx}` → `screen/`。型 `HostScreenOf` は `ScreenView` 用の `ScreenOf<K>` を `screen/types.ts` に作って置き換える。
-- Modify: `apps/live/src/client/main.tsx`（ルーティングとトークン処理）, `apps/live/src/client/host/host-action.ts`（`buildHostUrl` を `socket-url.ts` へ）
+- Delete: `apps/live/src/client/host/HostScreen.tsx`（`HostPanel` に置き換え）
+- Modify: `apps/live/src/client/main.tsx`（ルーティングとトークン処理）, `apps/live/src/client/host/HostApp.tsx`, `apps/live/src/client/host/useHostSession.ts`, `apps/live/src/client/host/host-action.ts`（`buildHostUrl` を `socket-url.ts` へ）, `apps/live/scripts/seed-session.ts`, `apps/live/README.md`, `CLAUDE.md`
 - Test: `apps/live/test/client/token-store.test.ts`, `apps/live/test/client/socket-url.test.ts`, `apps/live/test/client/host-action.test.ts`
 
 **Interfaces:**
@@ -199,47 +203,43 @@ apps/live/
   - `host-action.test.ts`: 既存の `buildHostUrl` のテストを `buildSocketUrl` に移す。
 - [ ] **Step 2: 実行して失敗を確認** — `pnpm exec vitest run test/client`。Expected: FAIL（モジュールがない）。
 - [ ] **Step 3: 実装** — 純関数 2 つを実装。画面部品を移し、`ScreenApp` / `ScreenContent` / `useScreenSession` を作る。`main.tsx` の `Router` は `parts[0] === "screen"` で `ScreenApp` を返し、`resolveHostToken` は `resolveToken` の呼び出しに置き換える。投影画面の「回答済み n / m 人」は出さない（`QuestionScreen` から外す）。
-- [ ] **Step 4: 実行して成功を確認** — `pnpm test && pnpm typecheck && pnpm lint`。Expected: PASS。
-- [ ] **Step 5: 目視確認** — `cp .dev.vars.sample .dev.vars && pnpm dev` を起動し、`pnpm seed http://localhost:5173`（Task 5 の後に URL が出る。Task 5 より先に確認するなら `curl` で `PUT` して手で URL を組み立てる）で作った開催回に、投影画面を開いて「参加用 QR と人数 → 問題 → 正解発表」が映り、操作ボタンがないことを確認する。
-- [ ] **Step 6: Commit** — `feat(live): 投影画面（/screen/:id）を追加`
+- **幹事画面の作り直し**（同じタスクの続き）:
+  - Consumes: `buildSocketUrl`、`resolveToken`（上で作ったもの）。`HostView` は変えない。
+  - Produces: `HostPanel({ view }: { view: HostView | null })` — 幹事が見る小さな状態表示。`view.screen.kind` の `switch` で次を返す（装飾は最小限。大きな文字・QR・棒グラフは投影画面の役割）:
+    - `lobby`: タイトル、参加人数
+    - `question`: 何問目（`question.index + 1` / `total`）、問題文、選択肢、`回答済み answeredCount / playerCount 人`
+    - `reveal`: 何問目、問題文、正解の選択肢、選択肢ごとの回答人数（`counts`）
+    - `list` / `podium`: 今の `list` / `podium` の内容を文字で並べる（計画 2 で作り直す）
+  - `useHostSession` は URL 生成を `buildSocketUrl(window.location, "host", ...)` にする。進行ボタン（`hostActionLabel` / `AdvanceGate`）は今のまま。
 
----
-
-### Task 5: 幹事画面を操作用に作り直す・文書とスクリプトの更新
-
-**Files:**
-- Modify: `apps/live/src/client/host/HostApp.tsx`, `apps/live/src/client/host/useHostSession.ts`
-- Create: `apps/live/src/client/host/HostPanel.tsx`
-- Delete: `apps/live/src/client/host/HostScreen.tsx`（`HostPanel` に置き換え）
-- Modify: `apps/live/src/client/host/host-action.ts`, `apps/live/scripts/seed-session.ts`, `apps/live/README.md`, `CLAUDE.md`
-- Test: `apps/live/test/client/host-action.test.ts`
-
-**Interfaces:**
-- Consumes: `buildSocketUrl`、`resolveToken`（Task 4）。`HostView` は変えない。
-- Produces: `HostPanel({ view }: { view: HostView | null })` — 幹事が見る小さな状態表示。`view.screen.kind` の `switch` で次を返す（装飾は最小限。大きな文字・QR・棒グラフは投影画面の役割）:
-  - `lobby`: タイトル、参加人数
-  - `question`: 何問目（`question.index + 1` / `total`）、問題文、選択肢、`回答済み answeredCount / playerCount 人`
-  - `reveal`: 何問目、問題文、正解の選択肢、選択肢ごとの回答人数（`counts`）
-  - `list` / `podium`: 今の `list` / `podium` の内容を文字で並べる（計画 2 で作り直す）
-- `useHostSession` は URL 生成を `buildSocketUrl(window.location, "host", ...)` にする。進行ボタン（`hostActionLabel` / `AdvanceGate`）は今のまま。
-
-- [ ] **Step 1: 失敗するテストを書く** — `host-action.test.ts`: `hostActionLabel` は変えない（既存テストが通り続けること）。`seed-session.ts` を純関数に切り出す必要はない（URL の組み立て 2 行）。幹事画面のコンポーネントの見た目にテストは書かない。
-- [ ] **Step 2: 実装** — `HostScreen` を `HostPanel` に置き換える。`HostApp` は `useHostSession` の結果から、再接続バナー・`HostPanel`・進行ボタンを並べるだけ。`seed-session.ts` は次の 3 行を出す: `ゲスト URL`、`幹事画面 URL: /host/<id>?token=<hostToken>`、`投影画面 URL: /screen/<id>?token=<screenToken>`（`screenTokenFor` を使う）。`README.md` と `CLAUDE.md` の「`/host/:id`（投影画面兼進行操作）」の記述、`GET /ws/:id/host?token=...` の節に `screen` を足す。
-- [ ] **Step 3: 全体を確認** — `pnpm test && pnpm typecheck && pnpm lint`。Expected: PASS。続けて `pnpm dev` と `pnpm seed` で、幹事画面（ボタン操作）と投影画面（別タブ）が連動して切り替わること、幹事画面に QR や大きな表示がないことを目視する。
-- [ ] **Step 4: Commit** — `feat(live): 幹事画面を操作用に作り直し、seed が両方の URL を表示`
+- [ ] **Step 4: 幹事画面を実装する** — `HostScreen` を `HostPanel` に置き換える。`HostApp` は `useHostSession` の結果から、再接続バナー・`HostPanel`・進行ボタンを並べるだけ。`hostActionLabel` のテストは変えない（既存テストが通り続けること）。幹事画面の見た目にテストは書かない。
+- [ ] **Step 5: スクリプトと文書を更新する** — `seed-session.ts` は次の 3 行を出す: `ゲスト URL`、`幹事画面 URL: /host/<id>?token=<hostToken>`、`投影画面 URL: /screen/<id>?token=<screenToken>`（`screenTokenFor` を使う。URL の組み立て 2 行なので純関数には切り出さない）。`README.md` と `CLAUDE.md` の「`/host/:id`（投影画面兼進行操作）」の記述、`GET /ws/:id/host?token=...` の節に `screen` を足す。
+- [ ] **Step 6: 実行して成功を確認** — `pnpm test && pnpm typecheck && pnpm lint`。Expected: PASS（旧ファイルへの import が残っていないこと。残っていれば typecheck が落ちる）。
+- [ ] **Step 7: 目視確認** — `cp .dev.vars.sample .dev.vars && pnpm dev` を起動し、`pnpm seed http://localhost:5173` が出した幹事画面 URL・投影画面 URL を別タブで開く。幹事画面のボタンで「参加用 QR と人数 → 問題 → 正解発表」が投影画面に連動して映ること、投影画面に操作ボタンがないこと、幹事画面に QR や大きな表示がないことを確認する。
+- [ ] **Step 8: Commit** — `feat(live): 投影画面（/screen/:id）を追加し、幹事画面を操作用に作り直す`
 
 ---
 
 ## ユーザーに確認すること
 
-1. **投影画面の認証**（既定は B）
+1. **投影画面の認証**
    - A. 認証なし（ゲストと同じ）。URL を知っている人は誰でも開ける。投影画面に出る内容は会場に映す内容だけなので漏れて困る情報は少ないが、第三者が接続数を増やせる。
-   - **B. 幹事とは別の派生トークン（推奨）**: `HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`。投影画面用の PC に残るのは読み取り専用の資格情報だけで、操作側（幹事トークン）には使えない。実装は `screenTokenFor` 1 つで、Rails も同じ計算をする。
+   - **B. 幹事とは別の派生トークン（推奨）**: `HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`。投影画面用の PC に残るのは読み取り専用の資格情報だけで、操作側（幹事トークン）には使えない。実装は `screenTokenFor` 1 つと開催回 ID の形式検証（Task 1）で、Rails も同じ計算をする。
    - C. 幹事のトークンをそのまま使う。実装は最小だが、会場の PC に操作権限つきのトークンが残る。
-2. **投影画面の URL**: `/screen/:id`（推奨。幹事画面の `/host/:id` と対になる）か、`/projector/:id` か。
-3. **投影画面に「回答済み n / m 人」を出すか**（既定は出さない）。要件では回答人数は幹事画面の表示（`UI作成.md` の問題表示画面）で、投影画面には問題と結果を映す。出す場合は `answer_recorded` でも投影画面に送ることになり、回答のたびに 1 通増える（120 人で 120 通）。
-4. （情報）幹事画面から投影画面の URL を開けるようにはしない。URL は `seed`（将来は Rails）が発行して、投影画面用の PC で直接開く。
+2. **投影画面の URL**
+   - **A. `/screen/:id`（推奨）**: 幹事画面の `/host/:id` と対になり、WebSocket の role 名（`screen`）と揃う。
+   - B. `/projector/:id`: 「プロジェクター」と直感的に分かるが、role 名と URL がずれる。
+3. **投影画面に「回答済み n / m 人」を出すか**
+   - **A. 出さない（推奨）**: 要件では回答人数は幹事画面の表示（`UI作成.md` の問題表示画面）で、投影画面には問題と結果を映す。回答のたびに投影画面へ送らずに済む。
+   - B. 出す: `answer_recorded` でも投影画面に送ることになり、回答のたびに 1 通増える（120 人で 120 通）。
+4. **幹事画面に投影画面の URL を表示するか**
+   - **A. 表示しない（推奨）**: URL は `seed`（将来は Rails）が発行し、投影画面用の PC で直接開く。幹事画面にトークンつき URL を出さずに済む。
+   - B. 幹事画面に「投影画面を開く」リンクを出す: 手元で URL を渡しやすいが、`HostView` に投影画面トークンを載せる変更が要る（作業量 +1 時間程度）。
 
 ## 作業量の見積もり
 
-約 4〜6 時間。Task 1: 20 分、Task 2: 45 分、Task 3: 1.5〜2 時間（Workers テストが多い）、Task 4: 1.5 時間（部品の移動とトークン処理）、Task 5: 1 時間。計画 2 がこの上に乗るので、先にここを安定させる。
+約 4〜6 時間。Task 1: 30 分（ID 検証を含む）、Task 2: 45 分、Task 3: 1.5〜2 時間（Workers テストが多い）、Task 4: 2〜2.5 時間（部品の移動、トークン処理、幹事画面の作り直し、目視）。計画 2 がこの上に乗るので、先にここを安定させる。
+
+## 各タスクの終わりの状態
+
+Task 1〜4 のコミットは、いずれも `pnpm test && pnpm typecheck && pnpm lint` が通る状態で終わる（Task 4 を分けないのはこのため）。
