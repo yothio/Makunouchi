@@ -56,16 +56,13 @@ describe("rankPlayers", () => {
     const s = make([7, 6, 5, 4, 3, 2, 1]);
     expect(listEntries(rankPlayers(s)).map((x) => x.rank)).toEqual([4, 5, 6, 7]);
   });
-  test("listEntries: 1 位が 3 人で 4 位が 1 人なら、4 位の 1 人だけ", () => {
-    const s = make([9, 9, 9, 7]);
-    expect(listEntries(rankPlayers(s)).map((x) => x.rank)).toEqual([4]);
-  });
   test("同点で rank が 1 位から 4 位に飛ぶと、2 位・3 位の枠は空", () => {
     const s = make([9, 9, 9, 7]);
     expect(podiumHasPlayers(rankPlayers(s), 1)).toBe(true);
     expect(podiumHasPlayers(rankPlayers(s), 2)).toBe(false);
     expect(podiumHasPlayers(rankPlayers(s), 3)).toBe(false);
     expect(podiumPlayers(rankPlayers(s), 1)).toHaveLength(3);
+    expect(listEntries(rankPlayers(s)).map((x) => x.rank)).toEqual([4]);
   });
   test("isFinal: 0 人の list は true、1 人の list は false", () => {
     expect(isFinalOf(make([]))).toBe(true);

@@ -140,7 +140,7 @@ describe("joinPlayer", () => {
 });
 
 describe("scoreOf", () => {
-  test("点数は正解数。closed の問題を数えず、revealed になって初めて加点（配点が 10 と 30 の旧データでも 1 問 1 点）", () => {
+  test("点数は正解数。closed の問題を数えず、revealed になって初めて加点", () => {
     let s = walk(withPlayer(), 1);
     s = ok(submitAnswer(s, "p1", 0, 1)); // correct
     s = walk(s, 1); // closed
