@@ -66,8 +66,7 @@ describe("quizPayloadSchema", () => {
     const result = quizPayloadSchema.safeParse(payload());
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(Object.keys(result.data).toSorted()).toEqual(["questions", "title"]);
-    expect(Object.keys(result.data.questions[0]).toSorted()).toEqual(["choices", "correctIndex", "imageUrl", "title"]);
+    expect(result.data).toEqual(payload());
   });
   test("imageUrl は https か null", () => {
     const ok = (v: unknown) =>
