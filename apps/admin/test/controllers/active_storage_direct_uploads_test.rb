@@ -79,4 +79,24 @@ class ActiveStorageDirectUploadsTest < ActionDispatch::IntegrationTest
 
     assert_response :unauthorized
   end
+
+  test "blob が文字列・配列・欠落でも 500 にならず 422" do
+    sign_in_as users(:organizer)
+
+    [ { blob: "abc" }, { blob: [ "x" ] }, {}, { blob: { content_type: "image/png" } } ].each do |payload|
+      post rails_direct_uploads_path, params: payload, as: :json
+      assert_response :unprocessable_entity, payload.inspect
+    end
+  end
+
+  test "filename と checksum が欠けていても 500 にならず 422" do
+    sign_in_as users(:organizer)
+
+    %i[filename checksum].each do |key|
+      params = blob_params
+      params[:blob].delete(key)
+      post rails_direct_uploads_path, params: params, as: :json
+      assert_response :unprocessable_entity, key.to_s
+    end
+  end
 end

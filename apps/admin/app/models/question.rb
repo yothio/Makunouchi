@@ -9,6 +9,9 @@ class Question < ApplicationRecord
   # 開催回に取り込んだスナップショットが画像の URL を持つため。
   has_one_attached :image, dependent: false
 
+  # 空白だけの入力は、前後の空白を取り除いたあとの長さの検証で弾く。
+  normalizes :title, *CHOICE_COLUMNS, with: ->(value) { value.strip }
+
   validates :title, length: { in: 1..200 }
   validates(*CHOICE_COLUMNS, length: { in: 1..50 })
   validates :correct_index, numericality: { only_integer: true, in: 0..3 }

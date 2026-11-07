@@ -18,12 +18,19 @@ module DirectUploadGuard
 
   def require_acceptable_blob
     blob = params[:blob]
-    content_type = blob.respond_to?(:[]) ? blob[:content_type].to_s : ""
-    byte_size = blob.respond_to?(:[]) ? blob[:byte_size].to_s : ""
+    # blob が文字列・配列・欠落でも、filename / checksum が無くても、Rails 本体が 500 を出す前に 422 にする。
+    return render_unacceptable unless blob.is_a?(ActionController::Parameters)
+    return render_unacceptable unless blob[:filename].is_a?(String) && blob[:filename].present?
+    return render_unacceptable unless blob[:checksum].is_a?(String) && blob[:checksum].present?
 
-    unless Question::IMAGE_CONTENT_TYPES.include?(content_type) && byte_size.match?(/\A\d+\z/) && byte_size.to_i <= Question::IMAGE_MAX_BYTES
-      render json: { error: "画像（png / jpeg / webp / gif、#{Question::IMAGE_MAX_BYTES / 1.megabyte} MB 以下）だけアップロードできます。" },
-             status: :unprocessable_entity
-    end
+    content_type = blob[:content_type].to_s
+    byte_size = blob[:byte_size].to_s
+    return render_unacceptable unless Question::IMAGE_CONTENT_TYPES.include?(content_type)
+    return render_unacceptable unless byte_size.match?(/\A\d+\z/) && byte_size.to_i <= Question::IMAGE_MAX_BYTES
+  end
+
+  def render_unacceptable
+    render json: { error: "画像（png / jpeg / webp / gif、#{Question::IMAGE_MAX_BYTES / 1.megabyte} MB 以下）だけアップロードできます。" },
+           status: :unprocessable_entity
   end
 end

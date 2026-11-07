@@ -24,6 +24,16 @@ class QuestionTest < ActiveSupport::TestCase
     assert build(choice_a: "あ" * 50).valid?
   end
 
+  test "空白だけのタイトル・選択肢は無効。前後の空白は取り除いて保存する" do
+    assert_not build(title: "   ").valid?
+    assert_not build(choice_a: " ").valid?
+
+    question = build(title: "  問題  ", choice_b: " B ")
+    question.save!
+    assert_equal "問題", question.reload.title
+    assert_equal "B", question.choice_b
+  end
+
   test "choices は A〜D の順の配列" do
     assert_equal %w[カレー ラーメン 寿司 ハンバーグ], questions(:first).choices
   end
