@@ -74,7 +74,7 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .host-results-wait { text-align: center; padding-top: 18vh; }
 .host-rank-reveal { text-align: center; padding-top: 12vh; }
 .host-rank-big { font-size: 4em; font-weight: 800; margin: 0.1em 0; color: #f0b27a; }
-.host-name-big { font-size: 3em; font-weight: 800; margin: 0.2em 0; }
+.host-name-big { font-size: 3em; font-weight: 800; margin: 0.2em 0; text-wrap: balance; }
 
 /* Participant's own answers so far (shown while waiting) */
 .history { list-style: none; margin: 20px auto 0; padding: 0; max-width: 320px; max-height: 40vh; overflow-y: auto; text-align: left; }
