@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { hostTokenFor } from "../../src/worker/auth";
+import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
 import { authHeaders, createSession, newSessionId, quiz } from "./helpers";
 
 const put = (id: string, body: unknown, headers: Record<string, string> = authHeaders) =>
@@ -22,6 +22,18 @@ describe("sessions API", () => {
     const id = newSessionId();
     expect((await createSession(id)).status).toBe(201);
     expect((await createSession(id)).status).toBe(409);
+  });
+
+  it("PUT with a session id containing ':' is 400 invalid_session_id and creates nothing", async () => {
+    const res = await put("screen:abc", quiz);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_session_id" });
+    const ranking = await exports.default.fetch("https://x/api/sessions/screen:abc/ranking", { headers: authHeaders });
+    expect(ranking.status).toBe(404);
+  });
+
+  it("PUT with a UUID session id is 201", async () => {
+    expect((await put(crypto.randomUUID(), quiz)).status).toBe(201);
   });
 
   it("invalid payload is 422 with issues", async () => {
@@ -73,6 +85,37 @@ describe("sessions API", () => {
     expect(res.status).toBe(401);
   });
 
+  it("screen WebSocket without a token or with a wrong token is 401", async () => {
+    const id = newSessionId();
+    await createSession(id);
+    const none = await exports.default.fetch(`https://x/ws/${id}/screen`, { headers: { Upgrade: "websocket" } });
+    expect(none.status).toBe(401);
+    const bad = await exports.default.fetch(`https://x/ws/${id}/screen?token=bad`, { headers: { Upgrade: "websocket" } });
+    expect(bad.status).toBe(401);
+  });
+
+  it("the host token cannot open the screen, and the screen token cannot open the host", async () => {
+    const id = newSessionId();
+    await createSession(id);
+    const hostToken = await hostTokenFor(env.ADMIN_API_SECRET, id);
+    const screenToken = await screenTokenFor(env.ADMIN_API_SECRET, id);
+    const screenWithHostToken = await exports.default.fetch(`https://x/ws/${id}/screen?token=${hostToken}`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(screenWithHostToken.status).toBe(401);
+    const hostWithScreenToken = await exports.default.fetch(`https://x/ws/${id}/host?token=${screenToken}`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(hostWithScreenToken.status).toBe(401);
+  });
+
+  it("WebSocket to an invalid session id is 404 for every role", async () => {
+    for (const role of ["host", "screen", "guest"]) {
+      const res = await exports.default.fetch(`https://x/ws/screen:abc/${role}?token=x`, { headers: { Upgrade: "websocket" } });
+      expect(res.status).toBe(404);
+    }
+  });
+
   it("WebSocket to uncreated session is 404", async () => {
     const id = newSessionId();
     const token = await hostTokenFor(env.ADMIN_API_SECRET, id);
@@ -80,6 +123,9 @@ describe("sessions API", () => {
     expect(host.status).toBe(404);
     const guest = await exports.default.fetch(`https://x/ws/${id}/guest`, { headers: { Upgrade: "websocket" } });
     expect(guest.status).toBe(404);
+    const screenToken = await screenTokenFor(env.ADMIN_API_SECRET, id);
+    const screen = await exports.default.fetch(`https://x/ws/${id}/screen?token=${screenToken}`, { headers: { Upgrade: "websocket" } });
+    expect(screen.status).toBe(404);
   });
 
   it("hostTokenFor is deterministic hex of 64 chars", async () => {

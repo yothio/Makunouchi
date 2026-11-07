@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { ADVANCE_COOLDOWN_MS, ADVANCE_LOCK_MS, AdvanceGate, buildHostUrl, hostActionLabel, listHeader } from "../../src/client/host/host-action";
+import { ADVANCE_COOLDOWN_MS, ADVANCE_LOCK_MS, AdvanceGate, hostActionLabel } from "../../src/client/host/host-action";
+import { listHeader } from "../../src/client/screen/list-header";
 import type { HostView } from "../../src/shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
@@ -32,13 +33,6 @@ describe("listHeader", () => {
     expect(listHeader([])).toBe("4 位以下はいません");
     expect(listHeader([{ rank: 4, nickname: "a", score: 1 }, { rank: 6, nickname: "b", score: 0 }])).toBe("4 位〜6 位");
     expect(listHeader([{ rank: 5, nickname: "a", score: 1 }, { rank: 5, nickname: "b", score: 1 }, { rank: 7, nickname: "c", score: 0 }])).toBe("5 位〜7 位");
-  });
-});
-
-describe("buildHostUrl", () => {
-  test("ws/wss with token", () => {
-    expect(buildHostUrl({ protocol: "https:", host: "x.dev" }, "s 1", "tk")).toBe("wss://x.dev/ws/s%201/host?token=tk");
-    expect(buildHostUrl({ protocol: "http:", host: "localhost:5173" }, "s", "a/b")).toBe("ws://localhost:5173/ws/s/host?token=a%2Fb");
   });
 });
 

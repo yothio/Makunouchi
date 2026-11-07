@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { driveQuiz, type Sock } from "../../src/loadtest/drive";
 import sample from "../../fixtures/sample-quiz.json";
-import { authHeaders, connectGuest, connectHost, newSessionId } from "./helpers";
+import { authHeaders, connectGuest, connectHost, connectScreen, newSessionId } from "./helpers";
 import { exports } from "cloudflare:workers";
 
 const toSock = (c: Awaited<ReturnType<typeof connectHost>>): Sock => {
@@ -23,6 +23,7 @@ describe("load: 150 guests", () => {
     expect(put.status).toBe(201);
 
     const host = await connectHost(id);
+    const screen = await connectScreen(id);
     // Register message handlers (inside driveQuiz) before any guest message can
     // arrive: connect() has already accepted the sockets, so buffer via replay.
     const guestClients = await Promise.all(Array.from({ length: 150 }, () => connectGuest(id)));
@@ -43,6 +44,14 @@ describe("load: 150 guests", () => {
       guests: guestClients.map(replay),
       log: (l) => console.log(l),
     });
+    // The projector gets one screen_view per advance. Wait for them instead of sleeping a fixed time.
+    const screenStages = () => screen.messages.flatMap((m) => (m.type === "screen_view" && m.view.kind !== "lobby" ? [m.view] : []));
+    const deadline = Date.now() + 5000;
+    while (screenStages().length < result.advances.length && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(screenStages()).toHaveLength(result.advances.length);
+    screen.ws.close();
     console.log(`worst advance ${result.worstMs.toFixed(0)} ms, missing ${result.totalMissing}`);
     guestClients.forEach((c) => c.ws.close());
     host.ws.close();
