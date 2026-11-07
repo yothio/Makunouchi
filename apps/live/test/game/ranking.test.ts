@@ -4,11 +4,10 @@ import { createGameState, joinPlayer } from "../../src/worker/game/state";
 import type { GameState } from "../../src/worker/game/types";
 import { isFinal, listEntries, podiumHasPlayers, podiumPlayers, rankPlayers } from "../../src/worker/game/ranking";
 
-const make = (scores: number[], topN = 10): GameState => {
+const make = (scores: number[]): GameState => {
   const quiz: QuizPayload = {
     title: "T",
-    topN,
-    questions: [{ title: "q", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 0, points: 1 }],
+    questions: [{ title: "q", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 0 }],
   };
   let s = createGameState(quiz);
   scores.forEach((_, i) => {
@@ -19,7 +18,7 @@ const make = (scores: number[], topN = 10): GameState => {
   // Inject scores via per-player answers on question 0 is limited to 1 point; use many questions instead.
   const max = Math.max(0, ...scores);
   const questions = Array.from({ length: max }, (_, i) => ({
-    title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
+    title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
   }));
   return {
     ...s,

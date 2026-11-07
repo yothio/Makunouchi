@@ -7,10 +7,9 @@ import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Tran
 
 const quiz: QuizPayload = {
   title: "T",
-  topN: 10,
   questions: [
-    { title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 1, points: 10 },
-    { title: "q1", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 2, points: 30 },
+    { title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 1 },
+    { title: "q1", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 2 },
   ],
 };
 
@@ -176,10 +175,10 @@ describe("scoreOf", () => {
 describe("results progression", () => {
   const resultsState = (scores: number[]): GameState => {
     const qs = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
-      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
+      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
     }));
     return {
-      quiz: { title: "T", topN: 10, questions: qs },
+      quiz: { title: "T", questions: qs },
       phase: { type: "results", stage: { kind: "list" } },
       players: scores.map((sc, i) => ({
         id: `id${i}`, token: `t${i}`, nickname: `p${i}`,
