@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { hostTokenFor } from "../../src/worker/auth";
+import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
 import { authHeaders, createSession, newSessionId, quiz } from "./helpers";
 
 const put = (id: string, body: unknown, headers: Record<string, string> = authHeaders) =>
@@ -85,6 +85,30 @@ describe("sessions API", () => {
     expect(res.status).toBe(401);
   });
 
+  it("screen WebSocket without a token or with a wrong token is 401", async () => {
+    const id = newSessionId();
+    await createSession(id);
+    const none = await exports.default.fetch(`https://x/ws/${id}/screen`, { headers: { Upgrade: "websocket" } });
+    expect(none.status).toBe(401);
+    const bad = await exports.default.fetch(`https://x/ws/${id}/screen?token=bad`, { headers: { Upgrade: "websocket" } });
+    expect(bad.status).toBe(401);
+  });
+
+  it("the host token cannot open the screen, and the screen token cannot open the host", async () => {
+    const id = newSessionId();
+    await createSession(id);
+    const hostToken = await hostTokenFor(env.ADMIN_API_SECRET, id);
+    const screenToken = await screenTokenFor(env.ADMIN_API_SECRET, id);
+    const screenWithHostToken = await exports.default.fetch(`https://x/ws/${id}/screen?token=${hostToken}`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(screenWithHostToken.status).toBe(401);
+    const hostWithScreenToken = await exports.default.fetch(`https://x/ws/${id}/host?token=${screenToken}`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(hostWithScreenToken.status).toBe(401);
+  });
+
   it("WebSocket to uncreated session is 404", async () => {
     const id = newSessionId();
     const token = await hostTokenFor(env.ADMIN_API_SECRET, id);
@@ -92,6 +116,9 @@ describe("sessions API", () => {
     expect(host.status).toBe(404);
     const guest = await exports.default.fetch(`https://x/ws/${id}/guest`, { headers: { Upgrade: "websocket" } });
     expect(guest.status).toBe(404);
+    const screenToken = await screenTokenFor(env.ADMIN_API_SECRET, id);
+    const screen = await exports.default.fetch(`https://x/ws/${id}/screen?token=${screenToken}`, { headers: { Upgrade: "websocket" } });
+    expect(screen.status).toBe(404);
   });
 
   it("hostTokenFor is deterministic hex of 64 chars", async () => {
