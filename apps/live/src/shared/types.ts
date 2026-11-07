@@ -4,10 +4,11 @@ export type Choice = 0 | 1 | 2 | 3;
 export type PodiumRank = 1 | 2 | 3;
 
 /**
- * Identifies a game phase as a string. Formats: `lobby`, `q:<index>:<open|closed|revealed>`,
- * `r:list`, `r:<rank>:<hidden|shown>`.
- * Two roles: the wire value the host client echoes back as `advance.from`, and the key the server
- * compares against the current phase to make advance idempotent. Do not change the encoding.
+ * Identifies a game phase as a string.
+ * Question phases (`lobby`, `q:<index>:<open|closed|revealed>`) must not change encoding.
+ * Results phases use `r:list` / `r:<playerId>:<hidden|rank|name|both>`.
+ * Two roles: the wire value the host client echoes back as `advance.from` / `results_action.from`,
+ * and the key the server compares against the current phase to make those actions idempotent.
  */
 export type PhaseKey = string;
 
@@ -25,7 +26,14 @@ export type QuizPayload = {
 
 export type ResultsStage =
   | { kind: "list" }
-  | { kind: "podium"; rank: PodiumRank; revealed: boolean };
+  | { kind: "podium"; rank: PodiumRank; revealed: boolean }
+  | { kind: "player"; playerId: string; rankShown: boolean; nameShown: boolean };
+
+export type ResultsAction =
+  | { kind: "select"; playerId: string }
+  | { kind: "show_rank" }
+  | { kind: "show_name" }
+  | { kind: "back" };
 
 export type Phase =
   | { type: "lobby" }
@@ -96,7 +104,8 @@ export type GuestView =
 export type ClientMessage =
   | { type: "join"; nickname: string }
   | { type: "answer"; questionIndex: number; choice: number }
-  | { type: "advance"; from: PhaseKey };
+  | { type: "advance"; from: PhaseKey }
+  | { type: "results_action"; from: PhaseKey; action: ResultsAction };
 
 export type ServerMessage =
   | { type: "host_view"; view: HostView }

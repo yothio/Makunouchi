@@ -45,6 +45,8 @@ export const nextPodiumRank = (ranked: RankedPlayer[], current: PodiumRank | nul
 export const isFinal = (phase: Phase, ranked: RankedPlayer[]): boolean => {
   if (phase.type !== "results") return false;
   const stage = phase.stage;
+  // Task 2 で置き換え
+  if (stage.kind === "player") return false;
   if (stage.kind === "podium") return stage.rank === 1 && stage.revealed;
   return !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
 };

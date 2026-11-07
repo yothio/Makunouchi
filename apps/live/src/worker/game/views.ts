@@ -40,7 +40,8 @@ export const hostView = (s: GameState): HostView => {
     case "results": {
       const stage = phase.stage;
       const ranked = rankPlayers(s);
-      if (stage.kind === "list") {
+      // Task 2 で置き換え: player 段階は暫定で list と同じ扱い
+      if (stage.kind === "list" || stage.kind === "player") {
         const entries = listEntries(ranked).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
         return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null) } };
       }
