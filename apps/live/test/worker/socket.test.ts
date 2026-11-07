@@ -384,7 +384,7 @@ describe("SessionRoom answer history", () => {
       steps.push([`q:${i}:open`, `q:${i}:closed`], [`q:${i}:closed`, `q:${i}:revealed`]);
       if (i < 4) steps.push([`q:${i}:revealed`, `q:${i + 1}:open`]);
     }
-    steps.push(["q:4:revealed", "r:list"]);
+    steps.push(["q:4:revealed", "r:list:0"]);
     await advanceTo(host, steps);
     const pending = await guest.next("guest_view", (m) => m.view.kind === "results_pending");
     expect(pending.view).toMatchObject({ history: expect.any(Array) });

@@ -1,5 +1,5 @@
 import type { Phase, PodiumRank } from "../../shared/types";
-import { LIST_FIRST_RANK, PODIUM_RANKS } from "./rules";
+import { LIST_FIRST_RANK, LIST_PAGE_SIZE, PODIUM_RANKS } from "./rules";
 import { scoreOf } from "./scoring";
 import type { GameState } from "./types";
 
@@ -25,6 +25,17 @@ export const listEntries = (ranked: RankedPlayer[]): RankedPlayer[] => {
   return ranked.filter((p) => p.rank >= LIST_FIRST_RANK);
 };
 
+/** Number of list pages (at least 1, so an empty list still has a page to show "nobody below 4th"). */
+export const listPageCount = (ranked: RankedPlayer[]): number => {
+  return Math.max(1, Math.ceil(listEntries(ranked).length / LIST_PAGE_SIZE));
+};
+
+/** The rows of one list page (0-based), in rank order. Out-of-range pages are empty. */
+export const listPageEntries = (ranked: RankedPlayer[], page: number): RankedPlayer[] => {
+  if (!Number.isInteger(page) || page < 0) return [];
+  return listEntries(ranked).slice(page * LIST_PAGE_SIZE, (page + 1) * LIST_PAGE_SIZE);
+};
+
 export const podiumPlayers = (ranked: RankedPlayer[], rank: PodiumRank): RankedPlayer[] => {
   return ranked.filter((p) => p.rank === rank);
 };
@@ -46,5 +57,6 @@ export const isFinal = (phase: Phase, ranked: RankedPlayer[]): boolean => {
   if (phase.type !== "results") return false;
   const stage = phase.stage;
   if (stage.kind === "podium") return stage.rank === 1 && stage.revealed;
-  return !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
+  // list stage: final only on the last page and when there is no podium to announce
+  return stage.page >= listPageCount(ranked) - 1 && !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
 };

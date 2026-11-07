@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { QuizPayload } from "../../src/shared/types";
 import { createGameState, joinPlayer } from "../../src/worker/game/state";
 import type { GameState } from "../../src/worker/game/types";
-import { isFinal, listEntries, podiumHasPlayers, podiumPlayers, rankPlayers } from "../../src/worker/game/ranking";
+import { isFinal, listEntries, listPageCount, listPageEntries, podiumHasPlayers, podiumPlayers, rankPlayers } from "../../src/worker/game/ranking";
 
 const make = (scores: number[]): GameState => {
   const quiz: QuizPayload = {
@@ -23,7 +23,7 @@ const make = (scores: number[]): GameState => {
   return {
     ...s,
     quiz: { ...s.quiz, questions },
-    phase: { type: "results", stage: { kind: "list" } },
+    phase: { type: "results", stage: { kind: "list", page: 0 } },
     players: s.players.map((p, i) => ({
       ...p,
       answers: Object.fromEntries(Array.from({ length: scores[i] }, (_, k) => [k, 0])),
@@ -69,3 +69,44 @@ describe("rankPlayers", () => {
     expect(isFinalOf(make([3]))).toBe(false);
   });
 });
+
+describe("list paging", () => {
+  /** 3 podium players followed by `n` players ranked 4th or lower. */
+  const rankedWithList = (n: number) => {
+    const total = 3 + n;
+    return rankPlayers(make(Array.from({ length: total }, (_, i) => total - i)));
+  };
+
+  test.each([
+    [0, 1],
+    [1, 1],
+    [40, 1],
+    [41, 2],
+    [80, 2],
+    [81, 3],
+    [117, 3],
+  ])("listPageCount: 一覧が %i 人なら %i ページ", (n, pages) => {
+    expect(listPageCount(rankedWithList(n))).toBe(pages);
+  });
+  test("listPageEntries: 40 行ずつで、最後は端数。順位の昇順で重複も欠落もない", () => {
+    const ranked = rankedWithList(97);
+    const pages = [0, 1, 2].map((p) => listPageEntries(ranked, p));
+    expect(pages.map((p) => p.length)).toEqual([40, 40, 17]);
+    const all = pages.flat();
+    expect(all.map((x) => x.rank)).toEqual(Array.from({ length: 97 }, (_, i) => i + 4));
+    expect(new Set(all.map((x) => x.playerId)).size).toBe(97);
+  });
+  test("listPageEntries: 範囲外のページは空", () => {
+    expect(listPageEntries(rankedWithList(5), 3)).toEqual([]);
+    expect(listPageEntries(rankedWithList(5), -1)).toEqual([]);
+  });
+  test("isFinal: 一覧は最後のページで、表彰台に人がいないときだけ true", () => {
+    const at = (n: number, page: number) => {
+      const s = make(Array.from({ length: n }, (_, i) => n - i));
+      return isFinal({ type: "results", stage: { kind: "list", page } }, rankPlayers(s));
+    };
+    expect(at(0, 0)).toBe(true);
+    expect(at(3, 0)).toBe(false); // podium still to announce
+  });
+});
+

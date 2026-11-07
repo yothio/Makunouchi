@@ -48,10 +48,13 @@ describe("advance", () => {
   test("最後の問題の revealed から results list へ", () => {
     const s = walk(createGameState(quiz), 6);
     expect(s.phase).toEqual({ type: "question", index: 1, status: "revealed" });
-    expect(ok(advance(s, "q:1:revealed")).phase).toEqual({ type: "results", stage: { kind: "list" } });
+    expect(ok(advance(s, "q:1:revealed")).phase).toEqual({ type: "results", stage: { kind: "list", page: 0 } });
   });
   test("phaseKey の形式", () => {
-    expect(phaseKey({ type: "results", stage: { kind: "list" } })).toBe("r:list");
+    expect(phaseKey({ type: "results", stage: { kind: "list", page: 0 } })).toBe("r:list:0");
+    expect(phaseKey({ type: "results", stage: { kind: "list", page: 2 } })).toBe("r:list:2");
+    expect(phaseKey({ type: "question", index: 14, status: "revealed" })).toBe("q:14:revealed");
+    expect(phaseKey({ type: "lobby" })).toBe("lobby");
     expect(phaseKey({ type: "results", stage: { kind: "podium", rank: 3, revealed: false } })).toBe("r:3:hidden");
     expect(phaseKey({ type: "results", stage: { kind: "podium", rank: 1, revealed: true } })).toBe("r:1:shown");
   });
@@ -179,7 +182,7 @@ describe("results progression", () => {
     }));
     return {
       quiz: { title: "T", questions: qs },
-      phase: { type: "results", stage: { kind: "list" } },
+      phase: { type: "results", stage: { kind: "list", page: 0 } },
       players: scores.map((sc, i) => ({
         id: `id${i}`, token: `t${i}`, nickname: `p${i}`,
         answers: Object.fromEntries(Array.from({ length: sc }, (_, k) => [k, 0])),
@@ -192,10 +195,10 @@ describe("results progression", () => {
     return out;
   };
   test("results: list → 3 位(伏せ) → 3 位(表) → 2 位(伏せ) → 2 位(表) → 1 位(伏せ) → 1 位(表)", () => {
-    expect(keys(resultsState([9, 8, 7, 6]), 6)).toEqual(["r:list", "r:3:hidden", "r:3:shown", "r:2:hidden", "r:2:shown", "r:1:hidden", "r:1:shown"]);
+    expect(keys(resultsState([9, 8, 7, 6]), 6)).toEqual(["r:list:0", "r:3:hidden", "r:3:shown", "r:2:hidden", "r:2:shown", "r:1:hidden", "r:1:shown"]);
   });
   test("空の発表枠は飛ばす（90,90,90,70 なら list → 1 位(伏せ)）", () => {
-    expect(keys(resultsState([9, 9, 9, 7]), 2)).toEqual(["r:list", "r:1:hidden", "r:1:shown"]);
+    expect(keys(resultsState([9, 9, 9, 7]), 2)).toEqual(["r:list:0", "r:1:hidden", "r:1:shown"]);
   });
   test("1 位(表) からの advance は何もしない。isFinal は true", () => {
     const s = walk(resultsState([9, 8, 7]), 6);
@@ -206,10 +209,58 @@ describe("results progression", () => {
   test("参加者 0 人でも最後まで進められる（list で isFinal）", () => {
     const s = resultsState([]);
     expect(isFinal(s.phase, rankPlayers(s))).toBe(true);
-    expect(advance(s, "r:list")).toEqual({ ok: false, reason: "no_next_stage" });
+    expect(advance(s, "r:list:0")).toEqual({ ok: false, reason: "no_next_stage" });
   });
   test("results 中の古い fromKey は stale_phase", () => {
     const s = resultsState([9, 8, 7]);
     expect(advance(s, "r:3:hidden")).toEqual({ ok: false, reason: "stale_phase" });
   });
 });
+
+describe("results list paging", () => {
+  /** 3 podium players followed by `listSize` players ranked 4th or lower (all distinct scores). */
+  const withList = (listSize: number): GameState => {
+    const total = 3 + listSize;
+    const scores = Array.from({ length: total }, (_, i) => total - i);
+    const qs = Array.from({ length: total }, (_, i) => ({
+      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
+    }));
+    return {
+      quiz: { title: "T", questions: qs },
+      phase: { type: "results", stage: { kind: "list", page: 0 } },
+      players: scores.map((sc, i) => ({
+        id: `id${i}`, token: `t${i}`, nickname: `p${i}`,
+        answers: Object.fromEntries(Array.from({ length: sc }, (_, k) => [k, 0])),
+      })),
+    };
+  };
+  const keysUntilEnd = (s: GameState): string[] => {
+    const out = [phaseKey(s.phase)];
+    for (;;) {
+      const r = advance(s, phaseKey(s.phase));
+      if (!r.ok) return out;
+      s = r.state;
+      out.push(phaseKey(s.phase));
+    }
+  };
+
+  test("41 人なら r:list:0 → r:list:1 → 3 位（伏せ）の順に進む", () => {
+    expect(keysUntilEnd(withList(41)).slice(0, 4)).toEqual(["r:list:0", "r:list:1", "r:3:hidden", "r:3:shown"]);
+  });
+  test("ちょうど 40 人なら 1 ページで、r:list:0 から直接 3 位（伏せ）へ", () => {
+    expect(keysUntilEnd(withList(40)).slice(0, 2)).toEqual(["r:list:0", "r:3:hidden"]);
+  });
+  test("117 人は 3 ページ", () => {
+    expect(keysUntilEnd(withList(117)).slice(0, 4)).toEqual(["r:list:0", "r:list:1", "r:list:2", "r:3:hidden"]);
+  });
+  test("同じ from で 2 回 advance しても 1 ページしか進まない", () => {
+    const s0 = withList(41);
+    const s1 = ok(advance(s0, "r:list:0"));
+    expect(phaseKey(s1.phase)).toBe("r:list:1");
+    expect(advance(s1, "r:list:0")).toEqual({ ok: false, reason: "stale_phase" });
+  });
+  test("4 位以下が 0 人でも r:list:0 を 1 ページとして出し、表彰台へ進む", () => {
+    expect(keysUntilEnd(withList(0)).slice(0, 2)).toEqual(["r:list:0", "r:3:hidden"]);
+  });
+});
+

@@ -34,7 +34,7 @@ const results = (scores: number[]): GameState => {
   scores.forEach((_, i) => (s = join(s, `n${i}`, `id${i}`)));
   return {
     ...s,
-    phase: { type: "results", stage: { kind: "list" } },
+    phase: { type: "results", stage: { kind: "list", page: 0 } },
     players: s.players.map((p, i) => ({ ...p, answers: Object.fromEntries(Array.from({ length: scores[i] }, (_, k) => [k, 0])) })),
   };
 };
@@ -86,9 +86,9 @@ describe("hostView", () => {
   });
   test("list の nextRank は空でない最初の枠（90,90,90,70 なら 1）", () => {
     const v = hostView(results([9, 9, 9, 7]));
-    expect(v.screen).toEqual({ kind: "list", entries: [{ rank: 4, nickname: "n3", score: 7 }], nextRank: 1 });
+    expect(v.screen).toEqual({ kind: "list", entries: [{ rank: 4, nickname: "n3", score: 7 }], nextRank: 1, page: 0, pageCount: 1 });
     expect(hostView(results([9, 8, 7, 6])).screen).toMatchObject({ nextRank: 3 });
-    expect(hostView(results([])).screen).toMatchObject({ kind: "list", entries: [], nextRank: null });
+    expect(hostView(results([])).screen).toMatchObject({ kind: "list", entries: [], nextRank: null, page: 0, pageCount: 1 });
   });
   test("podium で revealed=false の hostView には players が空で、ニックネームが含まれない", () => {
     const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
@@ -139,7 +139,23 @@ describe("screenView", () => {
     expect(screenView(results([9, 9, 9, 7]))).toEqual({
       kind: "list",
       entries: [{ rank: 4, nickname: "n3", score: 7 }],
+      page: 0,
+      pageCount: 1,
     });
+  });
+  test("list が複数ページのとき、entries はそのページの 40 行だけで page / pageCount が入る", () => {
+    const base = results(Array.from({ length: 44 }, (_, i) => 44 - i)); // 3 podium + 41 list players
+    const first = screenView(base);
+    expect(first).toMatchObject({ kind: "list", page: 0, pageCount: 2 });
+    expect((first as { entries: unknown[] }).entries).toHaveLength(40);
+    const second = screenView(at(base, { kind: "list", page: 1 }));
+    expect(second).toMatchObject({ kind: "list", page: 1, pageCount: 2 });
+    expect((second as { entries: { rank: number }[] }).entries.map((e) => e.rank)).toEqual([44]);
+  });
+  test("範囲外のページ番号でも例外を投げず、空の entries", () => {
+    const base = results(Array.from({ length: 10 }, (_, i) => 10 - i));
+    expect(screenView(at(base, { kind: "list", page: 9 }))).toMatchObject({ kind: "list", entries: [] });
+    expect(hostView(at(base, { kind: "list", page: 9 })).screen).toMatchObject({ kind: "list", entries: [] });
   });
   test("podium で revealed=false の間は players が空で、ニックネームが含まれない", () => {
     const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
@@ -243,7 +259,7 @@ describe("guestView", () => {
   test("結果発表の間は、どの段階でも results_pending で、順位は送らない", () => {
     const s = results([3, 2, 2, 1]);
     const stages: ResultsStage[] = [
-      { kind: "list" },
+      { kind: "list", page: 0 },
       { kind: "podium", rank: 3, revealed: false },
       { kind: "podium", rank: 1, revealed: false },
       { kind: "podium", rank: 1, revealed: true },

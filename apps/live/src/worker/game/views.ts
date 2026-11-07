@@ -1,5 +1,5 @@
 import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "../../shared/types";
-import { listEntries, nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
+import { listPageCount, listPageEntries, nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
 import { revealedCount, scoreOf } from "./scoring";
 import { phaseKey } from "./state";
 import type { GameState, Player } from "./types";
@@ -41,8 +41,11 @@ export const hostView = (s: GameState): HostView => {
       const stage = phase.stage;
       const ranked = rankPlayers(s);
       if (stage.kind === "list") {
-        const entries = listEntries(ranked).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
-        return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null) } };
+        const entries = listPageEntries(ranked, stage.page).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
+        return {
+          ...base,
+          screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null), page: stage.page, pageCount: listPageCount(ranked) },
+        };
       }
       const players = stage.revealed
         ? podiumPlayers(ranked, stage.rank).map(({ nickname, score }) => ({ nickname, score }))
@@ -66,7 +69,7 @@ export const screenView = (s: GameState): ScreenView => {
     case "reveal":
       return { kind: "reveal", question: screen.question, correctIndex: screen.correctIndex, counts: screen.counts };
     case "list":
-      return { kind: "list", entries: screen.entries };
+      return { kind: "list", entries: screen.entries, page: screen.page, pageCount: screen.pageCount };
     case "podium":
       return { kind: "podium", rank: screen.rank, revealed: screen.revealed, players: screen.players };
   }

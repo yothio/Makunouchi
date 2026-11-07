@@ -5,7 +5,7 @@ export type PodiumRank = 1 | 2 | 3;
 
 /**
  * Identifies a game phase as a string. Formats: `lobby`, `q:<index>:<open|closed|revealed>`,
- * `r:list`, `r:<rank>:<hidden|shown>`.
+ * `r:list:<page>` (0-based page of the 4th-and-below list), `r:<rank>:<hidden|shown>`.
  * Two roles: the wire value the host client echoes back as `advance.from`, and the key the server
  * compares against the current phase to make advance idempotent. Do not change the encoding.
  */
@@ -24,7 +24,7 @@ export type QuizPayload = {
 };
 
 export type ResultsStage =
-  | { kind: "list" }
+  | { kind: "list"; page: number }
   | { kind: "podium"; rank: PodiumRank; revealed: boolean };
 
 export type Phase =
@@ -48,7 +48,14 @@ export type HostView = {
     | { kind: "lobby" }
     | { kind: "question"; question: PublicQuestion; status: "open" | "closed"; answeredCount: number }
     | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number]; isLast: boolean }
-    | { kind: "list"; entries: { rank: number; nickname: string; score: number }[]; nextRank: PodiumRank | null }
+    | {
+        kind: "list";
+        /** only this page's rows */
+        entries: { rank: number; nickname: string; score: number }[];
+        nextRank: PodiumRank | null;
+        page: number;
+        pageCount: number;
+      }
     | {
         kind: "podium";
         rank: PodiumRank;
@@ -69,7 +76,7 @@ export type ScreenView =
   | { kind: "lobby"; title: string; playerCount: number }
   | { kind: "question"; question: PublicQuestion; status: "open" | "closed" }
   | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number] }
-  | { kind: "list"; entries: { rank: number; nickname: string; score: number }[] }
+  | { kind: "list"; entries: { rank: number; nickname: string; score: number }[]; page: number; pageCount: number }
   | { kind: "podium"; rank: PodiumRank; revealed: boolean; players: { nickname: string; score: number }[] };
 
 /** One question whose answer has been revealed, with the viewer's own choice (null = no answer). */
