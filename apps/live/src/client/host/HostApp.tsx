@@ -1,15 +1,31 @@
+import { OPEN_FAILURE_RELOGIN_THRESHOLD } from "./open-failure-counter";
 import { HostPanel } from "./HostPanel";
 import { useHostSession } from "./useHostSession";
 
-export const HostApp = ({ sessionId, token }: { sessionId: string; token: string }) => {
-  const { view, connected, label, canAdvance, advance, sendResultsAction, resultsLocked } = useHostSession(
-    sessionId,
-    token,
-  );
+export const HostApp = ({
+  sessionId,
+  token,
+  onRelogin,
+}: {
+  sessionId: string;
+  token: string;
+  onRelogin?: () => void;
+}) => {
+  const { view, connected, neverOpened, label, canAdvance, advance, sendResultsAction, resultsLocked } =
+    useHostSession(sessionId, token);
+  const offerRelogin = onRelogin && neverOpened >= OPEN_FAILURE_RELOGIN_THRESHOLD;
 
   return (
     <div className="host">
       {!connected && <div className="host-banner">再接続中…</div>}
+      {offerRelogin && (
+        <div className="host-banner">
+          接続できません。
+          <button type="button" className="host-relogin" onClick={onRelogin}>
+            ログインし直す
+          </button>
+        </div>
+      )}
       <main className="host-main">
         <HostPanel view={view} resultsLocked={resultsLocked} onResultsAction={sendResultsAction} />
       </main>

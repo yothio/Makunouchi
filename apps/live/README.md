@@ -19,7 +19,9 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
    ADMIN_API_SECRET=dev-secret-change-me-0123456789abcdef pnpm --filter live seed http://localhost:5173
    ```
 
-   `fixtures/sample-quiz.json`（5 問）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、幹事画面 URL（`/host/:id?token=...`）、投影画面 URL（`/screen/:id?token=...`）を表示する。幹事画面は手元の端末で進行操作に使い、投影画面は会場のプロジェクターにつないだ別の PC で開く。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
+   `fixtures/sample-quiz.json`（5 問 + 幹事 `host`）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、幹事画面 URL（`/host/:id`、トークンなし）、幹事トークン URL（緊急時）、投影画面 URL（`/screen/:id?token=...`）、幹事 ID/PASS を表示する。`host` を省略した JSON でも従来どおり作れる（その場合はトークン URL のみ）。幹事画面は手元の端末で進行操作に使い、投影画面は会場のプロジェクターにつないだ別の PC で開く。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
+
+   幹事は `/host/:id` で ID/パスワードを入れて入る。トークン付き URL も残してある（`seed` / `loadtest`・開発・緊急時、およびログイン失敗でロックされたときの非常口）。当日の前に一度ログインして画面を開いておく（リハーサルで確認する）。sessionStorage が使えない環境では、ページを開いている間だけトークンがメモリに残り、リロードするとログインし直しになる。
 
 ## テスト
 
@@ -47,7 +49,7 @@ pnpm --filter live deploy
 
 `deploy` は `vite build` のあと `wrangler deploy` を実行する。デプロイ先は `https://makunouchi-live.<account>.workers.dev`（`wrangler.jsonc` の `name`）。
 
-`ADMIN_API_SECRET` は Rails 側（`apps/admin`）と同じ値にする。Rails は `Authorization: Bearer <ADMIN_API_SECRET>` で API を呼び、`hostToken = HMAC-SHA256(ADMIN_API_SECRET, sessionId)`（hex）で幹事画面 URL を、`screenToken = HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`（hex）で投影画面 URL を作る。開催回 ID は英数字・`_`・`-` のみ（100 文字まで）。
+`ADMIN_API_SECRET` は Rails 側（`apps/admin`）と同じ値にする。Rails は `Authorization: Bearer <ADMIN_API_SECRET>` で API を呼び、開催回作成時に幹事の ID とパスワードのハッシュ（`host`）を送る。投影画面 URL は `screenToken = HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`（hex）。幹事 HMAC トークンはログイン成功時に Worker が返し、Rails は計算も表示もしない（緊急時のトークン URL は `seed` など Worker 側で出す）。開催回 ID は英数字・`_`・`-` のみ（100 文字まで）。
 
 **本番の進行中は絶対にデプロイしない（全員の接続が切れる）。**
 

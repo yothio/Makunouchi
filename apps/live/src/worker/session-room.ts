@@ -1,9 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
+import { safeEqual, verifyPbkdf2 } from "./auth";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { rankPlayers, type RankedPlayer } from "./game/ranking";
+import { reserveHostLoginAttempt, type HostAttempts } from "./host-login-attempts";
 import { parseClientMessage } from "./messages";
+import type { HostCredentials } from "./payload";
 import { isRole, ROLE_HEADER } from "./role";
 import { guestView, hostView, screenView } from "./game/views";
 
@@ -13,6 +16,7 @@ type Attachment = { role: "host" } | { role: "screen" } | GuestAttachment;
 const attachmentOf = (ws: WebSocket): Attachment | null => ws.deserializeAttachment() as Attachment | null;
 
 export type RankingResult = { phaseKey: PhaseKey; final: boolean; players: RankedPlayer[] };
+export type HostLoginResult = "ok" | "invalid" | "locked" | "missing";
 
 export class SessionRoom extends DurableObject<Env> {
   private state: GameState | null;
@@ -24,10 +28,50 @@ export class SessionRoom extends DurableObject<Env> {
     this.state = ctx.storage.kv.get<GameState>("state") ?? null;
   }
 
-  async init(quiz: QuizPayload): Promise<"created" | "exists"> {
+  async init(quiz: QuizPayload, host?: HostCredentials): Promise<"created" | "exists"> {
     if (this.state) return "exists";
     this.commit(createGameState(quiz));
+    if (host) this.ctx.storage.kv.put("host", host);
     return "created";
+  }
+
+  /**
+   * Verify host ID/password. Attempts are reserved (written) before PBKDF2 so concurrent requests
+   * cannot slip past the lock while deriveBits is awaiting.
+   */
+  async hostLogin(loginId: string, password: string): Promise<HostLoginResult> {
+    const host = this.ctx.storage.kv.get<HostCredentials>("host") ?? null;
+    if (!this.state || !host) return "missing";
+
+    const reserved = reserveHostLoginAttempt(
+      this.ctx.storage.kv.get<HostAttempts>("hostAttempts") ?? null,
+      Date.now(),
+    );
+    this.ctx.storage.kv.put("hostAttempts", reserved.attempts);
+    if (reserved.outcome === "locked") return "locked";
+
+    const passwordOk = await verifyPbkdf2(password, host.passwordHash);
+    const loginIdOk = safeEqual(loginId, host.loginId);
+    if (loginIdOk && passwordOk) {
+      this.ctx.storage.kv.delete("hostAttempts");
+      return "ok";
+    }
+    return "invalid";
+  }
+
+  /** Test helper: inspect kv without exposing credentials on HTTP. */
+  async storageSnapshot(): Promise<{ state: GameState | null; host: HostCredentials | null }> {
+    return {
+      state: this.ctx.storage.kv.get<GameState>("state") ?? null,
+      host: this.ctx.storage.kv.get<HostCredentials>("host") ?? null,
+    };
+  }
+
+  /** Test helper: pretend the lock window already ended. */
+  async expireHostLoginLockForTest(): Promise<void> {
+    const attempts = this.ctx.storage.kv.get<HostAttempts>("hostAttempts");
+    if (!attempts) return;
+    this.ctx.storage.kv.put("hostAttempts", { failures: attempts.failures, lockedUntil: 0 });
   }
 
   async ranking(): Promise<RankingResult | null> {

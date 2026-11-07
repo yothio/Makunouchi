@@ -6,6 +6,7 @@ const memoryStorage = () => {
   return {
     getItem: (k: string) => map.get(k) ?? null,
     setItem: (k: string, v: string) => void map.set(k, v),
+    removeItem: (k: string) => void map.delete(k),
   };
 };
 
@@ -65,6 +66,9 @@ describe("resolveToken", () => {
         throw new Error("denied");
       },
       setItem: () => {
+        throw new Error("denied");
+      },
+      removeItem: () => {
         throw new Error("denied");
       },
     };

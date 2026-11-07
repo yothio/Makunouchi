@@ -5,8 +5,38 @@ export type TokenIo = {
   pathname: string;
   hash: string;
   /** null when storage is unavailable (private window, blocked site data). */
-  storage: Pick<Storage, "getItem" | "setItem"> | null;
+  storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
   replaceUrl(url: string): void;
+};
+
+export const tokenStorageKey = (role: TokenRole, sessionId: string): string => {
+  return `makunouchi:${sessionId}:${role}Token`;
+};
+
+/** Persist a host/screen token under the shared key (used by URL capture and ID/password login). */
+export const storeToken = (
+  role: TokenRole,
+  sessionId: string,
+  token: string,
+  storage: Pick<Storage, "setItem"> | null,
+): void => {
+  try {
+    storage?.setItem(tokenStorageKey(role, sessionId), token);
+  } catch {
+    // storage unavailable — caller still holds the token in memory
+  }
+};
+
+export const clearStoredToken = (
+  role: TokenRole,
+  sessionId: string,
+  storage: Pick<Storage, "removeItem"> | null,
+): void => {
+  try {
+    storage?.removeItem(tokenStorageKey(role, sessionId));
+  } catch {
+    // storage unavailable
+  }
 };
 
 /**
@@ -15,15 +45,11 @@ export type TokenIo = {
  * If storage is unavailable the token only lives for this page load.
  */
 export const resolveToken = (role: TokenRole, sessionId: string, io: TokenIo): string => {
-  const key = `makunouchi:${sessionId}:${role}Token`;
+  const key = tokenStorageKey(role, sessionId);
   const params = new URLSearchParams(io.search);
   const fromUrl = params.get("token");
   if (fromUrl) {
-    try {
-      io.storage?.setItem(key, fromUrl);
-    } catch {
-      // storage unavailable
-    }
+    storeToken(role, sessionId, fromUrl, io.storage);
     params.delete("token");
     const qs = params.toString();
     io.replaceUrl(io.pathname + (qs ? `?${qs}` : "") + io.hash);

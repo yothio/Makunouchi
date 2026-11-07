@@ -5,6 +5,8 @@ import { createReconnectingSocket, type ReconnectingSocket } from "./reconnectin
 export type UseLiveSocketOptions = {
   /** Called synchronously for every message (never batched away like `last`). */
   onMessage?: (msg: ServerMessage) => void;
+  /** Opt-in never-opened failure counter (host relogin path). */
+  onNeverOpened?: (failures: number) => void;
 };
 
 export type LiveSocket = {
@@ -29,6 +31,7 @@ export const useLiveSocket = (
   // Always call the latest url / onMessage without re-creating the socket when their identity changes.
   const getUrl = useEffectEvent(() => (typeof url === "function" ? url() : url));
   const onMessage = useEffectEvent((m: ServerMessage) => options.onMessage?.(m));
+  const onNeverOpened = useEffectEvent((failures: number) => options.onNeverOpened?.(failures));
 
   useEffect(() => {
     const sock = createReconnectingSocket({
@@ -38,6 +41,7 @@ export const useLiveSocket = (
         setLast(m);
       },
       onStatus: setConnected,
+      onNeverOpened: (failures) => onNeverOpened(failures),
     });
     sockRef.current = sock;
     const onVisible = () => {

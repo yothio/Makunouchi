@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { hostTokenFor, isUsableSecret, isValidSessionId, MIN_ADMIN_SECRET_LENGTH, screenTokenFor, verifyBearer } from "../../src/worker/auth";
+import {
+  hostTokenFor,
+  isUsableSecret,
+  isValidSessionId,
+  MIN_ADMIN_SECRET_LENGTH,
+  screenTokenFor,
+  verifyBearer,
+  verifyPbkdf2,
+} from "../../src/worker/auth";
 
 const good = "x".repeat(MIN_ADMIN_SECRET_LENGTH);
 const short = "x".repeat(MIN_ADMIN_SECRET_LENGTH - 1);
@@ -59,5 +67,23 @@ describe("isValidSessionId", () => {
   });
   test.each(["screen:abc", "", "x".repeat(101), "a/b", "a b", "a?b", "日本語"])("rejects %s", (id) => {
     expect(isValidSessionId(id)).toBe(false);
+  });
+});
+
+describe("verifyPbkdf2", () => {
+  // Rails HostCredentials / Python hashlib と同じ固定ベクタ。
+  const VECTOR =
+    "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=";
+
+  test("固定ベクタのパスワードで true", async () => {
+    expect(await verifyPbkdf2("correct horse", VECTOR)).toBe(true);
+  });
+
+  test("違うパスワードは false", async () => {
+    expect(await verifyPbkdf2("wrong horse", VECTOR)).toBe(false);
+  });
+
+  test("壊れた形式は false", async () => {
+    expect(await verifyPbkdf2("correct horse", "not-a-hash")).toBe(false);
   });
 });
