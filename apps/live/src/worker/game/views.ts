@@ -1,4 +1,4 @@
-import type { Choice, GuestView, HostView, PublicQuestion } from "../../shared/types";
+import type { Choice, GuestView, HostView, PublicQuestion, ScreenView } from "../../shared/types";
 import { isFinal, listEntries, nextPodiumRank, podiumPlayers, rankPlayers, type RankedPlayer } from "./ranking";
 import { scoreOf } from "./scoring";
 import { phaseKey } from "./state";
@@ -52,6 +52,23 @@ export const hostView = (s: GameState): HostView => {
         screen: { kind: "podium", rank: stage.rank, revealed: stage.revealed, players, nextRank: nextPodiumRank(ranked, stage.rank) },
       };
     }
+  }
+};
+
+/** The projector's view: the host view minus everything that is for the operator only. */
+export const screenView = (s: GameState): ScreenView => {
+  const { title, playerCount, screen } = hostView(s);
+  switch (screen.kind) {
+    case "lobby":
+      return { kind: "lobby", title, playerCount };
+    case "question":
+      return { kind: "question", question: screen.question, status: screen.status };
+    case "reveal":
+      return { kind: "reveal", question: screen.question, correctIndex: screen.correctIndex, counts: screen.counts };
+    case "list":
+      return { kind: "list", entries: screen.entries };
+    case "podium":
+      return { kind: "podium", rank: screen.rank, revealed: screen.revealed, players: screen.players };
   }
 };
 
