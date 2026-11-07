@@ -26,6 +26,7 @@ ja:
     models:
       user: "ユーザー"
       question: "問題"
+      quiz_session: "開催回"
     errors:
       models:
         question:
@@ -58,3 +59,10 @@ ja:
         password: "パスワード"
         password_confirmation: "パスワード（確認）"
         role: "役割"
+      quiz_session:
+        title: "開催回名"
+  quiz_session:
+    status:
+      pending: "live への登録前（登録できていません）"
+      ready: "登録済み"
+      host_missing: "live が幹事の認証情報に未対応です。live を更新してから新しい開催回を作り直してください"

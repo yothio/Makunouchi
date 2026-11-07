@@ -1,0 +1,38 @@
+<% content_for :title, @quiz_session.title %>
+<main>
+  <h1><%= @quiz_session.title %></h1>
+  <p class="status">状態: <%= t("quiz_session.status.#{@quiz_session.status}") %></p>
+
+  <h2>幹事のログイン</h2>
+  <p>幹事には口頭で伝えてください。</p>
+  <dl>
+    <dt>ID</dt>
+    <dd class="host-login-id"><%= @quiz_session.host_login_id %></dd>
+    <dt>パスワード</dt>
+    <dd class="host-password"><%= @quiz_session.host_password %></dd>
+  </dl>
+
+  <h2>URL</h2>
+  <dl>
+    <dt>参列者</dt>
+    <dd class="guest-url"><%= @quiz_session.guest_url %></dd>
+    <dt>幹事</dt>
+    <dd class="host-url"><%= @quiz_session.host_url %></dd>
+  </dl>
+
+  <h2>作成時の質問解答（<%= @quiz_session.quiz_snapshot.size %> 問）</h2>
+  <ol>
+    <% @quiz_session.quiz_snapshot.each do |question| %>
+      <li class="snapshot-question">
+        <p><%= question["title"] %></p>
+        <ul>
+          <% question["choices"].each_with_index do |choice, index| %>
+            <li><%= %w[A B C D][index] %>. <%= choice %><%= "（正解）" if index == question["correctIndex"] %></li>
+          <% end %>
+        </ul>
+      </li>
+    <% end %>
+  </ol>
+
+  <p><%= link_to "トップへ戻る", root_path %></p>
+</main>

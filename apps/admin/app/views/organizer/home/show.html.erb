@@ -6,5 +6,14 @@
   <p class="question-count">質問解答の数: <%= @question_count %> 問</p>
   <p><%= link_to "質問解答の一覧へ", organizer_questions_path %></p>
 
+  <h2>開催回</h2>
+  <p class="quiz-session-count">開催回の数: <%= @quiz_sessions.size %> 件</p>
+  <ul>
+    <% @quiz_sessions.each do |quiz_session| %>
+      <li class="quiz-session"><%= link_to quiz_session.title, organizer_quiz_session_path(quiz_session) %></li>
+    <% end %>
+  </ul>
+  <p><%= link_to "開催回を作成", new_organizer_quiz_session_path %></p>
+
   <%= button_to "ログアウト", session_path, method: :delete %>
 </main>
