@@ -391,3 +391,80 @@ describe("SessionRoom answer history", () => {
     expect(JSON.stringify(guest.messages)).not.toContain('"rank"');
   });
 });
+
+describe("SessionRoom results list paging", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 150));
+
+  /** 44 players with distinct scores: 3 on the podium and 41 listed (two list pages). */
+  const toResultsList = async () => {
+    const id = newSessionId();
+    await createSession(id);
+    const host = await connectHost(id);
+    await host.next("host_view");
+    const total = 44;
+    // Each guest answers q0 correctly (choice 1) if their index is even; scores only need to exist, ties are fine.
+    const guests = await Promise.all(
+      Array.from({ length: total }, async (_, i) => {
+        const guest = await connectGuest(id);
+        await guest.next("need_join");
+        guest.send({ type: "join", nickname: `g${i}` });
+        await guest.next("joined");
+        return guest;
+      }),
+    );
+    await host.next("host_view", (m) => m.view.playerCount === total);
+    const keys: [string, string][] = [["lobby", "q:0:open"]];
+    for (let i = 0; i < 5; i++) {
+      keys.push([`q:${i}:open`, `q:${i}:closed`], [`q:${i}:closed`, `q:${i}:revealed`]);
+      if (i < 4) keys.push([`q:${i}:revealed`, `q:${i + 1}:open`]);
+    }
+    keys.push(["q:4:revealed", "r:list:0"]);
+    for (const [from, to] of keys) {
+      if (from.endsWith(":open") && from !== "lobby") {
+        const index = Number(from.split(":")[1]);
+        guests.forEach((g, gi) => g.send({ type: "answer", questionIndex: index, choice: gi < index * 8 + 3 ? 1 : 0 }));
+        await settle();
+      }
+      host.send({ type: "advance", from });
+      await host.next("host_view", (m) => m.view.phaseKey === to);
+    }
+    return { id, host };
+  };
+
+  it("pages through the list with advance: page 0 (40 rows) → page 1 → podium", async () => {
+    const { id, host } = await toResultsList();
+    const screen = await connectScreen(id);
+    const first = await screen.next("screen_view");
+    const rows = (v: unknown) => (v as { entries: unknown[] }).entries.length;
+    expect(first.view).toMatchObject({ kind: "list", page: 0, pageCount: 2 });
+    expect(rows(first.view)).toBe(40);
+
+    host.send({ type: "advance", from: "r:list:0" });
+    const second = await screen.next("screen_view", (m) => m.view.kind === "list" && m.view.page === 1);
+    expect(rows(second.view)).toBe(41 - 40);
+    const hv = await host.next("host_view", (m) => m.view.phaseKey === "r:list:1");
+    expect(hv.view.screen).toMatchObject({ kind: "list", page: 1, pageCount: 2 });
+
+    host.send({ type: "advance", from: "r:list:1" });
+    await screen.next("screen_view", (m) => m.view.kind === "podium");
+  }, 30_000);
+
+  it("a repeated advance from the same page key moves only one page", async () => {
+    const { id, host } = await toResultsList();
+    host.send({ type: "advance", from: "r:list:0" });
+    host.send({ type: "advance", from: "r:list:0" });
+    await host.next("host_view", (m) => m.view.phaseKey === "r:list:1");
+    await settle();
+    expect((await rankingOf(id)).body.phaseKey).toBe("r:list:1");
+  }, 30_000);
+
+  it("a screen opened on page 1 gets that page, and so does a re-connected host", async () => {
+    const { id, host } = await toResultsList();
+    host.send({ type: "advance", from: "r:list:0" });
+    await host.next("host_view", (m) => m.view.phaseKey === "r:list:1");
+    const screen = await connectScreen(id);
+    expect((await screen.next("screen_view")).view).toMatchObject({ kind: "list", page: 1, pageCount: 2 });
+    const host2 = await connectHost(id);
+    expect((await host2.next("host_view")).view.screen).toMatchObject({ kind: "list", page: 1, pageCount: 2 });
+  }, 30_000);
+});

@@ -55,7 +55,10 @@ export const HostPanel = ({ view }: { view: HostView | null }) => {
     case "list":
       return (
         <div className="console">
-          <h1 className="console-title">結果発表: {listHeader(s.entries)}</h1>
+          <h1 className="console-title">結果発表: {listHeader(s.entries, s.page, s.pageCount)}</h1>
+          <p className="console-progress">
+            ページ {s.page + 1} / {s.pageCount}
+          </p>
           <ol className="console-list">
             {s.entries.map((e) => (
               <li key={`${e.rank}:${e.nickname}`}>
