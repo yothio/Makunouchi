@@ -19,7 +19,7 @@ export const ScreenContent = ({ view, sessionId }: { view: ScreenView | null; se
     case "list":
       return (
         <div>
-          <h1 className="host-title">{listHeader(view.entries)}</h1>
+          <h1 className="host-title">{listHeader(view.entries, view.page, view.pageCount)}</h1>
           <FittedList entries={view.entries} />
         </div>
       );
