@@ -402,7 +402,7 @@ describe("SessionRoom results list paging", () => {
     const host = await connectHost(id);
     await host.next("host_view");
     const total = 44;
-    // Each guest answers q0 correctly (choice 1) if their index is even; scores only need to exist, ties are fine.
+    // Guests answer correctly (choice 1) a different number of times each, so scores differ; ties are fine.
     const guests = await Promise.all(
       Array.from({ length: total }, async (_, i) => {
         const guest = await connectGuest(id);

@@ -100,13 +100,15 @@ describe("list paging", () => {
     expect(listPageEntries(rankedWithList(5), 3)).toEqual([]);
     expect(listPageEntries(rankedWithList(5), -1)).toEqual([]);
   });
-  test("isFinal: 一覧は最後のページで、表彰台に人がいないときだけ true", () => {
+  test("isFinal: 一覧は、表彰台に人がいない（参加者 0 人）ときだけ true。人がいればどのページも false", () => {
     const at = (n: number, page: number) => {
       const s = make(Array.from({ length: n }, (_, i) => n - i));
       return isFinal({ type: "results", stage: { kind: "list", page } }, rankPlayers(s));
     };
     expect(at(0, 0)).toBe(true);
-    expect(at(3, 0)).toBe(false); // podium still to announce
+    expect(at(1, 0)).toBe(false); // a rank-1 player is still to be announced
+    expect(at(44, 0)).toBe(false);
+    expect(at(44, 1)).toBe(false); // last list page, podium still to come
   });
 });
 
