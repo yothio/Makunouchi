@@ -1,8 +1,5 @@
 import type { ScreenView } from "../../shared/types";
-import { FittedList } from "./FittedList";
-import { listHeader } from "./list-header";
 import { LobbyScreen } from "./screens/LobbyScreen";
-import { PodiumScreen } from "./screens/PodiumScreen";
 import { QuestionScreen } from "./screens/QuestionScreen";
 import { RankRevealScreen } from "./screens/RankRevealScreen";
 import { ResultsWaitScreen } from "./screens/ResultsWaitScreen";
@@ -18,15 +15,6 @@ export const ScreenContent = ({ view, sessionId }: { view: ScreenView | null; se
       return <QuestionScreen screen={view} />;
     case "reveal":
       return <RevealScreen screen={view} />;
-    case "list":
-      return (
-        <div>
-          <h1 className="host-title">{listHeader(view.entries)}</h1>
-          <FittedList entries={view.entries} />
-        </div>
-      );
-    case "podium":
-      return <PodiumScreen screen={view} />;
     case "results_wait":
       return <ResultsWaitScreen title={view.title} />;
     case "rank_reveal":

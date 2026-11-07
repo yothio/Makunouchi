@@ -44,8 +44,8 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
   - role は Worker が決めて `ROLE_HEADER` で DO に渡す（クライアントが送った値は上書き）。
   - DO は `getByName(sessionId, { locationHint: "apac-ne" })` で開催回ごとに 1 インスタンス。
 - `src/worker/session-room.ts`（`SessionRoom` DO）: WebSocket Hibernation API を使う。状態は `GameState` 1 つを `ctx.storage.kv` の `"state"` キーに丸ごと保存。ソケットの role（`host` / `screen` / `guest`）/ playerId は `serializeAttachment` に持つ。ping/pong は `setWebSocketAutoResponse` で DO を起こさずに返す。誰に何を送るかは `deliver()` に集約されている。
-- `src/worker/game/`: 純関数のゲームロジック。`state.ts` の遷移関数（`joinPlayer` / `submitAnswer` / `advance`）は `Transition`（新しい state と `GameEvent[]`、または失敗理由）を返し、通知先は決めない。`views.ts` が state から幹事用（`hostView`）・投影画面用（`screenView`）・ゲスト用のビューを作る（ゲストには表彰台の発表が終わるまで順位を見せない等のネタバレ防止はここ）。`ranking.ts` は同点同順位の順位付け。
-- `src/shared/types.ts`: Worker とクライアントで共有する型（`Phase`、`HostView`、`ScreenView`、`GuestView`、メッセージ）。`PhaseKey`（`lobby` / `q:<i>:<open|closed|revealed>` / `r:list` / `r:<rank>:<hidden|shown>`）はホストが `advance.from` として送り返し、サーバーが advance の冪等性判定に使う。**エンコーディングを変えないこと。**
+- `src/worker/game/`: 純関数のゲームロジック。`state.ts` の遷移関数（`joinPlayer` / `submitAnswer` / `advance` / `presentResults`）は `Transition`（新しい state と `GameEvent[]`、または失敗理由）を返し、通知先は決めない。`views.ts` が state から幹事用（`hostView`）・投影画面用（`screenView`）・ゲスト用のビューを作る（ゲストには順位を送らず、投影画面には幹事が投影した順位・名前だけを出す等のネタバレ防止はここ）。`ranking.ts` は同点同順位の順位付け。
+- `src/shared/types.ts`: Worker とクライアントで共有する型（`Phase`、`HostView`、`ScreenView`、`GuestView`、メッセージ）。問題フェーズの `PhaseKey`（`lobby` / `q:<i>:<open|closed|revealed>`）はホストが `advance.from` として送り返し、結果フェーズは `r:list` / `r:<playerId>:<hidden|rank|name|both>` を `results_action.from` でも使う。サーバーは現在のキーと照合して冪等にする。**問題フェーズのエンコーディングを変えないこと。**
 - `src/worker/payload.ts`: 開催回作成時のクイズ JSON を zod で検証。
 - `src/client/`: React。`main.tsx` が `/s/:id`（ゲスト）、`/host/:id`（幹事画面。手元で進行操作と確認。会場には映さない）、`/screen/:id`（投影画面。プロジェクター用の別の PC で開き、操作せず幹事の操作に従う）を振り分ける。ホストトークン・投影画面トークンは URL から sessionStorage に移してアドレスバーから消す（`token-store.ts`）。ゲストは `playerToken` を保存して再接続時に同じ参加者として復帰する。共通の再接続処理は `reconnecting-socket.ts` / `use-live-socket.ts`。
 

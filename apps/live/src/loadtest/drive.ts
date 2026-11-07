@@ -51,10 +51,10 @@ const expectedView = (from: string): ((v: GuestView) => boolean) => {
 
 /**
  * Joins all guests, then drives the quiz from lobby through the last reveal
- * into the results list (the load test stops once the first results screen is
- * out; podium stages are small host-only steps). Each guest answers randomly in
- * every open phase. For every advance, measures how long until every guest has
- * received the matching new guest_view.
+ * into the results list (the load test stops at `r:list`; free-order projection
+ * steps are exercised separately). Each guest answers randomly in every open
+ * phase. For every advance, measures how long until every guest has received
+ * the matching new guest_view.
  */
 export const driveQuiz = async (opts: DriveOptions): Promise<LoadResult> => {
   const { host, guests } = opts;

@@ -10,11 +10,6 @@ export const hostActionLabel = (view: HostView): string | null => {
       return s.status === "open" ? "回答を締め切る" : "正解を発表";
     case "reveal":
       return s.isLast ? "結果発表へ" : "次の問題へ";
-    case "list":
-      return s.nextRank === null ? null : `${s.nextRank} 位を発表`;
-    case "podium":
-      if (!s.revealed) return "めくる";
-      return s.nextRank === null ? null : `${s.nextRank} 位へ`;
     case "ranking":
     case "ranking_detail":
       return null;

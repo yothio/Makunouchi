@@ -1,8 +1,5 @@
 export type Choice = 0 | 1 | 2 | 3;
 
-/** A podium slot: 1st, 2nd or 3rd place. */
-export type PodiumRank = 1 | 2 | 3;
-
 /**
  * Identifies a game phase as a string.
  * Question phases (`lobby`, `q:<index>:<open|closed|revealed>`) must not change encoding.
@@ -26,7 +23,6 @@ export type QuizPayload = {
 
 export type ResultsStage =
   | { kind: "list" }
-  | { kind: "podium"; rank: PodiumRank; revealed: boolean }
   | { kind: "player"; playerId: string; rankShown: boolean; nameShown: boolean };
 
 export type ResultsAction =
@@ -56,16 +52,6 @@ export type HostView = {
     | { kind: "lobby" }
     | { kind: "question"; question: PublicQuestion; status: "open" | "closed"; answeredCount: number }
     | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number]; isLast: boolean }
-    | { kind: "list"; entries: { rank: number; nickname: string; score: number }[]; nextRank: PodiumRank | null }
-    | {
-        kind: "podium";
-        rank: PodiumRank;
-        revealed: boolean;
-        /** empty while revealed=false */
-        players: { nickname: string; score: number }[];
-        /** next non-empty slot to announce, or null */
-        nextRank: PodiumRank | null;
-      }
     | { kind: "ranking"; entries: { playerId: string; rank: number; nickname: string; score: number }[] }
     | {
         kind: "ranking_detail";
@@ -80,15 +66,13 @@ export type HostView = {
 
 /**
  * What the projector shows. It is derived from the same state as HostView but carries only what may be on the
- * big screen: no answered count, no `correctIndex` before the reveal, and podium names only once revealed.
- * The list / podium kinds are the current results stages and are replaced when results are reworked.
+ * big screen: no answered count, no `correctIndex` before the reveal, and projected rank/name only after the host
+ * presses the matching button.
  */
 export type ScreenView =
   | { kind: "lobby"; title: string; playerCount: number }
   | { kind: "question"; question: PublicQuestion; status: "open" | "closed" }
   | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number] }
-  | { kind: "list"; entries: { rank: number; nickname: string; score: number }[] }
-  | { kind: "podium"; rank: PodiumRank; revealed: boolean; players: { nickname: string; score: number }[] }
   | { kind: "results_wait"; title: string }
   | { kind: "rank_reveal"; rank: number | null; nickname: string | null };
 

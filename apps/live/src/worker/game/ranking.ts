@@ -1,5 +1,3 @@
-import type { Phase, PodiumRank } from "../../shared/types";
-import { LIST_FIRST_RANK, PODIUM_RANKS } from "./rules";
 import { scoreOf } from "./scoring";
 import type { GameState } from "./types";
 
@@ -19,34 +17,4 @@ export const rankPlayers = (s: GameState): RankedPlayer[] => {
     ranked.push({ ...p, rank: prev && prev.score === p.score ? prev.rank : index + 1 });
   });
   return ranked;
-};
-
-export const listEntries = (ranked: RankedPlayer[]): RankedPlayer[] => {
-  return ranked.filter((p) => p.rank >= LIST_FIRST_RANK);
-};
-
-export const podiumPlayers = (ranked: RankedPlayer[], rank: PodiumRank): RankedPlayer[] => {
-  return ranked.filter((p) => p.rank === rank);
-};
-
-export const podiumHasPlayers = (ranked: RankedPlayer[], rank: PodiumRank): boolean => {
-  return ranked.some((p) => p.rank === rank);
-};
-
-/**
- * Next non-empty podium slot announced after `current` (scanning 3, 2, 1), or null.
- * `current` is the slot announced last; null means the list stage (nothing on the podium announced yet).
- */
-export const nextPodiumRank = (ranked: RankedPlayer[], current: PodiumRank | null): PodiumRank | null => {
-  const before = current ?? LIST_FIRST_RANK;
-  return PODIUM_RANKS.find((rank) => rank < before && podiumHasPlayers(ranked, rank)) ?? null;
-};
-
-export const isFinal = (phase: Phase, ranked: RankedPlayer[]): boolean => {
-  if (phase.type !== "results") return false;
-  const stage = phase.stage;
-  // Task 2 で置き換え
-  if (stage.kind === "player") return false;
-  if (stage.kind === "podium") return stage.rank === 1 && stage.revealed;
-  return !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
 };

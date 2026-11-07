@@ -84,20 +84,6 @@ describe("hostView", () => {
     const last = hostView(step(s, 5)); // q1 revealed
     expect(last.screen).toMatchObject({ kind: "reveal", isLast: true, counts: [0, 0, 0, 0] });
   });
-  test("podium で revealed=false の hostView には players が空で、ニックネームが含まれない", () => {
-    const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
-    const v = hostView(s);
-    expect(v.screen).toEqual({ kind: "podium", rank: 3, revealed: false, players: [], nextRank: 2 });
-    expect(JSON.stringify(v)).not.toContain("n2");
-  });
-  test("podium revealed: players と nextRank。1 位(表) の nextRank は null", () => {
-    const s = results([3, 3, 1]);
-    expect(hostView(at(s, { kind: "podium", rank: 1, revealed: true })).screen).toEqual({
-      kind: "podium", rank: 1, revealed: true, players: [{ nickname: "n0", score: 3 }, { nickname: "n1", score: 3 }], nextRank: null,
-    });
-    // rank 3 is n2; rank 2 slot empty -> next is 1
-    expect(hostView(at(s, { kind: "podium", rank: 3, revealed: true })).screen).toMatchObject({ nextRank: 1 });
-  });
 });
 
 describe("screenView", () => {
@@ -128,20 +114,6 @@ describe("screenView", () => {
     s = step(s);
     s = ok(submitAnswer(ok(submitAnswer(ok(submitAnswer(s, "p0", 0, 1)), "p1", 0, 1)), "p2", 0, 3));
     expect(screenView(step(s, 2))).toMatchObject({ kind: "reveal", correctIndex: 1, counts: [0, 2, 0, 1] });
-  });
-  test("podium で revealed=false の間は players が空で、ニックネームが含まれない", () => {
-    const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
-    expect(screenView(s)).toEqual({ kind: "podium", rank: 3, revealed: false, players: [] });
-    expect(JSON.stringify(screenView(s))).not.toContain("n2");
-  });
-  test("podium revealed: その順位の人が入る", () => {
-    const s = at(results([3, 3, 1]), { kind: "podium", rank: 1, revealed: true });
-    expect(screenView(s)).toEqual({
-      kind: "podium",
-      rank: 1,
-      revealed: true,
-      players: [{ nickname: "n0", score: 3 }, { nickname: "n1", score: 3 }],
-    });
   });
 });
 
@@ -232,9 +204,8 @@ describe("guestView", () => {
     const s = results([3, 2, 2, 1]);
     const stages: ResultsStage[] = [
       { kind: "list" },
-      { kind: "podium", rank: 3, revealed: false },
-      { kind: "podium", rank: 1, revealed: false },
-      { kind: "podium", rank: 1, revealed: true },
+      { kind: "player", playerId: "id0", rankShown: false, nameShown: false },
+      { kind: "player", playerId: "id0", rankShown: true, nameShown: false },
       { kind: "player", playerId: "id0", rankShown: true, nameShown: true },
     ];
     for (const stage of stages) {

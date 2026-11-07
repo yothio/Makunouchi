@@ -6,7 +6,6 @@ import {
   hostActionLabel,
   resultsActionMessage,
 } from "../../src/client/host/host-action";
-import { listHeader } from "../../src/client/screen/list-header";
 import type { HostView } from "../../src/shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
@@ -22,15 +21,6 @@ describe("hostActionLabel", () => {
     const s: Extract<HostView["screen"], { kind: "reveal" }> = { kind: "reveal", question: q, correctIndex: 0, counts: [0, 0, 0, 0], isLast: false };
     expect(hostActionLabel(v(s))).toBe("次の問題へ");
     expect(hostActionLabel(v({ ...s, isLast: true }))).toBe("結果発表へ");
-  });
-  test("list", () => {
-    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3 }))).toBe("3 位を発表");
-    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null }))).toBeNull();
-  });
-  test("podium", () => {
-    expect(hostActionLabel(v({ kind: "podium", rank: 3, revealed: false, players: [], nextRank: 2 }))).toBe("めくる");
-    expect(hostActionLabel(v({ kind: "podium", rank: 3, revealed: true, players: [], nextRank: 2 }))).toBe("2 位へ");
-    expect(hostActionLabel(v({ kind: "podium", rank: 1, revealed: true, players: [], nextRank: null }))).toBeNull();
   });
   test("ranking / ranking_detail では進行ボタンなし", () => {
     expect(hostActionLabel(v({ kind: "ranking", entries: [] }))).toBeNull();
@@ -57,14 +47,6 @@ describe("resultsActionMessage", () => {
       from: "r:list",
       action: { kind: "select", playerId: "p1" },
     });
-  });
-});
-
-describe("listHeader", () => {
-  test("derives from entries", () => {
-    expect(listHeader([])).toBe("4 位以下はいません");
-    expect(listHeader([{ rank: 4, nickname: "a", score: 1 }, { rank: 6, nickname: "b", score: 0 }])).toBe("4 位〜6 位");
-    expect(listHeader([{ rank: 5, nickname: "a", score: 1 }, { rank: 5, nickname: "b", score: 1 }, { rank: 7, nickname: "c", score: 0 }])).toBe("5 位〜7 位");
   });
 });
 

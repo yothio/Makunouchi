@@ -15,19 +15,15 @@ export const phaseKey = (phase: Phase): PhaseKey => {
     case "results": {
       const stage = phase.stage;
       if (stage.kind === "list") return "r:list";
-      if (stage.kind === "player") {
-        const shown =
-          stage.rankShown && stage.nameShown
-            ? "both"
-            : stage.rankShown
-              ? "rank"
-              : stage.nameShown
-                ? "name"
-                : "hidden";
-        return `r:${stage.playerId}:${shown}`;
-      }
-      // Task 4 で削除。旧 podium 段階のキー。
-      return `r:${stage.rank}:${stage.revealed ? "shown" : "hidden"}`;
+      const shown =
+        stage.rankShown && stage.nameShown
+          ? "both"
+          : stage.rankShown
+            ? "rank"
+            : stage.nameShown
+              ? "name"
+              : "hidden";
+      return `r:${stage.playerId}:${shown}`;
     }
   }
 };

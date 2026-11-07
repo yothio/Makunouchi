@@ -1,6 +1,5 @@
 import type { HostView, ResultsAction } from "../../shared/types";
 import { CHOICE_LABELS } from "../choice-labels";
-import { listHeader } from "../screen/list-header";
 import { RankDetailPanel } from "./RankDetailPanel";
 import { ResultsPanel } from "./ResultsPanel";
 
@@ -60,36 +59,6 @@ export const HostPanel = ({
           <p className="console-count">
             正解は {CHOICE_LABELS[s.correctIndex]}：{s.question.choices[s.correctIndex]}
           </p>
-        </div>
-      );
-    case "list":
-      return (
-        <div className="console">
-          <h1 className="console-title">結果発表: {listHeader(s.entries)}</h1>
-          <ol className="console-list">
-            {s.entries.map((e) => (
-              <li key={`${e.rank}:${e.nickname}`}>
-                {e.rank} 位 {e.nickname}（{e.score} 点）
-              </li>
-            ))}
-          </ol>
-        </div>
-      );
-    case "podium":
-      return (
-        <div className="console">
-          <h1 className="console-title">{s.rank} 位</h1>
-          <ul className="console-list">
-            {s.revealed ? (
-              s.players.map((p, i) => (
-                <li key={i}>
-                  {p.nickname}（{p.score} 点）
-                </li>
-              ))
-            ) : (
-              <li>（まだ投影していません）</li>
-            )}
-          </ul>
         </div>
       );
     case "ranking":

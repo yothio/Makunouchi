@@ -1,5 +1,5 @@
 import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "../../shared/types";
-import { nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
+import { rankPlayers } from "./ranking";
 import { revealedCount, scoreOf } from "./scoring";
 import { phaseKey } from "./state";
 import type { GameState, Player } from "./types";
@@ -44,32 +44,22 @@ export const hostView = (s: GameState): HostView => {
         const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
         return { ...base, screen: { kind: "ranking", entries } };
       }
-      if (stage.kind === "player") {
-        const entry = ranked.find((p) => p.playerId === stage.playerId);
-        if (!entry) {
-          const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
-          return { ...base, screen: { kind: "ranking", entries } };
-        }
-        return {
-          ...base,
-          screen: {
-            kind: "ranking_detail",
-            playerId: entry.playerId,
-            rank: entry.rank,
-            nickname: entry.nickname,
-            score: entry.score,
-            rankShown: stage.rankShown,
-            nameShown: stage.nameShown,
-          },
-        };
+      const entry = ranked.find((p) => p.playerId === stage.playerId);
+      if (!entry) {
+        const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
+        return { ...base, screen: { kind: "ranking", entries } };
       }
-      // Task 4 で削除。旧 podium 段階（到達不可）。
-      const players = stage.revealed
-        ? podiumPlayers(ranked, stage.rank).map(({ nickname, score }) => ({ nickname, score }))
-        : [];
       return {
         ...base,
-        screen: { kind: "podium", rank: stage.rank, revealed: stage.revealed, players, nextRank: nextPodiumRank(ranked, stage.rank) },
+        screen: {
+          kind: "ranking_detail",
+          playerId: entry.playerId,
+          rank: entry.rank,
+          nickname: entry.nickname,
+          score: entry.score,
+          rankShown: stage.rankShown,
+          nameShown: stage.nameShown,
+        },
       };
     }
   }
@@ -85,10 +75,6 @@ export const screenView = (s: GameState): ScreenView => {
       return { kind: "question", question: screen.question, status: screen.status };
     case "reveal":
       return { kind: "reveal", question: screen.question, correctIndex: screen.correctIndex, counts: screen.counts };
-    case "list":
-      return { kind: "list", entries: screen.entries };
-    case "podium":
-      return { kind: "podium", rank: screen.rank, revealed: screen.revealed, players: screen.players };
     case "ranking":
       return { kind: "results_wait", title };
     case "ranking_detail": {
