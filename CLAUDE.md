@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 結婚式の余興で使う 4 択クイズシステム（pnpm モノレポ）。**要件の正は `docs/requirements/`**（企画書・行動シナリオ・UI作成・手書きスケッチ。入口は `README.md`）。設計はそれに合わせて改訂した `docs/superpowers/specs/2026-10-25-wedding-quiz-design.md` にあり、食い違ったときは `docs/requirements/` を優先する。設計書の「未決事項」の節に、資料と現在の実装が食い違っている点をまとめてある。実装計画は `docs/superpowers/plans/` にある。
 
 - `apps/live`: 当日の進行を受け持つ Cloudflare Workers + Durable Object + React。現在あるのはこれだけ。
-- `apps/admin`: Rails 8 の管理画面（式・問題の CRUD、開催回の作成、結果保存）。設計上の予定で、まだ存在しない。
+- `apps/admin`: Rails 8 の管理画面（式・問題の CRUD、開催回の作成と幹事 ID/PASS の発行。結果の取り込み・保存はしない）。設計上の予定で、まだ存在しない。
 
 **最優先の品質は「本番中にアクセス集中で進行が止まらないこと」**（1 開催回あたり最大 120 人程度、負荷試験は 150 接続）。当日はゲストのアクセスが Rails に届かない構成にしている。
 
@@ -37,7 +37,7 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 1 つの Worker がフロントの静的アセット配信と API / WebSocket を兼ねる（`wrangler.jsonc` の `run_worker_first: ["/api/*", "/ws/*"]`、それ以外は SPA フォールバック）。
 
 - `src/worker/index.ts`（Hono）: 入口。
-  - `PUT /api/sessions/:id`（開催回の作成）と `GET /api/sessions/:id/ranking` は `Authorization: Bearer <ADMIN_API_SECRET>` で保護。Rails から呼ばれる想定。
+  - `PUT /api/sessions/:id`（開催回の作成）と `GET /api/sessions/:id/ranking` は `Authorization: Bearer <ADMIN_API_SECRET>` で保護。`PUT` は Rails から呼ばれる想定。`ranking` は管理画面からは呼ばない（結果の取り込み・保存は作らない）。
   - `GET /ws/:id/host?token=...` はホストトークン `HMAC-SHA256(ADMIN_API_SECRET, sessionId)`（hex）、`GET /ws/:id/screen?token=...` は投影画面トークン `HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`（hex）を検証。互いのトークンでは入れない。`/ws/:id/guest` は認証なし。
   - 開催回 ID は `/^[A-Za-z0-9_-]{1,100}$/` のみ（`PUT` で検証。`:` を許さないので host / screen のトークンの入力が衝突しない）。
   - `ADMIN_API_SECRET` が未設定・短すぎる場合は fail closed（500）。
