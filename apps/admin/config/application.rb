@@ -26,6 +26,10 @@ module Admin
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # UI は日本語（config/locales/ja.yml）。
+    config.i18n.default_locale = :ja
+    config.i18n.fallbacks = [ :en ]
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
