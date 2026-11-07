@@ -14,7 +14,8 @@ const fitsBox = (n: number, px: number, cols: number, box: ListBox, colGap: numb
   const rows = Math.ceil(n / cols);
   const height = rows * 1.6 * px + Math.max(0, rows - 1) * 0.2 * px;
   const colWidth = (box.width - (cols - 1) * colGap) / cols;
-  return height <= box.height && colWidth >= (8.4 + 4) * px;
+  // fixed part of a row 7.2em (rank 2.8 + score 3 + gaps 0.6 + padding 0.8) plus at least 6em for the name
+  return height <= box.height && colWidth >= (7.2 + 6) * px;
 };
 
 describe.each(screens)("chooseListLayout on $name", ({ box, colGap }) => {
