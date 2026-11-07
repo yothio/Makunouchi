@@ -60,6 +60,18 @@ export type HostView = {
       };
 };
 
+/**
+ * What the projector shows. It is derived from the same state as HostView but carries only what may be on the
+ * big screen: no answered count, no `correctIndex` before the reveal, and podium names only once revealed.
+ * The list / podium kinds are the current results stages and are replaced when results are reworked.
+ */
+export type ScreenView =
+  | { kind: "lobby"; title: string; playerCount: number }
+  | { kind: "question"; question: PublicQuestion; status: "open" | "closed" }
+  | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number] }
+  | { kind: "list"; entries: { rank: number; nickname: string; score: number }[] }
+  | { kind: "podium"; rank: PodiumRank; revealed: boolean; players: { nickname: string; score: number }[] };
+
 export type GuestView =
   | { kind: "lobby"; title: string; nickname: string }
   | { kind: "question"; question: PublicQuestion; status: "open" | "closed"; myChoice: Choice | null }
@@ -74,6 +86,7 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: "host_view"; view: HostView }
+  | { type: "screen_view"; view: ScreenView }
   | { type: "guest_view"; view: GuestView }
   | { type: "need_join" }
   | { type: "joined"; playerToken: string }

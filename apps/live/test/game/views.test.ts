@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { QuizPayload, ResultsStage } from "../../src/shared/types";
 import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "../../src/worker/game/state";
 import type { GameState } from "../../src/worker/game/types";
-import { guestView, hostView } from "../../src/worker/game/views";
+import { guestView, hostView, screenView } from "../../src/worker/game/views";
 
 const quiz: QuizPayload = {
   title: "T",
@@ -103,6 +103,57 @@ describe("hostView", () => {
     });
     // rank 3 is n2; rank 2 slot empty -> next is 1
     expect(hostView(at(s, { kind: "podium", rank: 3, revealed: true })).screen).toMatchObject({ nextRank: 1 });
+  });
+});
+
+describe("screenView", () => {
+  test("lobby: タイトルと参加人数。参加が増えると playerCount も増える", () => {
+    const s = join(createGameState(quiz), "a", "p1");
+    expect(screenView(s)).toEqual({ kind: "lobby", title: "T", playerCount: 1 });
+    expect(screenView(join(s, "b", "p2"))).toEqual({ kind: "lobby", title: "T", playerCount: 2 });
+  });
+  test("question: open / closed で status が変わり、JSON に correctIndex も answeredCount も含まれない", () => {
+    let s = join(join(createGameState(quiz), "a", "p1"), "b", "p2");
+    s = ok(submitAnswer(step(s), "p1", 0, 1));
+    const open = screenView(s);
+    expect(open).toEqual({
+      kind: "question",
+      status: "open",
+      question: { index: 0, total: 2, title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"] },
+    });
+    expect(screenView(step(s))).toMatchObject({ kind: "question", status: "closed" });
+    for (const st of [s, step(s)]) {
+      const json = JSON.stringify(screenView(st));
+      expect(json).not.toContain("correctIndex");
+      expect(json).not.toContain("answeredCount");
+    }
+    expect(screenView(s)).not.toHaveProperty("answeredCount");
+  });
+  test("reveal: correctIndex と選択肢ごとの counts", () => {
+    let s = ["a", "b", "c"].reduce((acc, n, i) => join(acc, n, `p${i}`), createGameState(quiz));
+    s = step(s);
+    s = ok(submitAnswer(ok(submitAnswer(ok(submitAnswer(s, "p0", 0, 1)), "p1", 0, 1)), "p2", 0, 3));
+    expect(screenView(step(s, 2))).toMatchObject({ kind: "reveal", correctIndex: 1, counts: [0, 2, 0, 1] });
+  });
+  test("list: 4 位以降が入る", () => {
+    expect(screenView(results([9, 9, 9, 7]))).toEqual({
+      kind: "list",
+      entries: [{ rank: 4, nickname: "n3", score: 7 }],
+    });
+  });
+  test("podium で revealed=false の間は players が空で、ニックネームが含まれない", () => {
+    const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
+    expect(screenView(s)).toEqual({ kind: "podium", rank: 3, revealed: false, players: [] });
+    expect(JSON.stringify(screenView(s))).not.toContain("n2");
+  });
+  test("podium revealed: その順位の人が入る", () => {
+    const s = at(results([3, 3, 1]), { kind: "podium", rank: 1, revealed: true });
+    expect(screenView(s)).toEqual({
+      kind: "podium",
+      rank: 1,
+      revealed: true,
+      players: [{ nickname: "n0", score: 3 }, { nickname: "n1", score: 3 }],
+    });
   });
 });
 
