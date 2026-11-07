@@ -1,14 +1,19 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { hostTokenFor, isUsableSecret, isValidSessionId, safeEqual, verifyBearer } from "./auth";
+import { hostTokenFor, isUsableSecret, isValidSessionId, safeEqual, screenTokenFor, verifyBearer } from "./auth";
 import { quizPayloadSchema } from "./payload";
-import { ROLE_HEADER } from "./role";
+import { isRole, ROLE_HEADER, type Role } from "./role";
 
 export { SessionRoom } from "./session-room";
 
 /** Weddings are in Japan; pin the DO near there even if Rails (Cloud Run) happens to call first from elsewhere. */
 const roomFor = (env: Env, sessionId: string) => {
   return env.SESSION_ROOM.getByName(sessionId, { locationHint: "apac-ne" });
+};
+
+/** The token a host or screen connection must present for this session. */
+const tokenFor = (role: Exclude<Role, "guest">, secret: string, sessionId: string): Promise<string> => {
+  return role === "host" ? hostTokenFor(secret, sessionId) : screenTokenFor(secret, sessionId);
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -52,15 +57,17 @@ app.get("/api/sessions/:sessionId/ranking", async (c) => {
 app.get(
   "/ws/:sessionId/:role",
   async (c, next) => {
-    if (c.req.param("role") === "host") return requireAdminSecret(c, next);
+    // host and screen are authenticated with tokens derived from ADMIN_API_SECRET.
+    const role = c.req.param("role");
+    if (role === "host" || role === "screen") return requireAdminSecret(c, next);
     await next();
   },
   async (c) => {
     const { sessionId, role } = c.req.param();
-    if (role !== "host" && role !== "guest") return c.json({ error: "not_found" }, 404);
+    if (!isRole(role)) return c.json({ error: "not_found" }, 404);
     if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
-    if (role === "host") {
-      const expected = await hostTokenFor(c.env.ADMIN_API_SECRET, sessionId);
+    if (role !== "guest") {
+      const expected = await tokenFor(role, c.env.ADMIN_API_SECRET, sessionId);
       if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
     }
     // SessionRoom.fetch returns 404 itself when the session was never initialised.

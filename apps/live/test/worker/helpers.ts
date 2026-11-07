@@ -1,5 +1,5 @@
 import { env, exports } from "cloudflare:workers";
-import { hostTokenFor } from "../../src/worker/auth";
+import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
 import type { QuizPayload, ServerMessage } from "../../src/shared/types";
 
 export const quiz: QuizPayload = {
@@ -80,6 +80,11 @@ export const connect = async (path: string): Promise<Client> => {
 export const connectHost = async (sessionId: string): Promise<Client> => {
   const token = await hostTokenFor(env.ADMIN_API_SECRET, sessionId);
   return connect(`/ws/${sessionId}/host?token=${token}`);
+};
+
+export const connectScreen = async (sessionId: string): Promise<Client> => {
+  const token = await screenTokenFor(env.ADMIN_API_SECRET, sessionId);
+  return connect(`/ws/${sessionId}/screen?token=${token}`);
 };
 
 export const connectGuest = (sessionId: string, playerToken?: string) =>

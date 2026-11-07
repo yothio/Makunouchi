@@ -4,11 +4,11 @@ import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Game
 import type { GameState } from "./game/types";
 import { isFinal, rankPlayers, type RankedPlayer } from "./game/ranking";
 import { parseClientMessage } from "./messages";
-import { ROLE_HEADER } from "./role";
-import { guestView, hostView } from "./game/views";
+import { isRole, ROLE_HEADER } from "./role";
+import { guestView, hostView, screenView } from "./game/views";
 
 type GuestAttachment = { role: "guest"; playerId: string | null };
-type Attachment = { role: "host" } | GuestAttachment;
+type Attachment = { role: "host" } | { role: "screen" } | GuestAttachment;
 
 const attachmentOf = (ws: WebSocket): Attachment | null => ws.deserializeAttachment() as Attachment | null;
 
@@ -42,7 +42,7 @@ export class SessionRoom extends DurableObject<Env> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     const url = new URL(request.url);
     const role = request.headers.get(ROLE_HEADER);
-    if (role !== "host" && role !== "guest") return new Response("bad role", { status: 400 });
+    if (!isRole(role)) return new Response("bad role", { status: 400 });
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -51,6 +51,9 @@ export class SessionRoom extends DurableObject<Env> {
     if (role === "host") {
       server.serializeAttachment({ role: "host" } satisfies Attachment);
       this.send(server, { type: "host_view", view: hostView(this.state) });
+    } else if (role === "screen") {
+      server.serializeAttachment({ role: "screen" } satisfies Attachment);
+      this.send(server, { type: "screen_view", view: screenView(this.state) });
     } else {
       const token = url.searchParams.get("playerToken");
       const player = token ? this.state.players.find((p) => p.token === token) : undefined;
@@ -145,25 +148,34 @@ export class SessionRoom extends DurableObject<Env> {
    * Single place deciding who is told what. Targets are collected first so each
    * socket receives at most one message per call.
    *
-   *   event            | hosts     | guests
-   *   -----------------|-----------|---------------------------
-   *   phase_changed    | host_view | guest_view to every joined guest
-   *   player_joined    | host_view | guest_view to that player
-   *   answer_recorded  | host_view | guest_view to that player
+   *   event            | hosts     | screens                         | guests
+   *   -----------------|-----------|---------------------------------|---------------------------------
+   *   phase_changed    | host_view | screen_view                     | guest_view to every joined guest
+   *   player_joined    | host_view | screen_view (only while lobby)  | guest_view to that player
+   *   answer_recorded  | host_view | -                               | guest_view to that player
+   *
+   * A screen only needs the participant count while the lobby is shown, and never the answered count,
+   * so joins after the start and answers do not touch it.
    */
   private deliver(events: GameEvent[]): void {
     const s = this.state;
     if (!s || events.length === 0) return;
     let hosts = false;
+    let screens = false;
     let allGuests = false;
     const guestIds = new Set<string>();
     for (const event of events) {
       switch (event.type) {
         case "phase_changed":
           hosts = true;
+          screens = true;
           allGuests = true;
           break;
         case "player_joined":
+          hosts = true;
+          if (s.phase.type === "lobby") screens = true;
+          guestIds.add(event.playerId);
+          break;
         case "answer_recorded":
           hosts = true;
           guestIds.add(event.playerId);
@@ -173,10 +185,15 @@ export class SessionRoom extends DurableObject<Env> {
     // Results stages rank every guest's view from the same state; rank once for all of them.
     const ranked = s.phase.type === "results" && allGuests ? rankPlayers(s) : undefined;
     const hostMsg: ServerMessage | null = hosts ? { type: "host_view", view: hostView(s) } : null;
+    const screenMsg: ServerMessage | null = screens ? { type: "screen_view", view: screenView(s) } : null;
     for (const ws of this.ctx.getWebSockets()) {
       const att = attachmentOf(ws);
       if (att?.role === "host") {
         if (hostMsg) this.send(ws, hostMsg);
+        continue;
+      }
+      if (att?.role === "screen") {
+        if (screenMsg) this.send(ws, screenMsg);
         continue;
       }
       if (att?.role !== "guest" || !att.playerId) continue;
