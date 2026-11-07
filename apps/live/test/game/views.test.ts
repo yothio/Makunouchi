@@ -84,12 +84,6 @@ describe("hostView", () => {
     const last = hostView(step(s, 5)); // q1 revealed
     expect(last.screen).toMatchObject({ kind: "reveal", isLast: true, counts: [0, 0, 0, 0] });
   });
-  test("list の nextRank は空でない最初の枠（90,90,90,70 なら 1）", () => {
-    const v = hostView(results([9, 9, 9, 7]));
-    expect(v.screen).toEqual({ kind: "list", entries: [{ rank: 4, nickname: "n3", score: 7 }], nextRank: 1 });
-    expect(hostView(results([9, 8, 7, 6])).screen).toMatchObject({ nextRank: 3 });
-    expect(hostView(results([])).screen).toMatchObject({ kind: "list", entries: [], nextRank: null });
-  });
   test("podium で revealed=false の hostView には players が空で、ニックネームが含まれない", () => {
     const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
     const v = hostView(s);
@@ -134,12 +128,6 @@ describe("screenView", () => {
     s = step(s);
     s = ok(submitAnswer(ok(submitAnswer(ok(submitAnswer(s, "p0", 0, 1)), "p1", 0, 1)), "p2", 0, 3));
     expect(screenView(step(s, 2))).toMatchObject({ kind: "reveal", correctIndex: 1, counts: [0, 2, 0, 1] });
-  });
-  test("list: 4 位以降が入る", () => {
-    expect(screenView(results([9, 9, 9, 7]))).toEqual({
-      kind: "list",
-      entries: [{ rank: 4, nickname: "n3", score: 7 }],
-    });
   });
   test("podium で revealed=false の間は players が空で、ニックネームが含まれない", () => {
     const s = at(results([3, 2, 1]), { kind: "podium", rank: 3, revealed: false });
@@ -247,6 +235,7 @@ describe("guestView", () => {
       { kind: "podium", rank: 3, revealed: false },
       { kind: "podium", rank: 1, revealed: false },
       { kind: "podium", rank: 1, revealed: true },
+      { kind: "player", playerId: "id0", rankShown: true, nameShown: true },
     ];
     for (const stage of stages) {
       const view = guestView(at(s, stage), "id2");
@@ -257,5 +246,83 @@ describe("guestView", () => {
   });
   test("未知の playerId は例外", () => {
     expect(() => guestView(createGameState(quiz), "nope")).toThrow("unknown player: nope");
+  });
+});
+
+describe("free-order results views", () => {
+  test("r:list は ranking で、全員が順位の昇順（1,1,3,4）。playerId と score を含む", () => {
+    const v = hostView(results([9, 9, 7, 6]));
+    expect(v.screen).toEqual({
+      kind: "ranking",
+      entries: [
+        { playerId: "id0", rank: 1, nickname: "n0", score: 9 },
+        { playerId: "id1", rank: 1, nickname: "n1", score: 9 },
+        { playerId: "id2", rank: 3, nickname: "n2", score: 7 },
+        { playerId: "id3", rank: 4, nickname: "n3", score: 6 },
+      ],
+    });
+  });
+
+  test("ranking_detail は選んだ人の rank / nickname / score と rankShown / nameShown を含む", () => {
+    const s = at(results([9, 7]), {
+      kind: "player",
+      playerId: "id1",
+      rankShown: true,
+      nameShown: false,
+    });
+    expect(hostView(s).screen).toEqual({
+      kind: "ranking_detail",
+      playerId: "id1",
+      rank: 2,
+      nickname: "n1",
+      score: 7,
+      rankShown: true,
+      nameShown: false,
+    });
+  });
+
+  test("参加者ゼロなら ranking の entries は空配列", () => {
+    expect(hostView(results([])).screen).toEqual({ kind: "ranking", entries: [] });
+  });
+
+  test("r:list と :hidden は results_wait。JSON に選んだ人のニックネームと順位が含まれない", () => {
+    const list = results([9, 7]);
+    expect(screenView(list)).toEqual({ kind: "results_wait", title: "T" });
+    const hidden = at(list, { kind: "player", playerId: "id0", rankShown: false, nameShown: false });
+    const wait = screenView(hidden);
+    expect(wait).toEqual({ kind: "results_wait", title: "T" });
+    expect(JSON.stringify(wait)).not.toContain("n0");
+    expect(JSON.stringify(wait)).not.toContain('"rank"');
+  });
+
+  test(":rank は rank_reveal で nickname null。JSON にニックネームが含まれない", () => {
+    const s = at(results([9, 7]), { kind: "player", playerId: "id0", rankShown: true, nameShown: false });
+    const view = screenView(s);
+    expect(view).toEqual({ kind: "rank_reveal", rank: 1, nickname: null });
+    expect(JSON.stringify(view)).not.toContain("n0");
+  });
+
+  test(":name は nickname のみ。JSON にその人の順位が現れない", () => {
+    const s = at(results([9, 7]), { kind: "player", playerId: "id0", rankShown: false, nameShown: true });
+    const view = screenView(s);
+    expect(view).toEqual({ kind: "rank_reveal", rank: null, nickname: "n0" });
+    expect(JSON.stringify(view)).toContain('"rank":null');
+  });
+
+  test(":both は両方入る", () => {
+    const s = at(results([9, 7]), { kind: "player", playerId: "id0", rankShown: true, nameShown: true });
+    expect(screenView(s)).toEqual({ kind: "rank_reveal", rank: 1, nickname: "n0" });
+  });
+
+  test("同順位の 2 人のうち一方を投影しても、もう一方のニックネームは JSON に含まれない", () => {
+    const s = at(results([9, 9, 7]), {
+      kind: "player",
+      playerId: "id0",
+      rankShown: true,
+      nameShown: true,
+    });
+    const json = JSON.stringify(screenView(s));
+    expect(json).toContain("n0");
+    expect(json).not.toContain("n1");
   });
 });

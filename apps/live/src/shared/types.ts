@@ -65,6 +65,16 @@ export type HostView = {
         players: { nickname: string; score: number }[];
         /** next non-empty slot to announce, or null */
         nextRank: PodiumRank | null;
+      }
+    | { kind: "ranking"; entries: { playerId: string; rank: number; nickname: string; score: number }[] }
+    | {
+        kind: "ranking_detail";
+        playerId: string;
+        rank: number;
+        nickname: string;
+        score: number;
+        rankShown: boolean;
+        nameShown: boolean;
       };
 };
 
@@ -78,7 +88,9 @@ export type ScreenView =
   | { kind: "question"; question: PublicQuestion; status: "open" | "closed" }
   | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; counts: [number, number, number, number] }
   | { kind: "list"; entries: { rank: number; nickname: string; score: number }[] }
-  | { kind: "podium"; rank: PodiumRank; revealed: boolean; players: { nickname: string; score: number }[] };
+  | { kind: "podium"; rank: PodiumRank; revealed: boolean; players: { nickname: string; score: number }[] }
+  | { kind: "results_wait"; title: string }
+  | { kind: "rank_reveal"; rank: number | null; nickname: string | null };
 
 /** One question whose answer has been revealed, with the viewer's own choice (null = no answer). */
 export type HistoryEntry = { index: number; choice: Choice | null; correct: boolean };

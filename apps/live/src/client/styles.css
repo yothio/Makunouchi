@@ -76,6 +76,20 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .console-choices, .console-list { margin: 0; padding-left: 1.2em; }
 .console-list { max-height: 60vh; overflow-y: auto; }
 .console-correct { color: #8fe08f; font-weight: 700; }
+.console-ranking { list-style: none; margin: 0; padding: 0; max-height: none; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4em; }
+.console-ranking-row { width: 100%; display: flex; gap: 0.75em; align-items: baseline; text-align: left; font: inherit; color: inherit; background: #2e2a26; border: 0; border-radius: 10px; padding: 0.55em 0.8em; cursor: pointer; }
+.console-ranking-row:disabled { opacity: 0.5; cursor: not-allowed; }
+.console-ranking-rank { flex: none; min-width: 4.5em; font-weight: 800; color: #f0b27a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.console-ranking-name { flex: 1; min-width: 0; font-weight: 700; }
+.console-ranking-score { flex: none; font-variant-numeric: tabular-nums; }
+.console-actions { display: flex; flex-direction: column; gap: 0.6em; margin-top: 1em; }
+.console-action { font: inherit; font-weight: 700; min-height: 3rem; border: 0; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; }
+.console-action:disabled { opacity: 0.45; cursor: not-allowed; }
+.console-action-back { background: #555; }
+.host-results-wait { text-align: center; padding-top: 18vh; }
+.host-rank-reveal { text-align: center; padding-top: 12vh; }
+.host-rank-big { font-size: 4em; font-weight: 800; margin: 0.1em 0; color: #f0b27a; }
+.host-name-big { font-size: 3em; font-weight: 800; margin: 0.2em 0; }
 
 /* Participant's own answers so far (shown while waiting) */
 .history { list-style: none; margin: 20px auto 0; padding: 0; max-width: 320px; max-height: 40vh; overflow-y: auto; text-align: left; }

@@ -1,5 +1,5 @@
 import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "../../shared/types";
-import { listEntries, nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
+import { nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
 import { revealedCount, scoreOf } from "./scoring";
 import { phaseKey } from "./state";
 import type { GameState, Player } from "./types";
@@ -40,11 +40,30 @@ export const hostView = (s: GameState): HostView => {
     case "results": {
       const stage = phase.stage;
       const ranked = rankPlayers(s);
-      // Task 2 で置き換え: player 段階は暫定で list と同じ扱い
-      if (stage.kind === "list" || stage.kind === "player") {
-        const entries = listEntries(ranked).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
-        return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null) } };
+      if (stage.kind === "list") {
+        const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
+        return { ...base, screen: { kind: "ranking", entries } };
       }
+      if (stage.kind === "player") {
+        const entry = ranked.find((p) => p.playerId === stage.playerId);
+        if (!entry) {
+          const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
+          return { ...base, screen: { kind: "ranking", entries } };
+        }
+        return {
+          ...base,
+          screen: {
+            kind: "ranking_detail",
+            playerId: entry.playerId,
+            rank: entry.rank,
+            nickname: entry.nickname,
+            score: entry.score,
+            rankShown: stage.rankShown,
+            nameShown: stage.nameShown,
+          },
+        };
+      }
+      // Task 4 で削除。旧 podium 段階（到達不可）。
       const players = stage.revealed
         ? podiumPlayers(ranked, stage.rank).map(({ nickname, score }) => ({ nickname, score }))
         : [];
@@ -70,6 +89,16 @@ export const screenView = (s: GameState): ScreenView => {
       return { kind: "list", entries: screen.entries };
     case "podium":
       return { kind: "podium", rank: screen.rank, revealed: screen.revealed, players: screen.players };
+    case "ranking":
+      return { kind: "results_wait", title };
+    case "ranking_detail": {
+      if (!screen.rankShown && !screen.nameShown) return { kind: "results_wait", title };
+      return {
+        kind: "rank_reveal",
+        rank: screen.rankShown ? screen.rank : null,
+        nickname: screen.nameShown ? screen.nickname : null,
+      };
+    }
   }
 };
 

@@ -1,9 +1,19 @@
-import type { HostView } from "../../shared/types";
+import type { HostView, ResultsAction } from "../../shared/types";
 import { CHOICE_LABELS } from "../choice-labels";
 import { listHeader } from "../screen/list-header";
+import { RankDetailPanel } from "./RankDetailPanel";
+import { ResultsPanel } from "./ResultsPanel";
 
 /** The operator's status panel: just enough to run the quiz. Big text, QR and bars belong to the projector. */
-export const HostPanel = ({ view }: { view: HostView | null }) => {
+export const HostPanel = ({
+  view,
+  resultsLocked,
+  onResultsAction,
+}: {
+  view: HostView | null;
+  resultsLocked: boolean;
+  onResultsAction: (action: ResultsAction) => void;
+}) => {
   if (!view) return <p className="host-wait">接続中…</p>;
   const s = view.screen;
   switch (s.kind) {
@@ -82,5 +92,15 @@ export const HostPanel = ({ view }: { view: HostView | null }) => {
           </ul>
         </div>
       );
+    case "ranking":
+      return (
+        <ResultsPanel
+          entries={s.entries}
+          locked={resultsLocked}
+          onSelect={(playerId) => onResultsAction({ kind: "select", playerId })}
+        />
+      );
+    case "ranking_detail":
+      return <RankDetailPanel detail={s} locked={resultsLocked} onAction={onResultsAction} />;
   }
 };

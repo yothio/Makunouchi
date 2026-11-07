@@ -4,6 +4,8 @@ import { listHeader } from "./list-header";
 import { LobbyScreen } from "./screens/LobbyScreen";
 import { PodiumScreen } from "./screens/PodiumScreen";
 import { QuestionScreen } from "./screens/QuestionScreen";
+import { RankRevealScreen } from "./screens/RankRevealScreen";
+import { ResultsWaitScreen } from "./screens/ResultsWaitScreen";
 import { RevealScreen } from "./screens/RevealScreen";
 
 /** Picks the projector screen for a ScreenView. */
@@ -25,5 +27,9 @@ export const ScreenContent = ({ view, sessionId }: { view: ScreenView | null; se
       );
     case "podium":
       return <PodiumScreen screen={view} />;
+    case "results_wait":
+      return <ResultsWaitScreen title={view.title} />;
+    case "rank_reveal":
+      return <RankRevealScreen screen={view} />;
   }
 };
