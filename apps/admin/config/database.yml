@@ -1,36 +1,27 @@
-# SQLite. Versions 3.8.0 and up are supported.
-#   gem install sqlite3
+# PostgreSQL (Neon). 接続先は DATABASE_URL で渡す。
+# 本番（Cloud Run）は Neon の pooled 接続用 URL を使う。primary の 1 つだけで、
+# cache / queue 用の別 DB は持たない（キャッシュはメモリ、Active Job は :async）。
 #
-#   Ensure the SQLite 3 gem is defined in your Gemfile
-#   gem "sqlite3"
-#
+#   development / test: DATABASE_URL が無ければローカルの Postgres
+#   （ユーザー・ホストは PGUSER / PGHOST などの環境変数で指定できる）
 default: &default
-  adapter: sqlite3
+  adapter: postgresql
+  encoding: unicode
   max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  timeout: 5000
 
 development:
   <<: *default
-  database: storage/development.sqlite3
+  url: <%= ENV["DATABASE_URL"] %>
+  database: <%= ENV["DATABASE_URL"] ? nil : "admin_development" %>
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
 # Do not set this db to the same as development or production.
 test:
   <<: *default
-  database: storage/test.sqlite3
+  url: <%= ENV["TEST_DATABASE_URL"] %>
+  database: <%= ENV["TEST_DATABASE_URL"] ? nil : "admin_test" %>
 
-# Store production database in the storage/ directory, which by default
-# is mounted as a persistent Docker volume in config/deploy.yml.
 production:
-  primary:
-    <<: *default
-    database: storage/production.sqlite3
-  cache:
-    <<: *default
-    database: storage/production_cache.sqlite3
-    migrations_paths: db/cache_migrate
-  queue:
-    <<: *default
-    database: storage/production_queue.sqlite3
-    migrations_paths: db/queue_migrate
+  <<: *default
+  url: <%= ENV["DATABASE_URL"] %>
