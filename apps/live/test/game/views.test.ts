@@ -157,6 +157,71 @@ describe("screenView", () => {
   });
 });
 
+describe("guestView history", () => {
+  const entry = (index: number, choice: number | null, correct: boolean) => ({ index, choice, correct });
+  /** q0 correct = 1, q1 correct = 2 */
+  const started = () => ["a", "b", "c"].reduce((acc, n, i) => join(acc, n, `p${i}`), createGameState(quiz));
+
+  test("出題中（open）は空。締め切り後（closed）も空で、現在の問題の正誤を JSON に出さない", () => {
+    let s = step(started());
+    s = ok(submitAnswer(s, "p0", 0, 1));
+    for (const st of [s, step(s)]) {
+      const view = guestView(st, "p0");
+      expect(view).toMatchObject({ kind: "question", history: [] });
+      expect(JSON.stringify(view)).not.toContain('"correct"');
+      expect(JSON.stringify(view)).not.toContain("correctIndex");
+    }
+  });
+  test("正解発表のあとに、本人の選択と正誤が入る（正解・誤答・未回答）", () => {
+    let s = step(started());
+    s = ok(submitAnswer(s, "p0", 0, 1));
+    s = ok(submitAnswer(s, "p1", 0, 3));
+    s = step(s, 2); // q:0:revealed
+    expect(guestView(s, "p0")).toMatchObject({ kind: "reveal", history: [entry(0, 1, true)] });
+    expect(guestView(s, "p1")).toMatchObject({ kind: "reveal", history: [entry(0, 3, false)] });
+    expect(guestView(s, "p2")).toMatchObject({ kind: "reveal", history: [entry(0, null, false)] });
+  });
+  test("次の問題が open の間は、現在の問題を含まず前の問題だけ", () => {
+    let s = step(started());
+    s = ok(submitAnswer(s, "p0", 0, 1));
+    s = step(s, 3); // q:1:open
+    s = ok(submitAnswer(s, "p0", 1, 2));
+    expect(guestView(s, "p0")).toMatchObject({ kind: "question", status: "open", history: [entry(0, 1, true)] });
+    expect(guestView(step(s), "p0")).toMatchObject({ kind: "question", status: "closed", history: [entry(0, 1, true)] });
+  });
+  test("結果発表では全問ぶんが index 昇順で入る", () => {
+    let s = step(started());
+    s = ok(submitAnswer(s, "p0", 0, 1));
+    s = step(s, 3);
+    s = ok(submitAnswer(s, "p0", 1, 0));
+    s = step(s, 3); // results list
+    expect(s.phase.type).toBe("results");
+    expect(guestView(s, "p0")).toEqual({
+      kind: "results_pending",
+      nickname: "a",
+      history: [entry(0, 1, true), entry(1, 0, false)],
+    });
+  });
+  test("途中参加の人は、参加前の問題が未回答として入る", () => {
+    let s = step(createGameState(quiz), 4); // q:1:open, nobody joined
+    s = join(s, "late", "late");
+    s = ok(submitAnswer(s, "late", 1, 2));
+    s = step(s, 2); // q:1:revealed
+    expect(guestView(s, "late")).toMatchObject({ kind: "reveal", history: [entry(0, null, false), entry(1, 2, true)] });
+  });
+  test("history には本人の回答だけが入り、他人のニックネームや回答が出ない", () => {
+    let s = step(join(join(createGameState(quiz), "alice", "p1"), "bobby", "p2"));
+    s = ok(submitAnswer(ok(submitAnswer(s, "p1", 0, 1)), "p2", 0, 3));
+    s = step(s, 2);
+    const view = guestView(s, "p1");
+    expect(JSON.stringify(view)).not.toContain("bobby");
+    expect(view).toMatchObject({ history: [entry(0, 1, true)] });
+  });
+  test("lobby の guest_view に history はない", () => {
+    expect(guestView(join(createGameState(quiz), "a", "p1"), "p1")).not.toHaveProperty("history");
+  });
+});
+
 describe("guestView", () => {
   test("lobby", () => {
     const s = join(createGameState(quiz), "a", "p1");
@@ -175,13 +240,20 @@ describe("guestView", () => {
     expect(guestView(s, "p1")).toMatchObject({ kind: "reveal", correctIndex: 1, myChoice: 1, correct: true, score: 1 });
     expect(guestView(s, "p2")).toMatchObject({ kind: "reveal", myChoice: null, correct: false, score: 0 });
   });
-  test("最終発表の途中（1 位を伏せている段階まで）は results_pending、1 位をめくった後は final", () => {
+  test("結果発表の間は、どの段階でも results_pending で、順位は送らない", () => {
     const s = results([3, 2, 2, 1]);
-    expect(guestView(s, "id0")).toEqual({ kind: "results_pending", nickname: "n0" });
-    expect(guestView(at(s, { kind: "podium", rank: 1, revealed: false }), "id0")).toEqual({ kind: "results_pending", nickname: "n0" });
-    expect(guestView(at(s, { kind: "podium", rank: 1, revealed: true }), "id2")).toEqual({
-      kind: "final", nickname: "n2", rank: 2, score: 2, playerCount: 4,
-    });
+    const stages: ResultsStage[] = [
+      { kind: "list" },
+      { kind: "podium", rank: 3, revealed: false },
+      { kind: "podium", rank: 1, revealed: false },
+      { kind: "podium", rank: 1, revealed: true },
+    ];
+    for (const stage of stages) {
+      const view = guestView(at(s, stage), "id2");
+      expect(view).toMatchObject({ kind: "results_pending", nickname: "n2" });
+      expect(JSON.stringify(view)).not.toContain("rank");
+      expect(JSON.stringify(view)).not.toContain("n0");
+    }
   });
   test("未知の playerId は例外", () => {
     expect(() => guestView(createGameState(quiz), "nope")).toThrow("unknown player: nope");

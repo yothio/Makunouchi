@@ -72,12 +72,26 @@ export type ScreenView =
   | { kind: "list"; entries: { rank: number; nickname: string; score: number }[] }
   | { kind: "podium"; rank: PodiumRank; revealed: boolean; players: { nickname: string; score: number }[] };
 
+/** One question whose answer has been revealed, with the viewer's own choice (null = no answer). */
+export type HistoryEntry = { index: number; choice: Choice | null; correct: boolean };
+
+/**
+ * `history` only ever holds questions whose answer has been revealed, so it never leaks the current question's
+ * result. Participants are never sent their rank: it is announced on the projector.
+ */
 export type GuestView =
   | { kind: "lobby"; title: string; nickname: string }
-  | { kind: "question"; question: PublicQuestion; status: "open" | "closed"; myChoice: Choice | null }
-  | { kind: "reveal"; question: PublicQuestion; correctIndex: Choice; myChoice: Choice | null; correct: boolean; score: number }
-  | { kind: "results_pending"; nickname: string }
-  | { kind: "final"; nickname: string; rank: number; score: number; playerCount: number };
+  | { kind: "question"; question: PublicQuestion; status: "open" | "closed"; myChoice: Choice | null; history: HistoryEntry[] }
+  | {
+      kind: "reveal";
+      question: PublicQuestion;
+      correctIndex: Choice;
+      myChoice: Choice | null;
+      correct: boolean;
+      score: number;
+      history: HistoryEntry[];
+    }
+  | { kind: "results_pending"; nickname: string; history: HistoryEntry[] };
 
 export type ClientMessage =
   | { type: "join"; nickname: string }

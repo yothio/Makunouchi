@@ -182,8 +182,6 @@ export class SessionRoom extends DurableObject<Env> {
           break;
       }
     }
-    // Results stages rank every guest's view from the same state; rank once for all of them.
-    const ranked = s.phase.type === "results" && allGuests ? rankPlayers(s) : undefined;
     const hostMsg: ServerMessage | null = hosts ? { type: "host_view", view: hostView(s) } : null;
     const screenMsg: ServerMessage | null = screens ? { type: "screen_view", view: screenView(s) } : null;
     for (const ws of this.ctx.getWebSockets()) {
@@ -200,7 +198,7 @@ export class SessionRoom extends DurableObject<Env> {
       if (!allGuests && !guestIds.has(att.playerId)) continue;
       // One bad attachment must not abort delivery to everyone else after the commit.
       try {
-        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId, ranked) });
+        this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
       } catch {
         // skip this socket
       }
