@@ -1,5 +1,5 @@
 import type { Choice, Phase, PhaseKey, QuizPayload } from "../../shared/types";
-import { nextPodiumRank, rankPlayers } from "./ranking";
+import { listPageCount, nextPodiumRank, rankPlayers } from "./ranking";
 import { CHOICE_COUNT, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "./rules";
 import type { GameState, Player } from "./types";
 
@@ -15,7 +15,7 @@ export const phaseKey = (phase: Phase): PhaseKey => {
       return `q:${phase.index}:${phase.status}`;
     case "results":
       return phase.stage.kind === "list"
-        ? "r:list"
+        ? `r:list:${phase.stage.page}`
         : `r:${phase.stage.rank}:${phase.stage.revealed ? "shown" : "hidden"}`;
   }
 };
@@ -91,10 +91,13 @@ const nextPhase = (s: GameState): Phase | null => {
       if (phase.status === "open") return { ...phase, status: "closed" };
       if (phase.status === "closed") return { ...phase, status: "revealed" };
       if (phase.index + 1 < s.quiz.questions.length) return { type: "question", index: phase.index + 1, status: "open" };
-      return { type: "results", stage: { kind: "list" } };
+      return { type: "results", stage: { kind: "list", page: 0 } };
     }
     case "results": {
       const stage = phase.stage;
+      if (stage.kind === "list" && stage.page + 1 < listPageCount(rankPlayers(s))) {
+        return { type: "results", stage: { kind: "list", page: stage.page + 1 } };
+      }
       if (stage.kind === "podium" && !stage.revealed) {
         return { type: "results", stage: { ...stage, revealed: true } };
       }

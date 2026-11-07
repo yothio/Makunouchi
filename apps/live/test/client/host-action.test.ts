@@ -18,8 +18,8 @@ describe("hostActionLabel", () => {
     expect(hostActionLabel(v({ ...s, isLast: true }))).toBe("結果発表へ");
   });
   test("list", () => {
-    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3 }))).toBe("3 位を発表");
-    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null }))).toBeNull();
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3, page: 0, pageCount: 1 }))).toBe("3 位を発表");
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null, page: 0, pageCount: 1 }))).toBeNull();
   });
   test("podium", () => {
     expect(hostActionLabel(v({ kind: "podium", rank: 3, revealed: false, players: [], nextRank: 2 }))).toBe("めくる");
