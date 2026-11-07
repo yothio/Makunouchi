@@ -53,9 +53,8 @@ Rails.application.configure do
   # 自前のジョブは無い。Active Storage の解析・削除ジョブだけを同一プロセスで流す。
   config.active_job.queue_adapter = :async
 
-  # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
-  # the I18n.default_locale when a translation cannot be found).
-  config.i18n.fallbacks = true
+  # i18n のフォールバックは config/application.rb（ja → en）で決める。ここで true にすると
+  # [:ja] だけに上書きされ、翻訳漏れが "Translation missing" になる。
 
   # Do not dump schema after migrations.
   config.active_record.dump_schema_after_migration = false

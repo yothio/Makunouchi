@@ -118,6 +118,11 @@ class InfrastructureTest < Minitest::Test
     assert yaml("config/storage.yml", env_name: "development", env_vars: {}).key?("r2")
   end
 
+  test "production は i18n のフォールバックを上書きしない（Translation missing を出さない）" do
+    refute_match(/^\s*config\.i18n\.fallbacks = true/, read("config/environments/production.rb"))
+    assert_match(/config\.i18n\.fallbacks = \[ :en \]/, read("config/application.rb"))
+  end
+
   test "production は force_ssl で /up を除外する" do
     production = read("config/environments/production.rb")
 

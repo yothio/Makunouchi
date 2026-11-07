@@ -72,7 +72,7 @@ USER 1000:1000
 COPY --chown=rails:rails --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY --chown=rails:rails --from=build /rails /rails
 
-# Entrypoint prepares the database.
+# Entrypoint（マイグレーションは流さない。README 参照）
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
 # PORT（Cloud Run が渡す。無ければ 8080）で待ち受ける。マイグレーションは起動時に流さない（README 参照）

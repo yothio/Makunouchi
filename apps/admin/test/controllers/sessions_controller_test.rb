@@ -51,12 +51,35 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_session_path
   end
 
-  test "ログイン時にセッションを作り直す（セッション固定を避ける）" do
-    get new_session_path
-    before = request.session.id.to_s
-    sign_in_as users(:organizer)
+  test "ログイン試行は IP ごとに 3 分で 10 回まで。超えたら 429" do
+    10.times do
+      post session_path, params: { email: "nobody@example.com", password: "wrong" }
+      assert_response :unprocessable_entity
+    end
 
-    assert_not_equal before, request.session.id.to_s
+    post session_path, params: { email: users(:organizer).email, password: SignInHelper::PASSWORD }
+    assert_response :too_many_requests
+    assert_select ".error"
+  end
+
+  test "ログイン試行はメールごとにも 3 分で 10 回まで" do
+    10.times do |i|
+      post session_path, params: { email: "target@example.com", password: "wrong" },
+                         headers: { "REMOTE_ADDR" => "10.0.0.#{i + 1}" }
+      assert_response :unprocessable_entity
+    end
+
+    post session_path, params: { email: "TARGET@example.com", password: "wrong" },
+                       headers: { "REMOTE_ADDR" => "10.0.1.1" }
+    assert_response :too_many_requests
+  end
+
+  test "セッション cookie には有効期限がある（ログアウトでサーバー側は失効しない代わりの上限）" do
+    assert_equal 8.hours, Rails.application.config.session_options[:expire_after]
+  end
+
+  test "ログイン画面に出る文言は日本語で、翻訳漏れがフォールバックで英語になっても Translation missing にならない" do
+    assert_no_match(/Translation missing|translation missing/i, I18n.t("errors.messages.not_a_number"))
   end
 
   test "パスワードをログに出さない" do

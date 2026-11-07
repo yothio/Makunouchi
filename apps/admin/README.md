@@ -36,11 +36,17 @@ bin/rails test
 
 ## マイグレーション
 
-コンテナの起動時には `db:prepare` を流さない。Neon の pooled 接続（PgBouncer のトランザクションモード）はアドバイザリロックと相性が悪く（Neon の文書もマイグレーションには direct 接続を勧めている。**要確認**）、Cloud Run の複数インスタンスが同時に流すと競合するため。デプロイのたびに direct 接続で 1 回だけ流す（Cloud Run のジョブ、またはデプロイ前の手動手順）:
+コンテナの起動時には `db:prepare` を流さない。Neon の pooled 接続（PgBouncer のトランザクションモード）はアドバイザリロックと相性が悪く（Neon の文書もマイグレーションには direct 接続を勧めている。**要確認**）、Cloud Run の複数インスタンスが同時に流すと競合するため。デプロイのたびに direct 接続で 1 回だけ流す（Cloud Run のジョブ、またはデプロイ前の手動手順）。**環境変数はアプリと同じものを渡し（`RAILS_MASTER_KEY` と `R2_*` の 4 つを含む。本番では `storage.yml` が起動時に必ず読まれ、欠けると `KeyError` で落ちる）、`DATABASE_URL` だけを direct に差し替える**:
 
 ```
 DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
 ```
+
+## ログインとセッション
+
+- セッションは暗号化 cookie ストアで、有効期限は 8 時間。**ログアウトしてもサーバー側では失効しない**（控えた cookie は期限まで使える）。cookie は HTTPS 限定・HttpOnly。共用 PC では 8 時間を過ぎるまでブラウザを閉じて cookie を消す。
+- ログイン試行は、接続元 IP ごと・メールアドレスごとに 3 分で 10 回まで（超えたら 429）。回数はインスタンスごと（Cloud Run の複数インスタンスでは緩くなる）。
+- パスワードの再設定機能は無い。忘れたときは管理者が DB で直す。
 
 ## 同時実行の目安
 

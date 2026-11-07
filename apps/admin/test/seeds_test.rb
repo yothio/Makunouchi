@@ -37,6 +37,14 @@ class SeedsTest < ActiveSupport::TestCase
     assert User.find_by(email: "existing@example.com").authenticate("existing-pass")
   end
 
+  test "弱い ADMIN_PASSWORD（12 文字未満）では seed が失敗して管理者を作らない" do
+    ENV["ADMIN_EMAIL"] = "weak@example.com"
+    ENV["ADMIN_PASSWORD"] = "short-pass"
+
+    assert_raises(ActiveRecord::RecordInvalid) { run_seeds }
+    assert_equal 0, User.count
+  end
+
   test "環境変数が無ければ何も作らずメッセージだけ出す" do
     ENV.delete("ADMIN_EMAIL")
     ENV.delete("ADMIN_PASSWORD")
