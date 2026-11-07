@@ -7,10 +7,9 @@ import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Tran
 
 const quiz: QuizPayload = {
   title: "T",
-  topN: 10,
   questions: [
-    { title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 1, points: 10 },
-    { title: "q1", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 2, points: 30 },
+    { title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 1 },
+    { title: "q1", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 2 },
   ],
 };
 
@@ -141,37 +140,45 @@ describe("joinPlayer", () => {
 });
 
 describe("scoreOf", () => {
-  test("closed の問題を数えず、revealed になって初めて加点（配点 10 と 30）", () => {
+  test("点数は正解数。closed の問題を数えず、revealed になって初めて加点", () => {
     let s = walk(withPlayer(), 1);
     s = ok(submitAnswer(s, "p1", 0, 1)); // correct
     s = walk(s, 1); // closed
     expect(scoreOf(s, s.players[0])).toBe(0);
     s = walk(s, 1); // revealed
-    expect(scoreOf(s, s.players[0])).toBe(10);
+    expect(scoreOf(s, s.players[0])).toBe(1);
     s = walk(s, 1); // q1 open
     s = ok(submitAnswer(s, "p1", 1, 2)); // correct
-    expect(scoreOf(s, s.players[0])).toBe(10);
+    expect(scoreOf(s, s.players[0])).toBe(1);
     s = walk(s, 2); // q1 revealed
-    expect(scoreOf(s, s.players[0])).toBe(40);
+    expect(scoreOf(s, s.players[0])).toBe(2);
   });
-  test("不正解は加点なし、results では全問採点", () => {
+  test("不正解・未回答は加点なし、results では全問採点", () => {
     let s = walk(withPlayer(), 1);
-    s = ok(submitAnswer(s, "p1", 0, 0));
+    s = ok(submitAnswer(s, "p1", 0, 0)); // wrong
     s = walk(s, 3);
-    s = ok(submitAnswer(s, "p1", 1, 2));
+    s = ok(submitAnswer(s, "p1", 1, 2)); // correct
     s = walk(s, 4);
     expect(s.phase.type).toBe("results");
-    expect(scoreOf(s, s.players[0])).toBe(30);
+    expect(scoreOf(s, s.players[0])).toBe(1);
+  });
+  test("参加前の問題と未回答の問題は 0 点のまま", () => {
+    let s = walk(createGameState(quiz), 4); // q:1:open, nobody joined yet
+    const joined = joinPlayer(s, "late", { id: "late", token: "tlate" });
+    if (!joined.ok) throw new Error("join failed");
+    s = ok(submitAnswer(joined.state, "late", 1, 2)); // correct, but q0 was missed
+    s = walk(s, 2); // q1 revealed
+    expect(scoreOf(s, s.players[0])).toBe(1);
   });
 });
 
 describe("results progression", () => {
   const resultsState = (scores: number[]): GameState => {
     const qs = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
-      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
+      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
     }));
     return {
-      quiz: { title: "T", topN: 10, questions: qs },
+      quiz: { title: "T", questions: qs },
       phase: { type: "results", stage: { kind: "list" } },
       players: scores.map((sc, i) => ({
         id: `id${i}`, token: `t${i}`, nickname: `p${i}`,

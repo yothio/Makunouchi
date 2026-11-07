@@ -10,7 +10,7 @@ export const scoreOf = (s: GameState, player: Player): number => {
   let total = 0;
   for (let i = 0; i < scoredUpTo; i++) {
     const q = s.quiz.questions[i];
-    if (player.answers[i] === q.correctIndex) total += q.points;
+    if (player.answers[i] === q.correctIndex) total += 1;
   }
   return total;
 };

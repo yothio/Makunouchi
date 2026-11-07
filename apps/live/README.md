@@ -19,7 +19,7 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
    ADMIN_API_SECRET=dev-secret-change-me-0123456789abcdef pnpm --filter live seed http://localhost:5173
    ```
 
-   `fixtures/sample-quiz.json`（5 問、topN 10）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、投影画面 URL（`/host/:id?token=...`）を表示する。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
+   `fixtures/sample-quiz.json`（5 問）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、投影画面 URL（`/host/:id?token=...`）を表示する。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
 
 ## テスト
 
@@ -74,7 +74,7 @@ pnpm --filter live loadtest https://makunouchi-live.<account>.workers.dev <sessi
 2. リハーサル回で `loadtest ... --clients 150` を実行し、PASS を確認する。
 3. 実機チェック（未実施。ブラウザでの確認が必要）:
    - ゲスト: 同じ端末で 2 タブを開き、同じニックネームで参加すると拒否される。参加後にリロードしても同じ参加者として復帰する。別ブラウザからは復帰しない。
-   - 投影画面: 16:9 で崩れずに収まる。特に ~97 人の一覧（topN 100 に近い数）と、10 人以下の一覧の両方を確認する。
+   - 投影画面: 16:9 で崩れずに収まる。特に ~97 人の一覧（参加人数の上限に近い数）と、10 人以下の一覧の両方を確認する。
    - 投影画面をリロードしても、現在の段階から再開される。
 4. 公開前のゲート（最初のリハーサルの前に必ず行う）:
    - 実際にデプロイした環境に対して `seed` と `loadtest --clients 150` を実行する（できればスマホのテザリング回線から）。

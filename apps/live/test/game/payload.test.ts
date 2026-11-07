@@ -7,14 +7,12 @@ const question = (over: Record<string, unknown> = {}) => {
     imageUrl: null,
     choices: ["a", "b", "c", "d"],
     correctIndex: 0,
-    points: 10,
     ...over,
   };
 };
 const payload = (over: Record<string, unknown> = {}, n = 5) => {
   return {
     title: "T",
-    topN: 10,
     questions: Array.from({ length: n }, () => question()),
     ...over,
   };
@@ -34,13 +32,6 @@ describe("quizPayloadSchema", () => {
     expect(quizPayloadSchema.safeParse(payload({}, 5)).success).toBe(true);
     expect(quizPayloadSchema.safeParse(payload({}, 15)).success).toBe(true);
   });
-  test("topN 3 は拒否、4 と 100 は通り 101 と小数は拒否", () => {
-    expect(quizPayloadSchema.safeParse(payload({ topN: 3 })).success).toBe(false);
-    expect(quizPayloadSchema.safeParse(payload({ topN: 4 })).success).toBe(true);
-    expect(quizPayloadSchema.safeParse(payload({ topN: 100 })).success).toBe(true);
-    expect(quizPayloadSchema.safeParse(payload({ topN: 101 })).success).toBe(false);
-    expect(quizPayloadSchema.safeParse(payload({ topN: 5.5 })).success).toBe(false);
-  });
   test("title の長さ", () => {
     expect(quizPayloadSchema.safeParse(payload({ title: "" })).success).toBe(false);
     expect(quizPayloadSchema.safeParse(payload({ title: "a".repeat(101) })).success).toBe(false);
@@ -59,14 +50,23 @@ describe("quizPayloadSchema", () => {
     expect(ok(4)).toBe(false);
     expect(ok(-1)).toBe(false);
   });
-  test("points は整数 1〜1000", () => {
-    const ok = (v: number) =>
-      quizPayloadSchema.safeParse(payload({ questions: Array(5).fill(question({ points: v })) })).success;
-    expect(ok(1)).toBe(true);
-    expect(ok(1000)).toBe(true);
-    expect(ok(0)).toBe(false);
-    expect(ok(1001)).toBe(false);
-    expect(ok(1.5)).toBe(false);
+  test("points と topN を含む旧形式も受け付け、パース結果には残さない", () => {
+    const legacy = {
+      title: "T",
+      topN: 10,
+      questions: Array.from({ length: 5 }, () => ({ ...question(), points: 10 })),
+    };
+    const result = quizPayloadSchema.safeParse(legacy);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).not.toHaveProperty("topN");
+    expect(result.data.questions[0]).not.toHaveProperty("points");
+  });
+  test("points と topN がなくても通る", () => {
+    const result = quizPayloadSchema.safeParse(payload());
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).toEqual(payload());
   });
   test("imageUrl は https か null", () => {
     const ok = (v: unknown) =>
