@@ -1,6 +1,6 @@
-import type { HostScreenOf } from "../types";
+import type { ScreenOf } from "../types";
 
-export const PodiumScreen = ({ screen: s }: { screen: HostScreenOf<"podium"> }) => {
+export const PodiumScreen = ({ screen: s }: { screen: ScreenOf<"podium"> }) => {
   return (
     <div className="host-podium">
       <h1 className="host-title">{s.rank} 位</h1>

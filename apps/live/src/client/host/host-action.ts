@@ -18,22 +18,6 @@ export const hostActionLabel = (view: HostView): string | null => {
   }
 };
 
-/** The header is derived from the listed entries (HostView carries no list size). */
-export const listHeader = <T extends { rank: number }>(entries: readonly T[]): string => {
-  if (entries.length === 0) return "4 位以下はいません";
-  const ranks = entries.map((e) => e.rank);
-  return `${Math.min(...ranks)} 位〜${Math.max(...ranks)} 位`;
-};
-
-export const buildHostUrl = (
-  loc: { protocol: string; host: string },
-  sessionId: string,
-  token: string,
-): string => {
-  const scheme = loc.protocol === "https:" ? "wss" : "ws";
-  return `${scheme}://${loc.host}/ws/${encodeURIComponent(sessionId)}/host?token=${encodeURIComponent(token)}`;
-};
-
 export const ADVANCE_LOCK_MS = 3000;
 
 /** After the phase changes, ignore advance input for a while so a double-click can't skip a screen. */

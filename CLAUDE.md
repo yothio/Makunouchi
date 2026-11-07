@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `typecheck`: `tsc --noEmit`（本体と `scripts/` の 2 つの tsconfig）。
 - `lint` / `lint:fix`: oxlint（`.oxlintrc.json`）。
 - `build` / `deploy`（`vite build && wrangler deploy`）。
-- `seed <baseUrl> [quiz.json]`: `fixtures/sample-quiz.json` で開催回を作り、ゲスト URL と投影画面 URL を表示する。`ADMIN_API_SECRET` 環境変数が必要。
+- `seed <baseUrl> [quiz.json]`: `fixtures/sample-quiz.json` で開催回を作り、ゲスト URL・幹事画面 URL・投影画面 URL を表示する。`ADMIN_API_SECRET` 環境変数が必要。
 - `loadtest <baseUrl> <sessionId> --clients 150`: ロビー状態の新しい開催回に対して実行する（開催回は戻せないので毎回 `seed` し直す）。
 
 単一テストの実行（`apps/live` で）:
@@ -38,15 +38,16 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 
 - `src/worker/index.ts`（Hono）: 入口。
   - `PUT /api/sessions/:id`（開催回の作成）と `GET /api/sessions/:id/ranking` は `Authorization: Bearer <ADMIN_API_SECRET>` で保護。Rails から呼ばれる想定。
-  - `GET /ws/:id/host?token=...` はホストトークン `HMAC-SHA256(ADMIN_API_SECRET, sessionId)`（hex）を検証。`/ws/:id/guest` は認証なし。
+  - `GET /ws/:id/host?token=...` はホストトークン `HMAC-SHA256(ADMIN_API_SECRET, sessionId)`（hex）、`GET /ws/:id/screen?token=...` は投影画面トークン `HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`（hex）を検証。互いのトークンでは入れない。`/ws/:id/guest` は認証なし。
+  - 開催回 ID は `/^[A-Za-z0-9_-]{1,100}$/` のみ（`PUT` で検証。`:` を許さないので host / screen のトークンの入力が衝突しない）。
   - `ADMIN_API_SECRET` が未設定・短すぎる場合は fail closed（500）。
   - role は Worker が決めて `ROLE_HEADER` で DO に渡す（クライアントが送った値は上書き）。
   - DO は `getByName(sessionId, { locationHint: "apac-ne" })` で開催回ごとに 1 インスタンス。
-- `src/worker/session-room.ts`（`SessionRoom` DO）: WebSocket Hibernation API を使う。状態は `GameState` 1 つを `ctx.storage.kv` の `"state"` キーに丸ごと保存。ソケットの role / playerId は `serializeAttachment` に持つ。ping/pong は `setWebSocketAutoResponse` で DO を起こさずに返す。誰に何を送るかは `deliver()` に集約されている。
-- `src/worker/game/`: 純関数のゲームロジック。`state.ts` の遷移関数（`joinPlayer` / `submitAnswer` / `advance`）は `Transition`（新しい state と `GameEvent[]`、または失敗理由）を返し、通知先は決めない。`views.ts` が state からホスト用・ゲスト用のビューを作る（ゲストには表彰台の発表が終わるまで順位を見せない等のネタバレ防止はここ）。`ranking.ts` は同点同順位の順位付け。
-- `src/shared/types.ts`: Worker とクライアントで共有する型（`Phase`、`HostView`、`GuestView`、メッセージ）。`PhaseKey`（`lobby` / `q:<i>:<open|closed|revealed>` / `r:list` / `r:<rank>:<hidden|shown>`）はホストが `advance.from` として送り返し、サーバーが advance の冪等性判定に使う。**エンコーディングを変えないこと。**
+- `src/worker/session-room.ts`（`SessionRoom` DO）: WebSocket Hibernation API を使う。状態は `GameState` 1 つを `ctx.storage.kv` の `"state"` キーに丸ごと保存。ソケットの role（`host` / `screen` / `guest`）/ playerId は `serializeAttachment` に持つ。ping/pong は `setWebSocketAutoResponse` で DO を起こさずに返す。誰に何を送るかは `deliver()` に集約されている。
+- `src/worker/game/`: 純関数のゲームロジック。`state.ts` の遷移関数（`joinPlayer` / `submitAnswer` / `advance`）は `Transition`（新しい state と `GameEvent[]`、または失敗理由）を返し、通知先は決めない。`views.ts` が state から幹事用（`hostView`）・投影画面用（`screenView`）・ゲスト用のビューを作る（ゲストには表彰台の発表が終わるまで順位を見せない等のネタバレ防止はここ）。`ranking.ts` は同点同順位の順位付け。
+- `src/shared/types.ts`: Worker とクライアントで共有する型（`Phase`、`HostView`、`ScreenView`、`GuestView`、メッセージ）。`PhaseKey`（`lobby` / `q:<i>:<open|closed|revealed>` / `r:list` / `r:<rank>:<hidden|shown>`）はホストが `advance.from` として送り返し、サーバーが advance の冪等性判定に使う。**エンコーディングを変えないこと。**
 - `src/worker/payload.ts`: 開催回作成時のクイズ JSON を zod で検証。
-- `src/client/`: React。`main.tsx` が `/s/:id`（ゲスト）と `/host/:id`（投影画面兼進行操作）を振り分ける。ホストトークンは URL から sessionStorage に移してアドレスバーから消す。ゲストは `playerToken` を保存して再接続時に同じ参加者として復帰する。共通の再接続処理は `reconnecting-socket.ts` / `use-live-socket.ts`。
+- `src/client/`: React。`main.tsx` が `/s/:id`（ゲスト）、`/host/:id`（幹事画面。手元で進行操作と確認。会場には映さない）、`/screen/:id`（投影画面。プロジェクター用の別の PC で開き、操作せず幹事の操作に従う）を振り分ける。ホストトークン・投影画面トークンは URL から sessionStorage に移してアドレスバーから消す（`token-store.ts`）。ゲストは `playerToken` を保存して再接続時に同じ参加者として復帰する。共通の再接続処理は `reconnecting-socket.ts` / `use-live-socket.ts`。
 
 進行状態はすべてサーバー（DO）が持ち、ブラウザ側では持たない。開催回の作成時に受け取った問題一式をその開催回の間ずっと使う。
 

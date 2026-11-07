@@ -1,6 +1,6 @@
 // Usage: ADMIN_API_SECRET=... pnpm --filter live seed <baseUrl> [quiz.json]
 import { readFileSync } from "node:fs";
-import { hostTokenFor } from "../src/worker/auth.ts";
+import { hostTokenFor, screenTokenFor } from "../src/worker/auth.ts";
 import { normalizeBase, requireSecret } from "./env.ts";
 
 const secret = requireSecret();
@@ -18,7 +18,9 @@ if (res.status !== 201) {
   console.error(`PUT failed: ${res.status} ${await res.text()}`);
   process.exit(1);
 }
-const token = await hostTokenFor(secret, sessionId);
-console.log(`sessionId : ${sessionId}`);
-console.log(`ゲスト URL : ${new URL(`/s/${sessionId}`, base)}`);
-console.log(`投影画面 URL: ${new URL(`/host/${sessionId}?token=${token}`, base)}`);
+const hostToken = await hostTokenFor(secret, sessionId);
+const screenToken = await screenTokenFor(secret, sessionId);
+console.log(`sessionId  : ${sessionId}`);
+console.log(`ゲスト URL  : ${new URL(`/s/${sessionId}`, base)}`);
+console.log(`幹事画面 URL: ${new URL(`/host/${sessionId}?token=${hostToken}`, base)}`);
+console.log(`投影画面 URL: ${new URL(`/screen/${sessionId}?token=${screenToken}`, base)}`);

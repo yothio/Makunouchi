@@ -1,4 +1,4 @@
-import { HostScreen } from "./HostScreen";
+import { HostPanel } from "./HostPanel";
 import { useHostSession } from "./useHostSession";
 
 export const HostApp = ({ sessionId, token }: { sessionId: string; token: string }) => {
@@ -8,7 +8,7 @@ export const HostApp = ({ sessionId, token }: { sessionId: string; token: string
     <div className="host">
       {!connected && <div className="host-banner">再接続中…</div>}
       <main className="host-main">
-        <HostScreen view={view} sessionId={sessionId} />
+        <HostPanel view={view} />
       </main>
       {label && (
         <button type="button" className="host-advance" disabled={!canAdvance} onClick={advance}>

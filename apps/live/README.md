@@ -19,7 +19,7 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
    ADMIN_API_SECRET=dev-secret-change-me-0123456789abcdef pnpm --filter live seed http://localhost:5173
    ```
 
-   `fixtures/sample-quiz.json`（5 問）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、投影画面 URL（`/host/:id?token=...`）を表示する。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
+   `fixtures/sample-quiz.json`（5 問）を `PUT /api/sessions/:id` で登録し、新しい sessionId（`crypto.randomUUID()`）、ゲスト URL（`/s/:id`）、幹事画面 URL（`/host/:id?token=...`）、投影画面 URL（`/screen/:id?token=...`）を表示する。幹事画面は手元の端末で進行操作に使い、投影画面は会場のプロジェクターにつないだ別の PC で開く。別の問題ファイルを使うときは第 2 引数に JSON のパスを渡す。
 
 ## テスト
 
@@ -47,7 +47,7 @@ pnpm --filter live deploy
 
 `deploy` は `vite build` のあと `wrangler deploy` を実行する。デプロイ先は `https://makunouchi-live.<account>.workers.dev`（`wrangler.jsonc` の `name`）。
 
-`ADMIN_API_SECRET` は Rails 側（`apps/admin`）と同じ値にする。Rails は `Authorization: Bearer <ADMIN_API_SECRET>` で API を呼び、`hostToken = HMAC-SHA256(ADMIN_API_SECRET, sessionId)`（hex）で投影画面 URL を作る。
+`ADMIN_API_SECRET` は Rails 側（`apps/admin`）と同じ値にする。Rails は `Authorization: Bearer <ADMIN_API_SECRET>` で API を呼び、`hostToken = HMAC-SHA256(ADMIN_API_SECRET, sessionId)`（hex）で幹事画面 URL を、`screenToken = HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`（hex）で投影画面 URL を作る。開催回 ID は英数字・`_`・`-` のみ（100 文字まで）。
 
 **本番の進行中は絶対にデプロイしない（全員の接続が切れる）。**
 
@@ -75,7 +75,7 @@ pnpm --filter live loadtest https://makunouchi-live.<account>.workers.dev <sessi
 3. 実機チェック（未実施。ブラウザでの確認が必要）:
    - ゲスト: 同じ端末で 2 タブを開き、同じニックネームで参加すると拒否される。参加後にリロードしても同じ参加者として復帰する。別ブラウザからは復帰しない。
    - 投影画面: 16:9 で崩れずに収まる。特に ~97 人の一覧（参加人数の上限に近い数）と、10 人以下の一覧の両方を確認する。
-   - 投影画面をリロードしても、現在の段階から再開される。
+   - 幹事画面と投影画面を別のタブ（本番は別の PC）で開き、幹事画面の操作に投影画面が連動する。投影画面をリロードしても、現在の段階から再開される。
 4. 公開前のゲート（最初のリハーサルの前に必ず行う）:
    - 実際にデプロイした環境に対して `seed` と `loadtest --clients 150` を実行する（できればスマホのテザリング回線から）。
    - 実際の投影用 PC のブラウザで、1280×720 と 1920×1080 の両方を確認する。結果一覧は 9〜10 人、24〜30 人、82〜97 人の 3 パターンで、切れずに表示される（収まらない場合はスクロールできる）ことを見る。
