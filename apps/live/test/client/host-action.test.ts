@@ -17,9 +17,18 @@ describe("hostActionLabel", () => {
     expect(hostActionLabel(v(s))).toBe("次の問題へ");
     expect(hostActionLabel(v({ ...s, isLast: true }))).toBe("結果発表へ");
   });
-  test("list", () => {
+  test("list: 1 ページだけなら今までどおり", () => {
     expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3, page: 0, pageCount: 1 }))).toBe("3 位を発表");
     expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null, page: 0, pageCount: 1 }))).toBeNull();
+  });
+  test("list: 途中のページは次のページへ（現在+2/全体）", () => {
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3, page: 0, pageCount: 3 }))).toBe("次のページへ（2/3）");
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3, page: 1, pageCount: 3 }))).toBe("次のページへ（3/3）");
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null, page: 0, pageCount: 2 }))).toBe("次のページへ（2/2）");
+  });
+  test("list: 最後のページは順位の発表へ（表彰台がなければボタンなし）", () => {
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3, page: 2, pageCount: 3 }))).toBe("3 位を発表");
+    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null, page: 2, pageCount: 3 }))).toBeNull();
   });
   test("podium", () => {
     expect(hostActionLabel(v({ kind: "podium", rank: 3, revealed: false, players: [], nextRank: 2 }))).toBe("めくる");

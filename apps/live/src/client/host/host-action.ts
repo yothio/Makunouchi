@@ -11,6 +11,7 @@ export const hostActionLabel = (view: HostView): string | null => {
     case "reveal":
       return s.isLast ? "結果発表へ" : "次の問題へ";
     case "list":
+      if (s.page + 1 < s.pageCount) return `次のページへ（${s.page + 2}/${s.pageCount}）`;
       return s.nextRank === null ? null : `${s.nextRank} 位を発表`;
     case "podium":
       if (!s.revealed) return "めくる";
