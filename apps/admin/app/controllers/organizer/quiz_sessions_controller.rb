@@ -58,7 +58,11 @@ module Organizer
       when :invalid_session_id
         "開催回 ID の形式が live に通りませんでした。"
       when :unauthorized
-        "live への認証に失敗しました。ADMIN_API_SECRET を確認してください。"
+        "live への認証に失敗しました。管理者に設定を確認してもらってください。"
+      when :misconfigured
+        "live への接続設定が不足しています。管理者に設定を確認してもらってください。"
+      when :insecure_image_url
+        "画像の公開 URL が https ではありません。R2 の公開設定を確認してから、もう一度送ってください。"
       else
         "live への登録に失敗しました。しばらくしてから、もう一度送ってください。"
       end

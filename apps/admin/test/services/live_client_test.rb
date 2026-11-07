@@ -48,7 +48,25 @@ class LiveClientTest < ActiveSupport::TestCase
     assert_equal :error, client.create_session("sess-1", PAYLOAD)
   end
 
+  test "LIVE_BASE_URL や ADMIN_API_SECRET 欠落は :misconfigured（再試行しない設定ミス）" do
+    original_base = ENV["LIVE_BASE_URL"]
+    original_secret = ENV["ADMIN_API_SECRET"]
+    ENV.delete("LIVE_BASE_URL")
+    ENV.delete("ADMIN_API_SECRET")
+
+    assert_equal :misconfigured, LiveClient.new.create_session("sess-1", PAYLOAD)
+  ensure
+    ENV["LIVE_BASE_URL"] = original_base
+    ENV["ADMIN_API_SECRET"] = original_secret
+  end
+
+  test "タイムアウト定数は同期再試行 3 回でもリクエストを長く止めすぎない値" do
+    assert_equal 3, LiveClient::OPEN_TIMEOUT
+    assert_equal 5, LiveClient::READ_TIMEOUT
+  end
+
   test "PUT は Bearer と JSON を付け、ranking は呼ばない" do
+
     calls = []
     client = LiveClient.new(
       base_url: "https://live.example.com",

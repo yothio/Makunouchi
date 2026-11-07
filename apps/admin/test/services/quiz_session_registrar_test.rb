@@ -92,4 +92,36 @@ class QuizSessionRegistrarTest < ActiveSupport::TestCase
     assert_equal :unauthorized, QuizSessionRegistrar.call(session2, client: client2)
     assert session2.reload.pending?
   end
+
+  test "一時失敗が 3 回続くと pending のまま呼び出しは 3 回" do
+    session = session_for
+    client = FakeClient.new(:error, :error, :error)
+
+    assert_equal :error, QuizSessionRegistrar.call(session, client: client)
+    assert session.reload.pending?
+    assert_equal 3, client.calls.size
+  end
+
+  test ":misconfigured は再試行せず pending のまま返す" do
+    session = session_for
+    client = FakeClient.new(:misconfigured, :created)
+
+    assert_equal :misconfigured, QuizSessionRegistrar.call(session, client: client)
+    assert session.reload.pending?
+    assert_equal 1, client.calls.size
+  end
+
+  test "InsecureImageUrl は pending のまま :insecure_image_url を返す" do
+    session = session_for
+    client = FakeClient.new(:created)
+    builder = Class.new do
+      def self.call(*)
+        raise QuizPayloadBuilder::InsecureImageUrl, "http://"
+      end
+    end
+
+    assert_equal :insecure_image_url, QuizSessionRegistrar.call(session, client: client, payload_builder: builder)
+    assert session.reload.pending?
+    assert_empty client.calls
+  end
 end

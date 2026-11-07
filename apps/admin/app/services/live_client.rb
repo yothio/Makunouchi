@@ -4,8 +4,9 @@ require "json"
 # apps/live の開催回 PUT だけを呼ぶ。ranking は呼ばない。
 # host を送ったのに応答に host: true が無いときは :host_not_registered（古い live への保険）。
 class LiveClient
-  OPEN_TIMEOUT = 5
-  READ_TIMEOUT = 10
+  # 同期再試行は最大 3 回。合計の待ちが長くなりすぎないよう短めにする（最悪 roughly 3×(3+5) 秒）。
+  OPEN_TIMEOUT = 3
+  READ_TIMEOUT = 5
 
   def initialize(base_url: nil, secret: nil, requester: nil)
     @base_url = base_url
@@ -16,7 +17,11 @@ class LiveClient
   def create_session(session_id, payload)
     code, body = put_session(session_id, payload)
     interpret(code, body)
-  rescue StandardError
+  rescue KeyError => error
+    log_failure(error)
+    :misconfigured
+  rescue StandardError => error
+    log_failure(error)
     :error
   end
 
@@ -66,5 +71,10 @@ class LiveClient
     else
       :error
     end
+  end
+
+  # Authorization・passwordHash・平文パスワードは出さない。
+  def log_failure(error)
+    Rails.logger.warn("[LiveClient] #{error.class}: #{error.message}")
   end
 end

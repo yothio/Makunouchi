@@ -241,4 +241,29 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal(%w[[FILTERED]], filtered.values.uniq)
   end
+
+  test "設定ミスは専用の案内を出し pending のまま（秘密名は出さない）" do
+    user = users(:organizer)
+    add_questions(user, 5)
+    sign_in_as user
+    @fake_live = FakeLiveClient.new(:misconfigured)
+    QuizSessionRegistrar.client_factory = -> { @fake_live }
+
+    post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
+    created = user.quiz_sessions.order(:id).last
+
+    assert created.pending?
+    follow_redirect!
+    assert_match(/接続設定が不足/, response.body)
+    assert_no_match(/ADMIN_API_SECRET/, response.body)
+  end
+
+  test "画像 URL 不正と認証失敗の案内に秘密名を出さない" do
+    alerts = Organizer::QuizSessionsController.new.send(:registration_alert, :insecure_image_url)
+    assert_match(/https ではありません/, alerts)
+
+    unauthorized = Organizer::QuizSessionsController.new.send(:registration_alert, :unauthorized)
+    assert_match(/管理者に設定を確認/, unauthorized)
+    assert_no_match(/ADMIN_API_SECRET/, unauthorized)
+  end
 end
