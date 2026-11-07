@@ -26,7 +26,7 @@ export const QuestionView = ({
       {view.status === "open" ? (
         <QuestionChoices question={q} mine={mine} disabled={disabled} onAnswer={onAnswer} />
       ) : (
-        <QuestionClosed question={q} mine={mine} />
+        <QuestionClosed question={q} mine={mine} history={view.history} />
       )}
     </section>
   );

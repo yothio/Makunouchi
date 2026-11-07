@@ -1,7 +1,16 @@
-import type { Choice, PublicQuestion } from "../../../shared/types";
+import type { Choice, HistoryEntry, PublicQuestion } from "../../../shared/types";
 import { CHOICE_LABELS } from "../../choice-labels";
+import { AnswerHistory } from "../AnswerHistory";
 
-export const QuestionClosed = ({ question, mine }: { question: PublicQuestion; mine: Choice | null }) => {
+export const QuestionClosed = ({
+  question,
+  mine,
+  history,
+}: {
+  question: PublicQuestion;
+  mine: Choice | null;
+  history: HistoryEntry[];
+}) => {
   return (
     <div className="closed">
       <p className="closed-title">締め切りました</p>
@@ -12,6 +21,7 @@ export const QuestionClosed = ({ question, mine }: { question: PublicQuestion; m
       ) : (
         <p>回答なし</p>
       )}
+      <AnswerHistory history={history} />
     </div>
   );
 };

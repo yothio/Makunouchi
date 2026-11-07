@@ -1,4 +1,5 @@
 import type { Choice, GuestView } from "../../shared/types";
+import { AnswerHistory } from "./AnswerHistory";
 import { JoinForm } from "./JoinForm";
 import type { JoinError, PendingAnswer } from "./types";
 import { QuestionView } from "./views/QuestionView";
@@ -33,6 +34,7 @@ export const GuestScreen = ({ view, needJoin, joinError, pending, disabled, onAn
               {view.correct ? "⭕" : "❌"}
             </div>
             <p className="score">{view.score} 点</p>
+            <AnswerHistory history={view.history} />
           </section>
         );
       case "results_pending":
@@ -40,15 +42,7 @@ export const GuestScreen = ({ view, needJoin, joinError, pending, disabled, onAn
           <section className="center">
             <p className="nick">{view.nickname}</p>
             <h1>結果発表中…</h1>
-          </section>
-        );
-      case "final":
-        return (
-          <section className="center">
-            <p className="nick">{view.nickname}</p>
-            <h1>
-              あなたは {view.rank} 位（{view.score} 点）
-            </h1>
+            <AnswerHistory history={view.history} />
           </section>
         );
     }
