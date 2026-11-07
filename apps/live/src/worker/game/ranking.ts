@@ -57,6 +57,7 @@ export const isFinal = (phase: Phase, ranked: RankedPlayer[]): boolean => {
   if (phase.type !== "results") return false;
   const stage = phase.stage;
   if (stage.kind === "podium") return stage.rank === 1 && stage.revealed;
-  // list stage: final only on the last page and when there is no podium to announce
-  return stage.page >= listPageCount(ranked) - 1 && !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
+  // list stage: final only when there is no podium to announce, i.e. nobody joined. Anyone listed implies a
+  // rank-1 player, so a list page beyond the first can never be final and needs no page condition.
+  return !PODIUM_RANKS.some((r) => podiumHasPlayers(ranked, r));
 };
