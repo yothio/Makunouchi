@@ -42,15 +42,6 @@ export const GuestScreen = ({ view, needJoin, joinError, pending, disabled, onAn
             <h1>結果発表中…</h1>
           </section>
         );
-      case "final":
-        return (
-          <section className="center">
-            <p className="nick">{view.nickname}</p>
-            <h1>
-              あなたは {view.rank} 位（{view.score} 点）
-            </h1>
-          </section>
-        );
     }
   }
   if (needJoin) return <JoinForm error={joinError} disabled={disabled} onSubmit={onJoin} />;

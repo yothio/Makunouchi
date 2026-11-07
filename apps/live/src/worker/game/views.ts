@@ -1,8 +1,8 @@
-import type { Choice, GuestView, HostView, PublicQuestion, ScreenView } from "../../shared/types";
-import { isFinal, listEntries, nextPodiumRank, podiumPlayers, rankPlayers, type RankedPlayer } from "./ranking";
-import { scoreOf } from "./scoring";
+import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "../../shared/types";
+import { listEntries, nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
+import { revealedCount, scoreOf } from "./scoring";
 import { phaseKey } from "./state";
-import type { GameState } from "./types";
+import type { GameState, Player } from "./types";
 
 const publicQuestion = (s: GameState, index: number): PublicQuestion => {
   const q = s.quiz.questions[index];
@@ -72,8 +72,17 @@ export const screenView = (s: GameState): ScreenView => {
   }
 };
 
-/** `ranked` may be passed by callers rendering many guests from one state (results stages only use it). */
-export const guestView = (s: GameState, playerId: string, ranked?: RankedPlayer[]): GuestView => {
+/** The player's own result for every question whose answer has been revealed. Never includes the current open / closed question. */
+const answerHistory = (s: GameState, player: Player): HistoryEntry[] => {
+  const history: HistoryEntry[] = [];
+  for (let index = 0; index < revealedCount(s); index++) {
+    const choice: Choice | null = player.answers[index] ?? null;
+    history.push({ index, choice, correct: choice !== null && choice === s.quiz.questions[index].correctIndex });
+  }
+  return history;
+};
+
+export const guestView = (s: GameState, playerId: string): GuestView => {
   const player = s.players.find((p) => p.id === playerId);
   if (!player) throw new Error(`unknown player: ${playerId}`);
   const phase = s.phase;
@@ -83,15 +92,20 @@ export const guestView = (s: GameState, playerId: string, ranked?: RankedPlayer[
     case "question": {
       const question = publicQuestion(s, phase.index);
       const myChoice: Choice | null = player.answers[phase.index] ?? null;
-      if (phase.status !== "revealed") return { kind: "question", question, status: phase.status, myChoice };
+      const history = answerHistory(s, player);
+      if (phase.status !== "revealed") return { kind: "question", question, status: phase.status, myChoice, history };
       const correctIndex = s.quiz.questions[phase.index].correctIndex;
-      return { kind: "reveal", question, correctIndex, myChoice, correct: myChoice === correctIndex, score: scoreOf(s, player) };
+      return {
+        kind: "reveal",
+        question,
+        correctIndex,
+        myChoice,
+        correct: myChoice === correctIndex,
+        score: scoreOf(s, player),
+        history,
+      };
     }
-    case "results": {
-      const all = ranked ?? rankPlayers(s);
-      if (!isFinal(phase, all)) return { kind: "results_pending", nickname: player.nickname };
-      const me = all.find((r) => r.playerId === playerId)!;
-      return { kind: "final", nickname: player.nickname, rank: me.rank, score: me.score, playerCount: s.players.length };
-    }
+    case "results":
+      return { kind: "results_pending", nickname: player.nickname, history: answerHistory(s, player) };
   }
 };
