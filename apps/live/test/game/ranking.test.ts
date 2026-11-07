@@ -53,9 +53,13 @@ describe("rankPlayers", () => {
     const r = rankPlayers(make([5, 9, 9]));
     expect(r.map((x) => x.nickname)).toEqual(["p1", "p2", "p0"]);
   });
-  test("listEntries は 4 位〜topN 位。topN=5 で rank 6 の人は含まない", () => {
-    const s = make([7, 6, 5, 4, 3, 2, 1], 5);
-    expect(listEntries(rankPlayers(s), s.quiz.topN).map((x) => x.rank)).toEqual([4, 5]);
+  test("listEntries は 4 位以下の全員（topN で切らない）", () => {
+    const s = make([7, 6, 5, 4, 3, 2, 1]);
+    expect(listEntries(rankPlayers(s)).map((x) => x.rank)).toEqual([4, 5, 6, 7]);
+  });
+  test("listEntries: 1 位が 3 人で 4 位が 1 人なら、4 位の 1 人だけ", () => {
+    const s = make([9, 9, 9, 7]);
+    expect(listEntries(rankPlayers(s)).map((x) => x.rank)).toEqual([4]);
   });
   test("同点で rank が 1 位から 4 位に飛ぶと、2 位・3 位の枠は空", () => {
     const s = make([9, 9, 9, 7]);

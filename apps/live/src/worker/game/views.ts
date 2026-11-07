@@ -41,7 +41,7 @@ export const hostView = (s: GameState): HostView => {
       const stage = phase.stage;
       const ranked = rankPlayers(s);
       if (stage.kind === "list") {
-        const entries = listEntries(ranked, s.quiz.topN).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
+        const entries = listEntries(ranked).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
         return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null) } };
       }
       const players = stage.revealed
