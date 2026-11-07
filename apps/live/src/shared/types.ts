@@ -16,12 +16,10 @@ export type QuizQuestion = {
   imageUrl: string | null;
   choices: [string, string, string, string];
   correctIndex: Choice;
-  points: number;
 };
 
 export type QuizPayload = {
   title: string;
-  topN: number;
   questions: QuizQuestion[];
 };
 

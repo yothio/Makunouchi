@@ -4,13 +4,11 @@ import type { QuizPayload, ServerMessage } from "../../src/shared/types";
 
 export const quiz: QuizPayload = {
   title: "Test Quiz",
-  topN: 4,
   questions: Array.from({ length: 5 }, (_, i) => ({
     title: `Q${i}`,
     imageUrl: null,
     choices: ["a", "b", "c", "d"] as [string, string, string, string],
     correctIndex: 1 as const,
-    points: 10,
   })),
 };
 

@@ -6,10 +6,9 @@ import { guestView, hostView } from "../../src/worker/game/views";
 
 const quiz: QuizPayload = {
   title: "T",
-  topN: 10,
   questions: [
-    { title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 1, points: 10 },
-    { title: "q1", imageUrl: "https://x/y.png", choices: ["a", "b", "c", "d"], correctIndex: 2, points: 30 },
+    { title: "q0", imageUrl: null, choices: ["a", "b", "c", "d"], correctIndex: 1 },
+    { title: "q1", imageUrl: "https://x/y.png", choices: ["a", "b", "c", "d"], correctIndex: 2 },
   ],
 };
 
@@ -27,11 +26,11 @@ const step = (s: GameState, n = 1): GameState => {
   return s;
 };
 /** Players with scores injected via answers; phase set to results list. */
-const results = (scores: number[], topN = 10): GameState => {
+const results = (scores: number[]): GameState => {
   const questions = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
-    title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const, points: 1,
+    title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
   }));
-  let s = createGameState({ title: "T", topN, questions });
+  let s = createGameState({ title: "T", questions });
   scores.forEach((_, i) => (s = join(s, `n${i}`, `id${i}`)));
   return {
     ...s,

@@ -18,7 +18,7 @@ export const hostActionLabel = (view: HostView): string | null => {
   }
 };
 
-/** topN is not in HostView, so the header is derived from the listed entries. */
+/** The header is derived from the listed entries (HostView carries no list size). */
 export const listHeader = <T extends { rank: number }>(entries: readonly T[]): string => {
   if (entries.length === 0) return "4 位以下はいません";
   const ranks = entries.map((e) => e.rank);
