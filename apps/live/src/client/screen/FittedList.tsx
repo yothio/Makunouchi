@@ -1,9 +1,9 @@
 import type { ScreenOf } from "./types";
 import { useFitToBox } from "./useFitToBox";
 
-/** Ranking list that never silently clips; see `useFitToBox` for the fitting strategy. */
+/** Ranking page whose font size and columns are computed to fit the box; see `useFitToBox`. */
 export const FittedList = ({ entries }: { entries: ScreenOf<"list">["entries"] }) => {
-  const ref = useFitToBox(entries);
+  const ref = useFitToBox(entries.length);
 
   return (
     <ol ref={ref} className="host-list host-list-grid">

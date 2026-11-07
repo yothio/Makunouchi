@@ -1,48 +1,37 @@
 import { useLayoutEffect, useRef } from "react";
+import { chooseListLayout, LIST_MAX_COLS, LIST_MIN_PX } from "./list-layout";
 
-const FIT_MAX_PX = 40;
-const FIT_MIN_PX = 12;
-// Up to ~117 rows (ranks 4..120) must fit a 16:9 projector without anyone operating it, so allow many columns.
-const FIT_MAX_COLS = 8;
-
-export type FitCandidate = { px: number; cols: number };
-
-/** Layouts to try in order: the largest font first and, for each font size, the fewest columns first. */
-export const fitCandidates = (): FitCandidate[] => {
-  const candidates: FitCandidate[] = [];
-  for (let px = FIT_MAX_PX; px >= FIT_MIN_PX; px--) {
-    for (let cols = 1; cols <= FIT_MAX_COLS; cols++) candidates.push({ px, cols });
-  }
-  return candidates;
-};
+/** Mirrors the list's max-height in styles.css (100vh - 34vh) for the unlikely case the computed value is unreadable. */
+const FALLBACK_HEIGHT_RATIO = 0.66;
 
 /**
- * Measure-and-fit for a grid list: try the largest font first and the fewest columns for it, and
- * only if nothing fits at the floor font size fall back to a visible scroll. `entries` is the data
- * rendered inside the element; re-fits whenever it changes.
+ * Applies the font size and column count that `chooseListLayout` computes for `count` rows to the list element.
+ * Rows have a constant height (names are cut with an ellipsis, never wrapped), so nothing is measured per
+ * candidate. The list never scrolls: if nothing fits at the minimum font the minimum is applied (pages are sized
+ * so that does not happen). Re-computed on window resize.
  */
-export const useFitToBox = (entries: unknown) => {
+export const useFitToBox = (count: number) => {
   const ref = useRef<HTMLOListElement>(null);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const fits = () => el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth;
     const fit = () => {
-      el.style.overflowY = "hidden";
-      for (const { px, cols } of fitCandidates()) {
-        el.style.fontSize = `${px}px`;
-        el.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-        if (fits()) return;
-      }
-      el.style.overflowY = "auto"; // cannot fit even at the floor: make the overflow visible and scrollable
+      const style = getComputedStyle(el);
+      const maxHeight = parseFloat(style.maxHeight);
+      const colGap = parseFloat(style.columnGap);
+      const box = {
+        width: el.clientWidth,
+        height: Number.isFinite(maxHeight) ? maxHeight : window.innerHeight * FALLBACK_HEIGHT_RATIO,
+      };
+      const layout = chooseListLayout(count, box, Number.isFinite(colGap) ? colGap : 0);
+      el.style.fontSize = `${layout?.px ?? LIST_MIN_PX}px`;
+      el.style.gridTemplateColumns = `repeat(${layout?.cols ?? LIST_MAX_COLS}, minmax(0, 1fr))`;
     };
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-    // `entries` is not read in the effect but drives the DOM being measured: re-fit whenever it changes.
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies
-  }, [entries]);
+  }, [count]);
 
   return ref;
 };
