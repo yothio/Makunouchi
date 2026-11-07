@@ -44,10 +44,13 @@ describe("load: 150 guests", () => {
       guests: guestClients.map(replay),
       log: (l) => console.log(l),
     });
-    // The projector gets one screen_view per advance, all of them by the time the last guest has its view.
-    await new Promise((r) => setTimeout(r, 200));
-    const screenStages = screen.messages.flatMap((m) => (m.type === "screen_view" && m.view.kind !== "lobby" ? [m.view] : []));
-    expect(screenStages).toHaveLength(result.advances.length);
+    // The projector gets one screen_view per advance. Wait for them instead of sleeping a fixed time.
+    const screenStages = () => screen.messages.flatMap((m) => (m.type === "screen_view" && m.view.kind !== "lobby" ? [m.view] : []));
+    const deadline = Date.now() + 5000;
+    while (screenStages().length < result.advances.length && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(screenStages()).toHaveLength(result.advances.length);
     screen.ws.close();
     console.log(`worst advance ${result.worstMs.toFixed(0)} ms, missing ${result.totalMissing}`);
     guestClients.forEach((c) => c.ws.close());

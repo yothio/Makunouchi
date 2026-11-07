@@ -109,6 +109,13 @@ describe("sessions API", () => {
     expect(hostWithScreenToken.status).toBe(401);
   });
 
+  it("WebSocket to an invalid session id is 404 for every role", async () => {
+    for (const role of ["host", "screen", "guest"]) {
+      const res = await exports.default.fetch(`https://x/ws/screen:abc/${role}?token=x`, { headers: { Upgrade: "websocket" } });
+      expect(res.status).toBe(404);
+    }
+  });
+
   it("WebSocket to uncreated session is 404", async () => {
     const id = newSessionId();
     const token = await hostTokenFor(env.ADMIN_API_SECRET, id);

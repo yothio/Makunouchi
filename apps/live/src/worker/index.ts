@@ -64,7 +64,7 @@ app.get(
   },
   async (c) => {
     const { sessionId, role } = c.req.param();
-    if (!isRole(role)) return c.json({ error: "not_found" }, 404);
+    if (!isRole(role) || !isValidSessionId(sessionId)) return c.json({ error: "not_found" }, 404);
     if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
     if (role !== "guest") {
       const expected = await tokenFor(role, c.env.ADMIN_API_SECRET, sessionId);

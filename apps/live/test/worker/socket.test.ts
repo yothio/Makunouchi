@@ -208,6 +208,23 @@ describe("SessionRoom screen", () => {
     expect(sv.view).toEqual({ kind: "lobby", title: "Test Quiz", playerCount: 1 });
   });
 
+  it("ignores join and answer sent from a screen", async () => {
+    const { id, host } = await setup();
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    screen.send({ type: "join", nickname: "Sneaky" });
+    host.send({ type: "advance", from: "lobby" });
+    await host.next("host_view", (m) => m.view.phaseKey === "q:0:open");
+    screen.send({ type: "answer", questionIndex: 0, choice: 1 });
+    await settle();
+    const ranking = (await rankingOf(id)).body;
+    expect(ranking.players).toHaveLength(0);
+    const hostView = host.messages.filter((m) => m.type === "host_view").at(-1);
+    expect(hostView?.type === "host_view" && hostView.view.playerCount).toBe(0);
+    expect(hostView?.type === "host_view" && hostView.view.screen).toMatchObject({ kind: "question", answeredCount: 0 });
+    expect(screen.ws.readyState).toBe(WebSocket.OPEN);
+  });
+
   it("ignores advance from a screen", async () => {
     const { id, host } = await setup();
     const screen = await connectScreen(id);
