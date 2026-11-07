@@ -6,13 +6,24 @@ export const LIST_MIN_PX = 20;
 export const LIST_MAX_PX = 40;
 export const LIST_MAX_COLS = 4;
 
-// Row dimensions in em; keep in sync with `.host-list-grid li` in styles.css.
-export const ROW_HEIGHT_EM = 1.6;
+// Row dimensions in em. styles.css must use the same values; test/client/list-layout-css.test.ts checks it.
+export const ROW_LINE_HEIGHT_EM = 1.3;
+export const ROW_PAD_Y_EM = 0.15;
+export const ROW_PAD_X_EM = 0.4;
+/** gap between rank, name and score inside a row */
+export const ROW_INNER_GAP_EM = 0.3;
+/** gap between rows (the grid's row gap) */
 export const ROW_GAP_EM = 0.2;
-/** rank + score + gap / padding of one row */
-export const ROW_FIXED_WIDTH_EM = 8.4;
-/** the nickname gets at least this much; longer names are cut with an ellipsis */
-export const NAME_MIN_WIDTH_EM = 4;
+/** width of the rank ("120 位" at most) */
+export const ROW_RANK_EM = 2.8;
+/** width of the score ("15 点" at most; tabular digits) */
+export const ROW_SCORE_EM = 3;
+
+export const ROW_HEIGHT_EM = ROW_LINE_HEIGHT_EM + 2 * ROW_PAD_Y_EM;
+/** rank + score + the two inner gaps + the left / right padding of one row */
+export const ROW_FIXED_WIDTH_EM = ROW_RANK_EM + ROW_SCORE_EM + 2 * ROW_INNER_GAP_EM + 2 * ROW_PAD_X_EM;
+/** the nickname gets at least this much (about 6 full-width characters); longer names are cut with an ellipsis */
+export const NAME_MIN_WIDTH_EM = 6;
 
 const fits = (count: number, px: number, cols: number, box: ListBox, colGapPx: number): boolean => {
   const rows = Math.ceil(count / cols);
