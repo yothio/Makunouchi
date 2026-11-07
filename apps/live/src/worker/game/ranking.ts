@@ -21,8 +21,8 @@ export const rankPlayers = (s: GameState): RankedPlayer[] => {
   return ranked;
 };
 
-export const listEntries = (ranked: RankedPlayer[], topN: number): RankedPlayer[] => {
-  return ranked.filter((p) => p.rank >= LIST_FIRST_RANK && p.rank <= topN);
+export const listEntries = (ranked: RankedPlayer[]): RankedPlayer[] => {
+  return ranked.filter((p) => p.rank >= LIST_FIRST_RANK);
 };
 
 export const podiumPlayers = (ranked: RankedPlayer[], rank: PodiumRank): RankedPlayer[] => {

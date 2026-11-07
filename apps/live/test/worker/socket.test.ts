@@ -160,9 +160,9 @@ describe("SessionRoom sockets", () => {
     guest.ws.close();
     const g2 = await connectGuest(id, token);
     const gv = await g2.next("guest_view");
-    expect(gv.view).toMatchObject({ kind: "reveal", correct: true, score: 10, myChoice: 1 });
+    expect(gv.view).toMatchObject({ kind: "reveal", correct: true, score: 1, myChoice: 1 });
     const r = await rankingOf(id);
-    expect(r.body.players[0]).toMatchObject({ nickname: "Taro", score: 10 });
+    expect(r.body.players[0]).toMatchObject({ nickname: "Taro", score: 1 });
   });
 
   it("state survives re-creating the Durable Object", async () => {

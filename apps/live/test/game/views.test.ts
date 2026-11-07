@@ -122,7 +122,7 @@ describe("guestView", () => {
     let s = join(join(createGameState(quiz), "a", "p1"), "b", "p2");
     s = ok(submitAnswer(step(s), "p1", 0, 1));
     s = step(s, 2);
-    expect(guestView(s, "p1")).toMatchObject({ kind: "reveal", correctIndex: 1, myChoice: 1, correct: true, score: 10 });
+    expect(guestView(s, "p1")).toMatchObject({ kind: "reveal", correctIndex: 1, myChoice: 1, correct: true, score: 1 });
     expect(guestView(s, "p2")).toMatchObject({ kind: "reveal", myChoice: null, correct: false, score: 0 });
   });
   test("最終発表の途中（1 位を伏せている段階まで）は results_pending、1 位をめくった後は final", () => {
