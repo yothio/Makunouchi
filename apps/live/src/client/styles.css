@@ -76,3 +76,12 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .console-choices, .console-list { margin: 0; padding-left: 1.2em; }
 .console-list { max-height: 60vh; overflow-y: auto; }
 .console-correct { color: #8fe08f; font-weight: 700; }
+
+/* Participant's own answers so far (shown while waiting) */
+.history { list-style: none; margin: 20px auto 0; padding: 0; max-width: 320px; max-height: 40vh; overflow-y: auto; text-align: left; }
+.history li { display: flex; gap: 12px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid #eee; font-size: 16px; }
+.history-q { flex: none; width: 3.5em; color: #666; }
+.history-choice { flex: 1; font-weight: 700; }
+.history-mark { flex: none; font-weight: 800; }
+.history-ok .history-mark { color: #2e7d32; }
+.history-ng .history-mark { color: #c62828; }
