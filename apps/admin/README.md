@@ -19,16 +19,16 @@
 
 | 変数 | 必須 | 用途 |
 |---|---|---|
-| `DATABASE_URL` | 本番必須 | アプリ用。Neon の **pooled** 接続 URL |
-| `DATABASE_URL_DIRECT` | マイグレーション時 | Neon の **direct** 接続 URL。アプリ起動では読まない（下の「マイグレーション」） |
+| `DATABASE_URL` | 本番必須 | アプリ用。Neon の **pooled** 接続 URL。Cloud Run **サービス**側にはこれだけ（direct は載せない） |
+| `DATABASE_URL_DIRECT` | マイグレーション時 | Neon の **direct** 接続 URL。アプリ起動では読まない。migrate/seed 用 Job（または手元）で `DATABASE_URL` に差し替えて使う |
 | `TEST_DATABASE_URL` | テスト推奨 | test の接続先。未設定ならローカルの `admin_test` |
-| `RAILS_MASTER_KEY` | 本番必須 | `config/master.key` の値 |
-| `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` / `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` / `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | 本番必須 | 幹事パスワード暗号化。`bin/rails db:encryption:init` で生成。失うと既存開催回の PASS が読めない |
+| `RAILS_MASTER_KEY` | 本番必須 | `credentials.yml.enc` 解読用。リポジトリには入れない。**作成者のローカル** `apps/admin/config/master.key` を手元で読み、Secret Manager に一度だけ保存する。クローンしただけではファイルは無い。失うと credentials の再発行が必要 |
+| `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` / `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` / `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | 本番必須 | 幹事パスワード暗号化。**ローカル開発**で `bin/rails db:encryption:init` を実行し、表示された 3 値を本番 Secret へ移す（production イメージ上では回さない。鍵が無いと Rails が起動できない鶏卵になる）。失うと既存開催回の PASS が読めない |
 | `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | 本番必須 | R2。欠けたら起動で落ちる |
 | `R2_PUBLIC_BASE_URL` | 画像付き開催回 | 公開 https のベース（`{base}/{blob.key}`）。カスタムドメイン。`r2.dev` は本番向けでない |
 | `ADMIN_API_SECRET` | live 連携必須 | live Worker と同じ値（本番は 32 文字以上）。PUT `/api/sessions/:id` の Bearer |
 | `LIVE_BASE_URL` | live 連携必須 | Rails → Worker の API ベース（例: `https://makunouchi-live.<account>.workers.dev`） |
-| `LIVE_PUBLIC_URL` | 推奨 | 開催回詳細に出す参列者・幹事 URL の元 |
+| `LIVE_PUBLIC_URL` | 本番で画面を使うなら必須 | 開催回詳細の参列者・幹事 URL の元。未設定だと URL が空（先頭が欠けたパス）になり、画面からコピーできない |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 初回 seed | システム管理者 1 人。`ADMIN_PASSWORD` は **12 文字以上**。既に管理者がいれば seed は何もしない |
 | `PORT` | Cloud Run が渡す | 待ち受け。無いときの既定は本番 8080、開発・テスト 3000 |
 | `RAILS_LOG_LEVEL` | 任意 | 既定 `info` |
@@ -62,9 +62,9 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='your-long-password' bin/rails db:s
 DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
 ```
 
-## Cloud Run へのデプロイ（手順の骨格）
+## Cloud Run へのデプロイ
 
-実アカウント操作はこの文書では行わない。初回は下の「ユーザーが手で行う初回設定」を済ませてから。
+GCP コンソール（または同等の UI）での手作業を前提にする。`gcloud` の長いコマンド例は意図的に省略する（アカウント・リージョン・リポジトリ名が環境ごとに違うため）。初回は下の「ユーザーが手で行う初回設定」を済ませてから。
 
 1. **イメージをビルド**（`apps/admin` で）:
 
@@ -72,14 +72,21 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
    docker build -t admin .
    ```
 
-2. Artifact Registry 等へ push し、Cloud Run サービスを作成／更新する。
+2. Artifact Registry 等へタグ付けして push し、Cloud Run **サービス**を作成／リビジョン更新する。
 3. **サービス設定の要点**:
    - コンテナポート: `8080`（または `PORT` に合わせる）
    - **Startup probe / Liveness probe**: HTTP `GET /up`（`force_ssl` は `/up` をリダイレクト除外済み）
-   - 環境変数・Secret: 上表の本番必須項目
+   - 環境変数・Secret: 上表の本番必須項目。**`DATABASE_URL` は pooled だけ**（`DATABASE_URL_DIRECT` はサービスに常設しない）
    - 同時リクエスト数の既定（80）と Puma スレッド 3・DB `max_connections` 5 の前提を変えるときは三つを合わせて見直す
-4. **デプロイごとに** `DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate` を 1 回（Jobs または手元からイメージ／同じ環境で）
-5. **初回だけ** `ADMIN_EMAIL` / `ADMIN_PASSWORD` を渡して `bin/rails db:seed`
+4. **デプロイごとに migrate を 1 回**（推奨: Cloud Run **Jobs**）:
+   - サービスと **同じコンテナイメージ**を使う
+   - 環境変数・Secret はサービスと同一にする
+   - そのうえで Job だけ `DATABASE_URL` を **direct**（`DATABASE_URL_DIRECT` の値）に差し替える
+   - コマンド: `bin/rails db:migrate`（起動エントリはサービスと同じでよい）
+   - 手元で流す場合も同じ: イメージまたはローカルから、本番と同じ鍵一式＋`DATABASE_URL=<direct>` で `bin/rails db:migrate`
+5. **初回だけ seed**（同様に Job または手元）:
+   - `ADMIN_EMAIL` / `ADMIN_PASSWORD`（12 文字以上）を渡して `bin/rails db:seed`
+   - 既にシステム管理者がいれば何もしない（冪等）
 6. ブラウザでログインし、問題作成・開催回作成（live は stub または結合後の実 PUT）を確認
 
 ### Active Job（`:async`）について
@@ -117,27 +124,30 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
 - [ ] `PORT` を尊重して待ち受けている（Cloud Run が渡す）
 - [ ] `config.assume_ssl = true` と `force_ssl`（`/up` は除外）
 - [ ] Startup / Liveness probe が `GET /up`
-- [ ] `DATABASE_URL`（pooled）とマイグレーション用 `DATABASE_URL_DIRECT` が分かれている
+- [ ] Cloud Run **サービス**の `DATABASE_URL` は pooled だけ（direct は Job／手元の migrate 時だけ）
 - [ ] デプロイごとに migrate を 1 回だけ流した（起動時には流していない）
 - [ ] 初回 `db:seed` で管理者を作った（`ADMIN_PASSWORD` 12 文字以上）
-- [ ] Active Record Encryption の 3 鍵を Secret に入れ、バックアップした
+- [ ] Active Record Encryption の 3 鍵を（ローカルで生成し）Secret に入れ、バックアップした
+- [ ] `RAILS_MASTER_KEY` を作成者ローカルの `master.key` から Secret に入れた（リポジトリには無い）
 - [ ] R2 の 4 変数 + `R2_PUBLIC_BASE_URL`（https）
 - [ ] R2 CORS が管理画面オリジンのみ
 - [ ] `ADMIN_API_SECRET` が live と一致（32 文字以上）
-- [ ] `LIVE_BASE_URL` / `LIVE_PUBLIC_URL` が正しい
+- [ ] `LIVE_BASE_URL` / `LIVE_PUBLIC_URL` が正しい（後者未設定だと詳細の URL が空）
 - [ ] Task 6 マージ前に本番 live へ `host` 付き PUT をしていない
 - [ ] Active Job `:async` のジョブ欠落を許容していることを理解している
 - [ ] `master.key` / 各種秘密がリポジトリとログに出ていない
 
 ## ユーザーが手で行う初回設定
 
-1. Neon プロジェクト（pooled / direct の 2 URL）
-2. Cloudflare R2 バケット・公開カスタムドメイン・CORS・API トークン
-3. `bin/rails db:encryption:init` で暗号化鍵を生成し Secret に保存
-4. `RAILS_MASTER_KEY` と `ADMIN_API_SECRET`（live と共有）を用意
-5. Artifact Registry（または相当）と Cloud Run サービス作成、probe を `/up` に
-6. イメージ push → 環境変数設定 → migrate → seed → 動作確認
-7. live の Task 6 マージ後に、リハーサル開催回で実 PUT と幹事ログインを確認
+順番つきの詳細はリポジトリ外の作業メモ（`.scratchpad/task7-user-setup.md`）にもまとめる。概要:
+
+1. Neon（pooled / direct の 2 URL）
+2. R2 バケット・https 公開・CORS・API トークン
+3. **ローカル開発**で `bin/rails db:encryption:init` → 3 値を Secret へ（production 上では回さない）
+4. 作成者ローカルの `config/master.key` を読んで `RAILS_MASTER_KEY` を Secret へ。`ADMIN_API_SECRET`（live と共有）を用意
+5. Artifact Registry + Cloud Run サービス（probe = `/up`、サービスの DB は pooled のみ）
+6. イメージ push → Secret／環境変数 → Job で migrate（`DATABASE_URL`=direct）→ 初回だけ seed → 動作確認
+7. Task 6 マージ後にリハーサル開催回で実 PUT と幹事ログイン
 
 ## 注意
 
