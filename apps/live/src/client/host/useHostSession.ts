@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import type { HostView } from "../../shared/types";
+import { buildSocketUrl } from "../socket-url";
 import { useLiveSocket } from "../use-live-socket";
-import { AdvanceGate, buildHostUrl, hostActionLabel } from "./host-action";
+import { AdvanceGate, hostActionLabel } from "./host-action";
 
 export const useHostSession = (sessionId: string, token: string) => {
   const [view, setView] = useState<HostView | null>(null);
@@ -10,7 +11,7 @@ export const useHostSession = (sessionId: string, token: string) => {
   const { cooling, locked } = useSyncExternalStore(gate.subscribe, gate.getSnapshot);
 
   const { send, connected, forceReconnect } = useLiveSocket(
-    () => buildHostUrl(window.location, sessionId, token),
+    () => buildSocketUrl(window.location, "host", sessionId, token),
     {
       onMessage: (msg) => {
         if (msg.type !== "host_view") return;

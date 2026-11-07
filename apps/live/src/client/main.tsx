@@ -1,41 +1,32 @@
 import { createRoot } from "react-dom/client";
 import { GuestApp } from "./guest/GuestApp";
 import { HostApp } from "./host/HostApp";
+import { ScreenApp } from "./screen/ScreenApp";
+import { resolveToken, type TokenRole } from "./token-store";
 import "./styles.css";
 
-/**
- * The host token is a credential and the projector shows the URL bar: move it from the query string
- * into sessionStorage (so a reload still works) and strip it from the address.
- */
-const resolveHostToken = (sessionId: string): string => {
-  const key = `makunouchi:${sessionId}:hostToken`;
-  const params = new URLSearchParams(window.location.search);
-  const fromUrl = params.get("token");
-  if (fromUrl) {
-    try {
-      sessionStorage.setItem(key, fromUrl);
-    } catch {
-      // storage unavailable; token only lives for this page load
-    }
-    params.delete("token");
-    const qs = params.toString();
-    history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
-    return fromUrl;
-  }
+const tokenFor = (role: TokenRole, sessionId: string): string => {
+  let storage: Storage | null = null;
   try {
-    return sessionStorage.getItem(key) ?? "";
+    storage = sessionStorage;
   } catch {
-    return "";
+    // storage blocked
   }
+  return resolveToken(role, sessionId, {
+    search: window.location.search,
+    pathname: window.location.pathname,
+    hash: window.location.hash,
+    storage,
+    replaceUrl: (url) => history.replaceState(null, "", url),
+  });
 };
 
 const Router = () => {
   const parts = window.location.pathname.split("/").filter(Boolean);
   const id = parts[1];
   if (parts[0] === "s" && id && parts.length === 2) return <GuestApp sessionId={id} />;
-  if (parts[0] === "host" && id && parts.length === 2) {
-    return <HostApp sessionId={id} token={resolveHostToken(id)} />;
-  }
+  if (parts[0] === "host" && id && parts.length === 2) return <HostApp sessionId={id} token={tokenFor("host", id)} />;
+  if (parts[0] === "screen" && id && parts.length === 2) return <ScreenApp sessionId={id} token={tokenFor("screen", id)} />;
   return <p className="note">URL が正しくありません</p>;
 };
 

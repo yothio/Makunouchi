@@ -67,3 +67,12 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .host-list-grid li { line-height: 1.3; min-width: 0; gap: 0.5em; padding: 0.15em 0.5em; }
 .host-list-grid .host-rank { width: 3em; flex: none; }
 .host-list-grid .host-name { min-width: 0; overflow-wrap: anywhere; }
+
+/* Host (operator) console: compact status, not for the projector */
+.console { font-size: 1rem; line-height: 1.5; max-width: 40rem; margin: 0 auto; }
+.console-title { font-size: 1.3em; margin: 0.2em 0 0.5em; }
+.console-progress { margin: 0; color: #f0b27a; font-weight: 700; }
+.console-count { font-size: 1.1em; font-weight: 700; margin: 0.6em 0; }
+.console-choices, .console-list { margin: 0; padding-left: 1.2em; }
+.console-list { max-height: 60vh; overflow-y: auto; }
+.console-correct { color: #8fe08f; font-weight: 700; }

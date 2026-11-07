@@ -1,8 +1,8 @@
-import type { HostScreenOf } from "./types";
+import type { ScreenOf } from "./types";
 import { useFitToBox } from "./useFitToBox";
 
 /** Ranking list that never silently clips; see `useFitToBox` for the fitting strategy. */
-export const FittedList = ({ entries }: { entries: HostScreenOf<"list">["entries"] }) => {
+export const FittedList = ({ entries }: { entries: ScreenOf<"list">["entries"] }) => {
   const ref = useFitToBox(entries);
 
   return (

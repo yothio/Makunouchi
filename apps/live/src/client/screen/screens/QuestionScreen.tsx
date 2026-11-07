@@ -1,8 +1,8 @@
 import { CHOICE_LABELS } from "../../choice-labels";
 import { QuestionBlock } from "../QuestionBlock";
-import type { HostScreenOf } from "../types";
+import type { ScreenOf } from "../types";
 
-export const QuestionScreen = ({ screen: s, playerCount }: { screen: HostScreenOf<"question">; playerCount: number }) => {
+export const QuestionScreen = ({ screen: s }: { screen: ScreenOf<"question"> }) => {
   return (
     <div>
       <QuestionBlock q={s.question} />
@@ -14,9 +14,7 @@ export const QuestionScreen = ({ screen: s, playerCount }: { screen: HostScreenO
           </li>
         ))}
       </ul>
-      <p className="host-count">
-        回答済み {s.answeredCount} / {playerCount} 人{s.status === "closed" ? "（締め切りました）" : ""}
-      </p>
+      {s.status === "closed" && <p className="host-count">締め切りました</p>}
     </div>
   );
 };
