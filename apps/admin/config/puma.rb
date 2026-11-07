@@ -28,8 +28,8 @@
 threads_count = ENV.fetch("RAILS_MAX_THREADS", 3)
 threads threads_count, threads_count
 
-# Cloud Run は PORT を渡してくる。無いときは 8080。
-port ENV.fetch("PORT", 8080)
+# Cloud Run は PORT を渡してくる。無いときの既定は、本番だけ 8080、開発・テストは雛形どおり 3000。
+port ENV.fetch("PORT") { ENV["RAILS_ENV"] == "production" ? 8080 : 3000 }
 
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart

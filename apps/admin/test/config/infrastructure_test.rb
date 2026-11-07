@@ -13,22 +13,26 @@ class InfrastructureTest < Minitest::Test
 
   def read(path) = root.join(path).read
 
-  # storage.yml が Rails.root / Rails.env を ERB で参照するので、Rails を起動せずに最小限だけ用意する。
-  unless defined?(Rails)
-    module ::Rails
-      def self.root = Pathname.new(File.expand_path("../..", __dir__))
+  # storage.yml の ERB が参照する Rails を、環境ごとに差し替えて描画する（本物の Rails は使わない）。
+  FakeEnv = Struct.new(:name) do
+    def production? = name == "production"
 
-      def self.env = "test"
-    end
+    def to_s = name
   end
 
-  def yaml(path)
+  def yaml(path, env_name: "test", env_vars: {})
+    fake_rails = Module.new
+    fake_rails.define_singleton_method(:root) { Pathname.new(File.expand_path("../..", __dir__)) }
+    fake_rails.define_singleton_method(:env) { FakeEnv.new(env_name) }
+    sandbox = Module.new
+    sandbox.const_set(:Rails, fake_rails)
+    sandbox.const_set(:ENV, env_vars)
     body = read(path).lines.reject { |line| line.start_with?("#") }.join
-    YAML.safe_load(ERB.new(body).result, aliases: true)
+    YAML.safe_load(ERB.new(body).result(sandbox.module_eval("binding")), aliases: true)
   end
 
   test "データベースは PostgreSQL の primary 1 つだけ" do
-    config = yaml("config/database.yml")
+    config = yaml("config/database.yml", env_vars: {})
 
     %w[development test production].each do |env|
       assert_equal "postgresql", config.fetch(env).fetch("adapter"), "#{env} は postgresql"
@@ -69,7 +73,10 @@ class InfrastructureTest < Minitest::Test
   end
 
   test "Puma は PORT（既定 8080）で待ち受ける" do
-    assert_match(/ENV\.fetch\("PORT", 8080\)/, read("config/puma.rb"))
+    puma = read("config/puma.rb")
+    assert_match(/ENV\.fetch\("PORT"\)/, puma)
+    assert_match(/production.*8080|8080.*production/m, puma)
+    assert_match(/3000/, puma)
     dockerfile = read("Dockerfile")
     assert_match(/EXPOSE 8080/, dockerfile)
     refute_match(/EXPOSE 80\b|EXPOSE 3000/, dockerfile)
@@ -82,17 +89,45 @@ class InfrastructureTest < Minitest::Test
     refute_match(/^require "action_text\/engine"/, application)
   end
 
+  R2_VARS = {
+    "R2_BUCKET" => "bucket", "R2_ENDPOINT" => "https://abc.r2.cloudflarestorage.com",
+    "R2_ACCESS_KEY_ID" => "id", "R2_SECRET_ACCESS_KEY" => "secret"
+  }.freeze
+
   test "Active Storage の本番は R2（S3 互換）で、チェックサムは when_required" do
-    storage = yaml("config/storage.yml")
-    r2 = storage.fetch("r2")
+    r2 = yaml("config/storage.yml", env_name: "production", env_vars: R2_VARS).fetch("r2")
 
     assert_equal "S3", r2.fetch("service")
     assert_equal "auto", r2.fetch("region")
-    assert_match(/r2\.cloudflarestorage\.com/, r2.fetch("endpoint").to_s)
+    assert_equal "https://abc.r2.cloudflarestorage.com", r2.fetch("endpoint")
     assert_equal "when_required", r2.fetch("request_checksum_calculation")
     assert_equal "when_required", r2.fetch("response_checksum_validation")
     assert_match(/config\.active_storage\.service = :r2/, read("config/environments/production.rb"))
     assert_match(/config\.active_storage\.service = :local/, read("config/environments/development.rb"))
+  end
+
+  test "本番では R2 の設定が欠けたら黙ってダミーに落ちず、起動で落ちる" do
+    R2_VARS.each_key do |name|
+      assert_raises(KeyError, "#{name} が無いのに描画できてしまう") do
+        yaml("config/storage.yml", env_name: "production", env_vars: R2_VARS.except(name))
+      end
+    end
+  end
+
+  test "開発・テストでは R2 の環境変数が無くても storage.yml を描画できる" do
+    assert yaml("config/storage.yml", env_name: "development", env_vars: {}).key?("r2")
+  end
+
+  test "production は force_ssl で /up を除外する" do
+    production = read("config/environments/production.rb")
+
+    assert_match(/^\s*config\.force_ssl = true/, production)
+    assert_match(/config\.ssl_options = .*\/up/, production)
+  end
+
+  test "起動のたびに db:prepare を流さない（マイグレーションは direct 接続で別に流す）" do
+    refute_match(/db:(prepare|migrate)/, read("bin/docker-entrypoint"))
+    assert_match(/DATABASE_URL_DIRECT/, read("README.md"))
   end
 
   test "master.key とシークレットを追跡しない" do

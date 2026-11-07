@@ -3,7 +3,8 @@
 
 # Cloud Run 向け。PORT（既定 8080）で待ち受ける。手元で試すとき:
 # docker build -t admin .
-# docker run -d -p 8080:8080 -e RAILS_MASTER_KEY=<value from config/master.key> -e DATABASE_URL=... --name admin admin
+# docker run -d -p 8080:8080 -e RAILS_MASTER_KEY=<value from config/master.key> -e DATABASE_URL=... \
+#   -e R2_BUCKET=... -e R2_ENDPOINT=... -e R2_ACCESS_KEY_ID=... -e R2_SECRET_ACCESS_KEY=... --name admin admin
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
@@ -53,8 +54,8 @@ COPY . .
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY.
-# R2_BUCKET は本番の起動時に必須（storage.yml の r2）。ビルド中だけダミーを渡す。
-RUN SECRET_KEY_BASE_DUMMY=1 R2_BUCKET=build-dummy ./bin/rails assets:precompile
+# R2_* は本番の起動時に必須（storage.yml の r2）。ビルド中だけダミーを渡す（ENV ではないのでイメージには残らない）。
+RUN SECRET_KEY_BASE_DUMMY=1 R2_BUCKET=build-dummy R2_ENDPOINT=https://build-dummy.invalid R2_ACCESS_KEY_ID=build-dummy R2_SECRET_ACCESS_KEY=build-dummy ./bin/rails assets:precompile
 
 
 
@@ -74,6 +75,6 @@ COPY --chown=rails:rails --from=build /rails /rails
 # Entrypoint prepares the database.
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
-# PORT（Cloud Run が渡す。無ければ 8080）で待ち受ける。起動時に bin/docker-entrypoint が db:prepare を流す
+# PORT（Cloud Run が渡す。無ければ 8080）で待ち受ける。マイグレーションは起動時に流さない（README 参照）
 EXPOSE 8080
 CMD ["./bin/rails", "server"]
