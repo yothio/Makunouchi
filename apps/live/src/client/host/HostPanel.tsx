@@ -1,9 +1,18 @@
-import type { HostView } from "../../shared/types";
+import type { HostView, ResultsAction } from "../../shared/types";
 import { CHOICE_LABELS } from "../choice-labels";
-import { listHeader } from "../screen/list-header";
+import { RankDetailPanel } from "./RankDetailPanel";
+import { ResultsPanel } from "./ResultsPanel";
 
 /** The operator's status panel: just enough to run the quiz. Big text, QR and bars belong to the projector. */
-export const HostPanel = ({ view }: { view: HostView | null }) => {
+export const HostPanel = ({
+  view,
+  resultsLocked,
+  onResultsAction,
+}: {
+  view: HostView | null;
+  resultsLocked: boolean;
+  onResultsAction: (action: ResultsAction) => void;
+}) => {
   if (!view) return <p className="host-wait">接続中…</p>;
   const s = view.screen;
   switch (s.kind) {
@@ -52,35 +61,15 @@ export const HostPanel = ({ view }: { view: HostView | null }) => {
           </p>
         </div>
       );
-    case "list":
+    case "ranking":
       return (
-        <div className="console">
-          <h1 className="console-title">結果発表: {listHeader(s.entries)}</h1>
-          <ol className="console-list">
-            {s.entries.map((e) => (
-              <li key={`${e.rank}:${e.nickname}`}>
-                {e.rank} 位 {e.nickname}（{e.score} 点）
-              </li>
-            ))}
-          </ol>
-        </div>
+        <ResultsPanel
+          entries={s.entries}
+          locked={resultsLocked}
+          onSelect={(playerId) => onResultsAction({ kind: "select", playerId })}
+        />
       );
-    case "podium":
-      return (
-        <div className="console">
-          <h1 className="console-title">{s.rank} 位</h1>
-          <ul className="console-list">
-            {s.revealed ? (
-              s.players.map((p, i) => (
-                <li key={i}>
-                  {p.nickname}（{p.score} 点）
-                </li>
-              ))
-            ) : (
-              <li>（まだ投影していません）</li>
-            )}
-          </ul>
-        </div>
-      );
+    case "ranking_detail":
+      return <RankDetailPanel detail={s} locked={resultsLocked} onAction={onResultsAction} />;
   }
 };

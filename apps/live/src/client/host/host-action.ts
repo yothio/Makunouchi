@@ -1,4 +1,4 @@
-import type { HostView } from "../../shared/types";
+import type { ClientMessage, HostView, PhaseKey, ResultsAction } from "../../shared/types";
 
 /** Label of the single progress button, or null when no button should be shown. */
 export const hostActionLabel = (view: HostView): string | null => {
@@ -10,12 +10,14 @@ export const hostActionLabel = (view: HostView): string | null => {
       return s.status === "open" ? "回答を締め切る" : "正解を発表";
     case "reveal":
       return s.isLast ? "結果発表へ" : "次の問題へ";
-    case "list":
-      return s.nextRank === null ? null : `${s.nextRank} 位を発表`;
-    case "podium":
-      if (!s.revealed) return "めくる";
-      return s.nextRank === null ? null : `${s.nextRank} 位へ`;
+    case "ranking":
+    case "ranking_detail":
+      return null;
   }
+};
+
+export const resultsActionMessage = (phaseKey: PhaseKey, action: ResultsAction): ClientMessage => {
+  return { type: "results_action", from: phaseKey, action };
 };
 
 export const ADVANCE_LOCK_MS = 3000;
@@ -29,7 +31,7 @@ export type AdvanceGateState = { readonly cooling: boolean; readonly locked: boo
  * Event-driven gate for the host advance button. Both flags are explicit state cleared by timers,
  * never derived by comparing clocks, so a timer that fires slightly early cannot leave the gate stuck.
  *
- * - cooling: set when a new phase arrives, cleared after ADVANCE_COOLDOWN_MS.
+ * - cooling: set when a new phase arrives, cleared after cooldownMs (skipped when cooldownMs is 0).
  * - locked: set by an accepted advance; cleared on phase change, disconnect, or after ADVANCE_LOCK_MS
  *   (the last case also calls the lock-expired handler, since the connection may be half-open).
  *
@@ -44,6 +46,11 @@ export class AdvanceGate {
   private listeners = new Set<() => void>();
   private onLockExpired: (() => void) | null = null;
   private snapshot: AdvanceGateState = { cooling: false, locked: false };
+  private readonly cooldownMs: number;
+
+  constructor(options?: { cooldownMs?: number }) {
+    this.cooldownMs = options?.cooldownMs ?? ADVANCE_COOLDOWN_MS;
+  }
 
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -64,10 +71,14 @@ export class AdvanceGate {
     this.phaseKey = phaseKey;
     this.clearLockTimer();
     this.clearCooldownTimer();
+    if (this.cooldownMs === 0) {
+      this.publish({ cooling: false, locked: false });
+      return;
+    }
     this.cooldownTimer = setTimeout(() => {
       this.cooldownTimer = null;
       this.publish({ cooling: false, locked: this.snapshot.locked });
-    }, ADVANCE_COOLDOWN_MS);
+    }, this.cooldownMs);
     this.publish({ cooling: true, locked: false });
   }
 

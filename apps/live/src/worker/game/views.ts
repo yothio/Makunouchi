@@ -1,5 +1,5 @@
 import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "../../shared/types";
-import { listEntries, nextPodiumRank, podiumPlayers, rankPlayers } from "./ranking";
+import { rankPlayers } from "./ranking";
 import { revealedCount, scoreOf } from "./scoring";
 import { phaseKey } from "./state";
 import type { GameState, Player } from "./types";
@@ -41,15 +41,25 @@ export const hostView = (s: GameState): HostView => {
       const stage = phase.stage;
       const ranked = rankPlayers(s);
       if (stage.kind === "list") {
-        const entries = listEntries(ranked).map(({ rank, nickname, score }) => ({ rank, nickname, score }));
-        return { ...base, screen: { kind: "list", entries, nextRank: nextPodiumRank(ranked, null) } };
+        const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
+        return { ...base, screen: { kind: "ranking", entries } };
       }
-      const players = stage.revealed
-        ? podiumPlayers(ranked, stage.rank).map(({ nickname, score }) => ({ nickname, score }))
-        : [];
+      const entry = ranked.find((p) => p.playerId === stage.playerId);
+      if (!entry) {
+        const entries = ranked.map(({ playerId, rank, nickname, score }) => ({ playerId, rank, nickname, score }));
+        return { ...base, screen: { kind: "ranking", entries } };
+      }
       return {
         ...base,
-        screen: { kind: "podium", rank: stage.rank, revealed: stage.revealed, players, nextRank: nextPodiumRank(ranked, stage.rank) },
+        screen: {
+          kind: "ranking_detail",
+          playerId: entry.playerId,
+          rank: entry.rank,
+          nickname: entry.nickname,
+          score: entry.score,
+          rankShown: stage.rankShown,
+          nameShown: stage.nameShown,
+        },
       };
     }
   }
@@ -65,10 +75,16 @@ export const screenView = (s: GameState): ScreenView => {
       return { kind: "question", question: screen.question, status: screen.status };
     case "reveal":
       return { kind: "reveal", question: screen.question, correctIndex: screen.correctIndex, counts: screen.counts };
-    case "list":
-      return { kind: "list", entries: screen.entries };
-    case "podium":
-      return { kind: "podium", rank: screen.rank, revealed: screen.revealed, players: screen.players };
+    case "ranking":
+      return { kind: "results_wait", title };
+    case "ranking_detail": {
+      if (!screen.rankShown && !screen.nameShown) return { kind: "results_wait", title };
+      return {
+        kind: "rank_reveal",
+        rank: screen.rankShown ? screen.rank : null,
+        nickname: screen.nameShown ? screen.nickname : null,
+      };
+    }
   }
 };
 

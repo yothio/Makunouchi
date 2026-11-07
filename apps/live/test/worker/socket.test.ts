@@ -3,7 +3,16 @@ import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { SessionRoom } from "../../src/worker/session-room";
 import { screenTokenFor } from "../../src/worker/auth";
-import { connectGuest, connectHost, connectScreen, createSession, newSessionId, rankingOf } from "./helpers";
+import {
+  connectGuest,
+  connectHost,
+  connectScreen,
+  createSession,
+  driveToResults,
+  findLast,
+  newSessionId,
+  rankingOf,
+} from "./helpers";
 
 const setup = async () => {
   const id = newSessionId();
@@ -379,15 +388,193 @@ describe("SessionRoom answer history", () => {
   it("never sends a rank to a participant, even at the end of the results", async () => {
     const { id, host } = await setup();
     const { guest } = await joinGuest(id, "Taro");
-    const steps: [string, string][] = [["lobby", "q:0:open"]];
-    for (let i = 0; i < 5; i++) {
-      steps.push([`q:${i}:open`, `q:${i}:closed`], [`q:${i}:closed`, `q:${i}:revealed`]);
-      if (i < 4) steps.push([`q:${i}:revealed`, `q:${i + 1}:open`]);
-    }
-    steps.push(["q:4:revealed", "r:list"]);
-    await advanceTo(host, steps);
+    await driveToResults(host, id);
     const pending = await guest.next("guest_view", (m) => m.view.kind === "results_pending");
     expect(pending.view).toMatchObject({ history: expect.any(Array) });
     expect(JSON.stringify(guest.messages)).not.toContain('"rank"');
+  });
+});
+
+describe("SessionRoom free-order results", () => {
+  const lastRanking = (host: Awaited<ReturnType<typeof setup>>["host"]) => {
+    const ranking = findLast(
+      host.messages,
+      (m) => m.type === "host_view" && m.view.screen.kind === "ranking",
+    );
+    if (!ranking || ranking.type !== "host_view" || ranking.view.screen.kind !== "ranking") {
+      throw new Error("no ranking host_view");
+    }
+    return ranking.view.screen;
+  };
+
+  it("結果フェーズに入ると幹事は ranking、投影は results_wait、参列者は results_pending", async () => {
+    const { id, host } = await setup();
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    const { guest } = await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    expect(lastRanking(host).kind).toBe("ranking");
+    const lastScreen = findLast(screen.messages, (m) => m.type === "screen_view");
+    expect(lastScreen && lastScreen.type === "screen_view" ? lastScreen.view : null).toMatchObject({
+      kind: "results_wait",
+    });
+    const lastGuest = findLast(guest.messages, (m) => m.type === "guest_view");
+    expect(lastGuest && lastGuest.type === "guest_view" ? lastGuest.view : null).toMatchObject({
+      kind: "results_pending",
+    });
+  });
+
+  it("select で幹事は ranking_detail、投影は results_wait。参列者には届かない", async () => {
+    const { id, host } = await setup();
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    const { guest } = await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    await guest.next("guest_view", (m) => m.view.kind === "results_pending");
+    await screen.next("screen_view", (m) => m.view.kind === "results_wait");
+    const guestCount = guest.messages.length;
+    const screenCount = screen.messages.length;
+    const playerId = lastRanking(host).entries[0].playerId;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId } });
+    const detail = await host.next("host_view", (m) => m.view.screen.kind === "ranking_detail");
+    expect(detail.view.screen).toMatchObject({ kind: "ranking_detail", playerId, rankShown: false, nameShown: false });
+    await screen.next("screen_view", (m) => m.view.kind === "results_wait");
+    expect(screen.messages.length).toBeGreaterThan(screenCount);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(guest.messages.length).toBe(guestCount);
+  });
+
+  it("show_rank のあと show_name で両方入り、back で一覧に戻る", async () => {
+    const { id, host } = await setup();
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    const { guest } = await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    await screen.next("screen_view", (m) => m.view.kind === "results_wait");
+    const playerId = lastRanking(host).entries[0].playerId;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId } });
+    await host.next("host_view", (m) => m.view.screen.kind === "ranking_detail");
+    await screen.next("screen_view", (m) => m.view.kind === "results_wait");
+    host.send({ type: "results_action", from: `r:${playerId}:hidden`, action: { kind: "show_rank" } });
+    const rankOnly = await screen.next("screen_view", (m) => m.view.kind === "rank_reveal");
+    expect(rankOnly.view).toEqual({ kind: "rank_reveal", rank: 1, nickname: null });
+    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:rank`);
+    host.send({ type: "results_action", from: `r:${playerId}:rank`, action: { kind: "show_name" } });
+    const both = await screen.next("screen_view", (m) => m.view.kind === "rank_reveal" && m.view.nickname !== null);
+    expect(both.view).toMatchObject({ kind: "rank_reveal", rank: 1, nickname: "Taro" });
+    host.send({ type: "results_action", from: `r:${playerId}:both`, action: { kind: "back" } });
+    await host.next("host_view", (m) => m.view.screen.kind === "ranking");
+    await screen.next("screen_view", (m) => m.view.kind === "results_wait");
+    expect(guest.messages.filter((m) => m.type === "guest_view" && m.view.kind === "results_pending").length).toBe(1);
+  });
+
+  it("同じ from の select を 2 回送っても 1 回ぶんだけ変わる", async () => {
+    const { id, host } = await setup();
+    await joinGuest(id, "A");
+    await joinGuest(id, "B");
+    await driveToResults(host, id);
+    const entries = lastRanking(host).entries;
+    const a = entries.find((e: { nickname: string }) => e.nickname === "A")!.playerId;
+    const b = entries.find((e: { nickname: string }) => e.nickname === "B")!.playerId;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: a } });
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: b } });
+    const detail = await host.next("host_view", (m) => m.view.screen.kind === "ranking_detail");
+    expect(detail.view.screen).toMatchObject({ kind: "ranking_detail", playerId: a });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(host.messages.filter((m) => m.type === "host_view" && m.view.screen.kind === "ranking_detail")).toHaveLength(1);
+    const rank = await rankingOf(id);
+    expect(rank.body.phaseKey).toBe(`r:${a}:hidden`);
+  });
+
+  it("show_rank 直後に古い from の show_name は無視され rank のまま", async () => {
+    const { id, host } = await setup();
+    await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    const playerId = lastRanking(host).entries[0].playerId;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId } });
+    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:hidden`);
+    host.send({ type: "results_action", from: `r:${playerId}:hidden`, action: { kind: "show_rank" } });
+    host.send({ type: "results_action", from: `r:${playerId}:hidden`, action: { kind: "show_name" } });
+    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:rank`);
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await rankingOf(id)).body.phaseKey).toBe(`r:${playerId}:rank`);
+  });
+
+  it("別の幹事タブ 2 つが同じ from から別々の人を選ぶと片方だけ選ばれる", async () => {
+    const { id, host } = await setup();
+    const host2 = await connectHost(id);
+    await host2.next("host_view");
+    await joinGuest(id, "A");
+    await joinGuest(id, "B");
+    await driveToResults(host, id);
+    await host2.next("host_view", (m) => m.view.phaseKey === "r:list");
+    const entries = lastRanking(host).entries;
+    const a = entries.find((e: { nickname: string }) => e.nickname === "A")!.playerId;
+    const b = entries.find((e: { nickname: string }) => e.nickname === "B")!.playerId;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: a } });
+    host2.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: b } });
+    await host.next("host_view", (m) => m.view.screen.kind === "ranking_detail");
+    await new Promise((r) => setTimeout(r, 100));
+    const key = (await rankingOf(id)).body.phaseKey as string;
+    expect([`r:${a}:hidden`, `r:${b}:hidden`]).toContain(key);
+  });
+
+  it("投影画面・参列者が送った results_action は無視される", async () => {
+    const { id, host } = await setup();
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    const { guest } = await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    const before = (await rankingOf(id)).body.phaseKey;
+    screen.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: "x" } });
+    guest.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: "x" } });
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await rankingOf(id)).body.phaseKey).toBe(before);
+  });
+
+  it("results 以外での results_action は無視される", async () => {
+    const { id, host } = await setup();
+    await joinGuest(id, "Taro");
+    host.send({ type: "advance", from: "lobby" });
+    await host.next("host_view", (m) => m.view.phaseKey === "q:0:open");
+    host.send({ type: "results_action", from: "q:0:open", action: { kind: "select", playerId: "x" } });
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await rankingOf(id)).body.phaseKey).toBe("q:0:open");
+  });
+
+  it("存在しない playerId の select で幹事に何も届かず接続も閉じない", async () => {
+    const { id, host } = await setup();
+    await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    const before = host.messages.length;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId: "nobody" } });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(host.messages.length).toBe(before);
+    expect(host.ws.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it("再読み込みと DO 再作成でも選択と投影が復元される", async () => {
+    const { id, host } = await setup();
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    await joinGuest(id, "Taro");
+    await driveToResults(host, id);
+    const playerId = lastRanking(host).entries[0].playerId;
+    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId } });
+    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:hidden`);
+    host.send({ type: "results_action", from: `r:${playerId}:hidden`, action: { kind: "show_rank" } });
+    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:rank`);
+    host.ws.close();
+    screen.ws.close();
+    const host2 = await connectHost(id);
+    const restoredHost = await host2.next("host_view");
+    expect(restoredHost.view.screen).toMatchObject({ kind: "ranking_detail", rankShown: true, nameShown: false });
+    const screen2 = await connectScreen(id);
+    expect((await screen2.next("screen_view")).view).toEqual({ kind: "rank_reveal", rank: 1, nickname: null });
+    const stub = env.SESSION_ROOM.getByName(id);
+    await runInDurableObject(stub, async (_inst, ctx) => {
+      const fresh = new SessionRoom(ctx, env);
+      expect(await fresh.ranking()).toMatchObject({ phaseKey: `r:${playerId}:rank`, final: true });
+    });
   });
 });

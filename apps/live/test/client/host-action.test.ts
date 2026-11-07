@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { ADVANCE_COOLDOWN_MS, ADVANCE_LOCK_MS, AdvanceGate, hostActionLabel } from "../../src/client/host/host-action";
-import { listHeader } from "../../src/client/screen/list-header";
+import {
+  ADVANCE_COOLDOWN_MS,
+  ADVANCE_LOCK_MS,
+  AdvanceGate,
+  hostActionLabel,
+  resultsActionMessage,
+} from "../../src/client/host/host-action";
 import type { HostView } from "../../src/shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
@@ -17,22 +22,31 @@ describe("hostActionLabel", () => {
     expect(hostActionLabel(v(s))).toBe("次の問題へ");
     expect(hostActionLabel(v({ ...s, isLast: true }))).toBe("結果発表へ");
   });
-  test("list", () => {
-    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: 3 }))).toBe("3 位を発表");
-    expect(hostActionLabel(v({ kind: "list", entries: [], nextRank: null }))).toBeNull();
-  });
-  test("podium", () => {
-    expect(hostActionLabel(v({ kind: "podium", rank: 3, revealed: false, players: [], nextRank: 2 }))).toBe("めくる");
-    expect(hostActionLabel(v({ kind: "podium", rank: 3, revealed: true, players: [], nextRank: 2 }))).toBe("2 位へ");
-    expect(hostActionLabel(v({ kind: "podium", rank: 1, revealed: true, players: [], nextRank: null }))).toBeNull();
+  test("ranking / ranking_detail では進行ボタンなし", () => {
+    expect(hostActionLabel(v({ kind: "ranking", entries: [] }))).toBeNull();
+    expect(
+      hostActionLabel(
+        v({
+          kind: "ranking_detail",
+          playerId: "p1",
+          rank: 1,
+          nickname: "a",
+          score: 3,
+          rankShown: false,
+          nameShown: false,
+        }),
+      ),
+    ).toBeNull();
   });
 });
 
-describe("listHeader", () => {
-  test("derives from entries", () => {
-    expect(listHeader([])).toBe("4 位以下はいません");
-    expect(listHeader([{ rank: 4, nickname: "a", score: 1 }, { rank: 6, nickname: "b", score: 0 }])).toBe("4 位〜6 位");
-    expect(listHeader([{ rank: 5, nickname: "a", score: 1 }, { rank: 5, nickname: "b", score: 1 }, { rank: 7, nickname: "c", score: 0 }])).toBe("5 位〜7 位");
+describe("resultsActionMessage", () => {
+  test("results_action メッセージを組み立てる", () => {
+    expect(resultsActionMessage("r:list", { kind: "select", playerId: "p1" })).toEqual({
+      type: "results_action",
+      from: "r:list",
+      action: { kind: "select", playerId: "p1" },
+    });
   });
 });
 
@@ -142,5 +156,63 @@ describe("AdvanceGate", () => {
     gate.dispose();
     vi.advanceTimersByTime(ADVANCE_LOCK_MS * 2);
     expect(onExpired).not.toHaveBeenCalled();
+  });
+});
+
+describe("AdvanceGate cooldownMs: 0", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const make = () => {
+    const gate = new AdvanceGate({ cooldownMs: 0 });
+    const onExpired = vi.fn<() => void>();
+    gate.setLockExpiredHandler(onExpired);
+    return { gate, onExpired };
+  };
+
+  test("phaseChanged で cooling が立たない", () => {
+    const { gate } = make();
+    gate.phaseChanged("r:list");
+    expect(gate.getSnapshot()).toEqual({ cooling: false, locked: false });
+  });
+
+  test("tryAdvance は true（ロック）。同じ phaseKey のうちは 2 回目が false", () => {
+    const { gate } = make();
+    gate.phaseChanged("r:p1:hidden");
+    expect(gate.tryAdvance()).toBe(true);
+    expect(gate.getSnapshot().locked).toBe(true);
+    expect(gate.tryAdvance()).toBe(false);
+  });
+
+  test("新しい phaseKey でロックが解け、直後に tryAdvance が true", () => {
+    const { gate } = make();
+    gate.phaseChanged("r:p1:hidden");
+    expect(gate.tryAdvance()).toBe(true);
+    gate.phaseChanged("r:p1:rank");
+    expect(gate.getSnapshot().locked).toBe(false);
+    expect(gate.tryAdvance()).toBe(true);
+  });
+
+  test("3000 ms でロックが解け、解除ハンドラが呼ばれる", () => {
+    const { gate, onExpired } = make();
+    gate.phaseChanged("r:p1:hidden");
+    gate.tryAdvance();
+    vi.advanceTimersByTime(ADVANCE_LOCK_MS - 1);
+    expect(gate.getSnapshot().locked).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(gate.getSnapshot().locked).toBe(false);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+  });
+
+  test("切断でロックが解ける", () => {
+    const { gate } = make();
+    gate.phaseChanged("r:p1:hidden");
+    gate.tryAdvance();
+    gate.setConnected(false);
+    expect(gate.getSnapshot().locked).toBe(false);
   });
 });

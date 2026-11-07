@@ -1,9 +1,16 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload } from "../../src/shared/types";
-import { isFinal, rankPlayers } from "../../src/worker/game/ranking";
 import { scoreOf } from "../../src/worker/game/scoring";
 import type { GameState } from "../../src/worker/game/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "../../src/worker/game/state";
+import {
+  advance,
+  createGameState,
+  joinPlayer,
+  phaseKey,
+  presentResults,
+  submitAnswer,
+  type Transition,
+} from "../../src/worker/game/state";
 
 const quiz: QuizPayload = {
   title: "T",
@@ -50,10 +57,11 @@ describe("advance", () => {
     expect(s.phase).toEqual({ type: "question", index: 1, status: "revealed" });
     expect(ok(advance(s, "q:1:revealed")).phase).toEqual({ type: "results", stage: { kind: "list" } });
   });
-  test("phaseKey の形式", () => {
-    expect(phaseKey({ type: "results", stage: { kind: "list" } })).toBe("r:list");
-    expect(phaseKey({ type: "results", stage: { kind: "podium", rank: 3, revealed: false } })).toBe("r:3:hidden");
-    expect(phaseKey({ type: "results", stage: { kind: "podium", rank: 1, revealed: true } })).toBe("r:1:shown");
+  test("問題フェーズの phaseKey は変わらない", () => {
+    expect(phaseKey({ type: "lobby" })).toBe("lobby");
+    expect(phaseKey({ type: "question", index: 0, status: "open" })).toBe("q:0:open");
+    expect(phaseKey({ type: "question", index: 3, status: "closed" })).toBe("q:3:closed");
+    expect(phaseKey({ type: "question", index: 14, status: "revealed" })).toBe("q:14:revealed");
   });
 });
 
@@ -158,7 +166,7 @@ describe("scoreOf", () => {
     s = ok(submitAnswer(s, "p1", 0, 0)); // wrong
     s = walk(s, 3);
     s = ok(submitAnswer(s, "p1", 1, 2)); // correct
-    s = walk(s, 4);
+    s = walk(s, 3); // closed → revealed → results
     expect(s.phase.type).toBe("results");
     expect(scoreOf(s, s.players[0])).toBe(1);
   });
@@ -175,41 +183,160 @@ describe("scoreOf", () => {
 describe("results progression", () => {
   const resultsState = (scores: number[]): GameState => {
     const qs = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
-      title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
+      title: `q${i}`,
+      imageUrl: null,
+      choices: ["a", "b", "c", "d"] as [string, string, string, string],
+      correctIndex: 0 as const,
     }));
     return {
       quiz: { title: "T", questions: qs },
       phase: { type: "results", stage: { kind: "list" } },
       players: scores.map((sc, i) => ({
-        id: `id${i}`, token: `t${i}`, nickname: `p${i}`,
+        id: `id${i}`,
+        token: `t${i}`,
+        nickname: `p${i}`,
         answers: Object.fromEntries(Array.from({ length: sc }, (_, k) => [k, 0])),
       })),
     };
   };
-  const keys = (s: GameState, n: number) => {
-    const out = [phaseKey(s.phase)];
-    for (let i = 0; i < n; i++) { s = ok(advance(s, phaseKey(s.phase))); out.push(phaseKey(s.phase)); }
-    return out;
-  };
-  test("results: list → 3 位(伏せ) → 3 位(表) → 2 位(伏せ) → 2 位(表) → 1 位(伏せ) → 1 位(表)", () => {
-    expect(keys(resultsState([9, 8, 7, 6]), 6)).toEqual(["r:list", "r:3:hidden", "r:3:shown", "r:2:hidden", "r:2:shown", "r:1:hidden", "r:1:shown"]);
+
+  test("結果フェーズの phaseKey: r:list / r:<id>:hidden|rank|name|both", () => {
+    const id = "id0";
+    expect(phaseKey({ type: "results", stage: { kind: "list" } })).toBe("r:list");
+    expect(
+      phaseKey({
+        type: "results",
+        stage: { kind: "player", playerId: id, rankShown: false, nameShown: false },
+      }),
+    ).toBe(`r:${id}:hidden`);
+    expect(
+      phaseKey({
+        type: "results",
+        stage: { kind: "player", playerId: id, rankShown: true, nameShown: false },
+      }),
+    ).toBe(`r:${id}:rank`);
+    expect(
+      phaseKey({
+        type: "results",
+        stage: { kind: "player", playerId: id, rankShown: false, nameShown: true },
+      }),
+    ).toBe(`r:${id}:name`);
+    expect(
+      phaseKey({
+        type: "results",
+        stage: { kind: "player", playerId: id, rankShown: true, nameShown: true },
+      }),
+    ).toBe(`r:${id}:both`);
   });
-  test("空の発表枠は飛ばす（90,90,90,70 なら list → 1 位(伏せ)）", () => {
-    expect(keys(resultsState([9, 9, 9, 7]), 2)).toEqual(["r:list", "r:1:hidden", "r:1:shown"]);
+
+  test("最後の問題の revealed から advance すると r:list。r:list からの advance は no_next_stage", () => {
+    const s = walk(createGameState(quiz), 6);
+    expect(s.phase).toEqual({ type: "question", index: 1, status: "revealed" });
+    const list = ok(advance(s, "q:1:revealed"));
+    expect(phaseKey(list.phase)).toBe("r:list");
+    expect(advance(list, "r:list")).toEqual({ ok: false, reason: "no_next_stage" });
   });
-  test("1 位(表) からの advance は何もしない。isFinal は true", () => {
-    const s = walk(resultsState([9, 8, 7]), 6);
-    expect(phaseKey(s.phase)).toBe("r:1:shown");
-    expect(isFinal(s.phase, rankPlayers(s))).toBe(true);
-    expect(advance(s, "r:1:shown")).toEqual({ ok: false, reason: "no_next_stage" });
+
+  test("select で r:<id>:hidden になり events が projection_changed", () => {
+    const s = resultsState([2, 1]);
+    const r = presentResults(s, "r:list", { kind: "select", playerId: "id0" });
+    expect(r).toMatchObject({
+      ok: true,
+      events: [{ type: "projection_changed" }],
+    });
+    expect(phaseKey(ok(r).phase)).toBe("r:id0:hidden");
   });
-  test("参加者 0 人でも最後まで進められる（list で isFinal）", () => {
-    const s = resultsState([]);
-    expect(isFinal(s.phase, rankPlayers(s))).toBe(true);
-    expect(advance(s, "r:list")).toEqual({ ok: false, reason: "no_next_stage" });
+
+  test("select を同じ from で 2 回送ると 2 回目は stale_phase", () => {
+    const s = resultsState([2, 1]);
+    const first = ok(presentResults(s, "r:list", { kind: "select", playerId: "id0" }));
+    expect(presentResults(first, "r:list", { kind: "select", playerId: "id1" })).toEqual({
+      ok: false,
+      reason: "stale_phase",
+    });
+    expect(phaseKey(first.phase)).toBe("r:id0:hidden");
   });
-  test("results 中の古い fromKey は stale_phase", () => {
-    const s = resultsState([9, 8, 7]);
-    expect(advance(s, "r:3:hidden")).toEqual({ ok: false, reason: "stale_phase" });
+
+  test("存在しない playerId の select は unknown_player", () => {
+    const s = resultsState([2]);
+    expect(presentResults(s, "r:list", { kind: "select", playerId: "nobody" })).toEqual({
+      ok: false,
+      reason: "unknown_player",
+    });
+    expect(s.phase).toEqual({ type: "results", stage: { kind: "list" } });
+  });
+
+  test("show_rank → show_name で both。show_name → show_rank でも both", () => {
+    const base = resultsState([2]);
+    const selected = ok(presentResults(base, "r:list", { kind: "select", playerId: "id0" }));
+    const ranked = ok(presentResults(selected, "r:id0:hidden", { kind: "show_rank" }));
+    expect(phaseKey(ranked.phase)).toBe("r:id0:rank");
+    const both = ok(presentResults(ranked, "r:id0:rank", { kind: "show_name" }));
+    expect(phaseKey(both.phase)).toBe("r:id0:both");
+
+    const named = ok(presentResults(selected, "r:id0:hidden", { kind: "show_name" }));
+    expect(phaseKey(named.phase)).toBe("r:id0:name");
+    const both2 = ok(presentResults(named, "r:id0:name", { kind: "show_rank" }));
+    expect(phaseKey(both2.phase)).toBe("r:id0:both");
+  });
+
+  test("show_rank の二度押しは stale_phase。同じ段階で再送は no_change", () => {
+    const selected = ok(presentResults(resultsState([2]), "r:list", { kind: "select", playerId: "id0" }));
+    const ranked = ok(presentResults(selected, "r:id0:hidden", { kind: "show_rank" }));
+    expect(presentResults(ranked, "r:id0:hidden", { kind: "show_rank" })).toEqual({
+      ok: false,
+      reason: "stale_phase",
+    });
+    expect(presentResults(ranked, "r:id0:rank", { kind: "show_rank" })).toEqual({
+      ok: false,
+      reason: "no_change",
+    });
+  });
+
+  test("連続操作: 古い from のまま show_name を送ると stale_phase で rank のまま", () => {
+    const selected = ok(presentResults(resultsState([2]), "r:list", { kind: "select", playerId: "id0" }));
+    const ranked = ok(presentResults(selected, "r:id0:hidden", { kind: "show_rank" }));
+    expect(presentResults(ranked, "r:id0:hidden", { kind: "show_name" })).toEqual({
+      ok: false,
+      reason: "stale_phase",
+    });
+    expect(phaseKey(ranked.phase)).toBe("r:id0:rank");
+  });
+
+  test("back で r:list に戻り players と answers は変わらない。一覧での back は invalid_action", () => {
+    const s0 = resultsState([2, 1]);
+    const selected = ok(presentResults(s0, "r:list", { kind: "select", playerId: "id0" }));
+    const back = ok(presentResults(selected, "r:id0:hidden", { kind: "back" }));
+    expect(phaseKey(back.phase)).toBe("r:list");
+    expect(back.players).toEqual(s0.players);
+    expect(presentResults(back, "r:list", { kind: "back" })).toEqual({ ok: false, reason: "invalid_action" });
+  });
+
+  test("select 後に from: r:list で別の人を選ぶと stale_phase", () => {
+    const selected = ok(presentResults(resultsState([2, 1]), "r:list", { kind: "select", playerId: "id0" }));
+    expect(presentResults(selected, "r:list", { kind: "select", playerId: "id1" })).toEqual({
+      ok: false,
+      reason: "stale_phase",
+    });
+    expect(phaseKey(selected.phase)).toBe("r:id0:hidden");
+  });
+
+  test("results 以外のフェーズでの presentResults は not_in_results", () => {
+    const s = createGameState(quiz);
+    expect(presentResults(s, "lobby", { kind: "select", playerId: "id0" })).toEqual({
+      ok: false,
+      reason: "not_in_results",
+    });
+  });
+
+  test("参加者ゼロの results でも advance で入れ、select は unknown_player", () => {
+    const list = ok(advance(walk(createGameState(quiz), 6), "q:1:revealed"));
+    expect(phaseKey(list.phase)).toBe("r:list");
+    expect(list.players).toHaveLength(0);
+    expect(presentResults(list, "r:list", { kind: "select", playerId: "id0" })).toEqual({
+      ok: false,
+      reason: "unknown_player",
+    });
+    expect(advance(list, "r:list")).toEqual({ ok: false, reason: "no_next_stage" });
   });
 });

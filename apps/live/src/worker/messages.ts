@@ -3,10 +3,18 @@ import type { ClientMessage } from "../shared/types";
 
 // Deliberately permissive: nickname length/normalisation and choice range are
 // validated by the game layer, which owns the matching rejection reasons.
+const resultsActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("select"), playerId: z.string() }),
+  z.object({ kind: z.literal("show_rank") }),
+  z.object({ kind: z.literal("show_name") }),
+  z.object({ kind: z.literal("back") }),
+]);
+
 export const clientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("join"), nickname: z.string() }),
   z.object({ type: z.literal("answer"), questionIndex: z.number(), choice: z.number() }),
   z.object({ type: z.literal("advance"), from: z.string() }),
+  z.object({ type: z.literal("results_action"), from: z.string(), action: resultsActionSchema }),
 ]) satisfies z.ZodType<ClientMessage>;
 
 /** Parse a raw WebSocket frame; anything malformed or unknown yields null. */

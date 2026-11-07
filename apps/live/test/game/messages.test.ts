@@ -46,4 +46,41 @@ describe("parseClientMessage", () => {
   test("returns the message for valid JSON", () => {
     expect(parseClientMessage('{"type":"advance","from":"x"}')).toEqual({ type: "advance", from: "x" });
   });
+
+  test("results_action の 4 種類が通る", () => {
+    expect(
+      parseClientMessage(
+        JSON.stringify({ type: "results_action", from: "r:list", action: { kind: "select", playerId: "p1" } }),
+      ),
+    ).toEqual({ type: "results_action", from: "r:list", action: { kind: "select", playerId: "p1" } });
+    expect(
+      parseClientMessage(JSON.stringify({ type: "results_action", from: "r:p1:hidden", action: { kind: "show_rank" } })),
+    ).toEqual({ type: "results_action", from: "r:p1:hidden", action: { kind: "show_rank" } });
+    expect(
+      parseClientMessage(JSON.stringify({ type: "results_action", from: "r:p1:rank", action: { kind: "show_name" } })),
+    ).toEqual({ type: "results_action", from: "r:p1:rank", action: { kind: "show_name" } });
+    expect(
+      parseClientMessage(JSON.stringify({ type: "results_action", from: "r:p1:both", action: { kind: "back" } })),
+    ).toEqual({ type: "results_action", from: "r:p1:both", action: { kind: "back" } });
+  });
+
+  test("select の playerId なしは null", () => {
+    expect(
+      parseClientMessage(JSON.stringify({ type: "results_action", from: "r:list", action: { kind: "select" } })),
+    ).toBeNull();
+  });
+
+  test("未知の kind は null", () => {
+    expect(
+      parseClientMessage(
+        JSON.stringify({ type: "results_action", from: "r:list", action: { kind: "hide_rank" } }),
+      ),
+    ).toBeNull();
+  });
+
+  test("from なしは null", () => {
+    expect(
+      parseClientMessage(JSON.stringify({ type: "results_action", action: { kind: "back" } })),
+    ).toBeNull();
+  });
 });

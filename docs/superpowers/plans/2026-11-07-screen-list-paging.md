@@ -1,5 +1,7 @@
 # 投影画面の結果一覧のページ送り（追補）Implementation Plan
 
+> **取りやめ（2026-11-07）：** 投影画面に結果一覧を出さない方針に変更。`free-order-results` に置き換え。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 投影画面の結果一覧（4 位以下）を 1 ページ 40 人までに分け、幹事のボタンでページを送る。どのページも、スクロールも見切れもなく、20px 以上の文字で読めるようにする。
