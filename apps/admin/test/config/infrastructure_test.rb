@@ -123,6 +123,14 @@ class InfrastructureTest < Minitest::Test
     assert_match(/config\.i18n\.fallbacks = \[ :en \]/, read("config/application.rb"))
   end
 
+  test "development にも Active Record Encryption の開発用の鍵がある（無いと開催回の作成が 500 になる）" do
+    development = read("config/environments/development.rb")
+
+    %w[primary_key deterministic_key key_derivation_salt].each do |key|
+      assert_match(/encryption\.#{key} = "/, development)
+    end
+  end
+
   test "production は Active Record Encryption の鍵を環境変数から必須で読む" do
     production = read("config/environments/production.rb")
 

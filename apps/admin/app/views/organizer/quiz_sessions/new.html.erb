@@ -16,7 +16,7 @@
       <%= form.label :title, "開催回名" %><br>
       <%= form.text_field :title, required: true, maxlength: 100, size: 40 %>
     </p>
-    <p><%= form.submit "作成" %></p>
+    <p><%= form.submit "作成", data: { turbo_submits_with: "作成中…" } %></p>
   <% end %>
 
   <p><%= link_to "トップへ戻る", root_path %></p>

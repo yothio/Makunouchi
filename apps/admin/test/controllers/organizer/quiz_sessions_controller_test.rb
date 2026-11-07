@@ -87,6 +87,25 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "幹事パスワードを出す詳細は no-store（戻るボタンやキャッシュに残さない）" do
+    user = users(:organizer)
+    add_questions(user, 5)
+    session = QuizSession.prepare(user: user, title: "本番").tap(&:save!)
+    sign_in_as user
+
+    get organizer_quiz_session_path(session)
+
+    assert_includes response.headers["Cache-Control"], "no-store"
+  end
+
+  test "作成ボタンは送信中に無効になる（二重送信で開催回が 2 つできないように）" do
+    sign_in_as users(:organizer)
+
+    get new_organizer_quiz_session_path
+
+    assert_select "input[type=submit][data-turbo-submits-with]"
+  end
+
   test "トップに開催回の件数と一覧（タイトル）と作成ボタンが出る" do
     user = users(:organizer)
     add_questions(user, 5)

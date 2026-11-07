@@ -29,6 +29,8 @@
 
 ## ローカルで動かす
 
+開発・テストの Active Record Encryption の鍵は `config/environments/{development,test}.rb` に捨ての固定値で入れてある（本番の鍵とは無関係。本番は環境変数で必須）。
+
 ローカルの Postgres が要る（`PGUSER` / `PGHOST` で接続先を変えられる）。
 
 ```

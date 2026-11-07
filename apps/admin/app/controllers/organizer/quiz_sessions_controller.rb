@@ -18,6 +18,8 @@ module Organizer
 
     def show
       @quiz_session = current_user.quiz_sessions.find(params[:id])
+      # 幹事の平文パスワードを出す画面なので、戻るボタンやブラウザのキャッシュに残さない。
+      response.headers["Cache-Control"] = "no-store"
     end
   end
 end
