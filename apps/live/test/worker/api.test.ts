@@ -24,6 +24,18 @@ describe("sessions API", () => {
     expect((await createSession(id)).status).toBe(409);
   });
 
+  it("PUT with a session id containing ':' is 400 invalid_session_id and creates nothing", async () => {
+    const res = await put("screen:abc", quiz);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_session_id" });
+    const ranking = await exports.default.fetch("https://x/api/sessions/screen:abc/ranking", { headers: authHeaders });
+    expect(ranking.status).toBe(404);
+  });
+
+  it("PUT with a UUID session id is 201", async () => {
+    expect((await put(crypto.randomUUID(), quiz)).status).toBe(201);
+  });
+
   it("invalid payload is 422 with issues", async () => {
     const res = await put(newSessionId(), { title: "x" });
     expect(res.status).toBe(422);
