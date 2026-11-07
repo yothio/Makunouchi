@@ -70,8 +70,9 @@ apps/live/
 ### Task 1: サーバーが `history` を作り、順位を送らない
 
 **Files:**
-- Modify: `apps/live/src/shared/types.ts`, `apps/live/src/worker/game/views.ts`
-- Test: `apps/live/test/game/views.test.ts`
+- Modify: `apps/live/src/shared/types.ts`, `apps/live/src/worker/game/views.ts`, `apps/live/src/worker/session-room.ts`
+- Modify（typecheck を通すための最小変更）: `apps/live/src/client/guest/GuestScreen.tsx` — `case "final":` の分岐だけを削除する（`GuestView` から `final` が消えるため、残すと `switch (view.kind)` が型エラーになる）。`history` を画面に出す作業は Task 3 まで行わない。
+- Test: `apps/live/test/game/views.test.ts`（`GuestView` のリテラルを作っている他のテスト、`test/client/*.test.ts` なども `history` / `final` の変更に合わせて直す）
 
 **Interfaces:**
 - Produces（`shared/types.ts`）:
@@ -99,8 +100,8 @@ apps/live/
   - 「`results` の `guestView` は `kind: "results_pending"` で、JSON に `"rank"` が含まれない」（1 位を発表し終えた状態に相当する `results` でも）
   - 既存の「最終発表の途中は `results_pending`、1 位をめくった後は `final`」のテストは、「`results` ならいつでも `results_pending`」に書き換える。
 - [ ] **Step 2: 実行して失敗を確認** — `cd apps/live && pnpm exec vitest run test/game/views.test.ts`。Expected: FAIL。
-- [ ] **Step 3: 実装** — 型を直し、`guestView` の各分岐に `history: answerHistory(s, player)` を足し、`results` は常に `results_pending` を返す。`session-room.ts` の `deliver()` から `ranked` を外す。
-- [ ] **Step 4: 実行して成功を確認** — `pnpm test && pnpm typecheck`。Expected: PASS。`test/worker/socket.test.ts` や `load.test.ts` に `final` を前提にした箇所があれば同じ考え方で直す。
+- [ ] **Step 3: 実装** — 型を直し、`guestView` の各分岐に `history: answerHistory(s, player)` を足し、`results` は常に `results_pending` を返す。`session-room.ts` の `deliver()` から `ranked` を外す。`GuestScreen.tsx` の `case "final":` を削除する。未使用になった import（`views.ts` の `isFinal` / `RankedPlayer`、`session-room.ts` の `RankedPlayer` など。oxlint が警告する）を消す。
+- [ ] **Step 4: 実行して成功を確認** — `pnpm test && pnpm typecheck && pnpm lint`。Expected: PASS（この時点のゲスト画面は、`history` を受け取っても表示しないだけで動く）。`test/worker/socket.test.ts` や `load.test.ts` に `final` を前提にした箇所があれば同じ考え方で直す。
 - [ ] **Step 5: Commit** — `feat(live): guest_view に回答一覧を足し、順位を送らない`
 
 ---
@@ -118,7 +119,7 @@ apps/live/
   - 「保存済みの `playerToken` で再接続すると、`history` つきの `guest_view` が復元される」（`reconnect with saved token restores nickname and score` の隣に置く）
   - 「問 1 を `open` にしたあとの参列者の `guest_view`（`question`）の `history` は問 0 のみ」
   - 「途中参加した人の `reveal` では、参加前の問題が `choice: null`」
-- [ ] **Step 2: 実行する** — `pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts`。Expected: PASS（Task 1 で実装済みなので、落ちるなら Task 1 の穴）。
+- [ ] **Step 2: 実行する** — `pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts`。Expected: PASS。このタスクは Task 1 の実装を結合テストで確かめるもので、red は Task 1 の単体テストで確認済み。落ちるなら Task 1 の穴。
 - [ ] **Step 3: 負荷試験の確認** — `pnpm exec vitest run --config vitest.workers.config.ts test/worker/load.test.ts`。Expected: PASS（`src/loadtest/drive.ts` は `results_pending` を見ているので変更不要。落ちたら `final` の参照が残っていないか確認）。
 - [ ] **Step 4: Commit** — `test(live): 回答一覧の再接続・途中参加を確認`
 
@@ -136,7 +137,11 @@ apps/live/
 - Produces:
   - `formatHistoryEntry(entry: HistoryEntry): { question: string; choice: string; mark: "○" | "×" }` — `question` は `問 ${index + 1}`、`choice` は選んだ選択肢のラベル（`A`〜`D`）、未回答は `"未回答"`、`mark` は `correct` なら `○`、そうでなければ `×`。
   - `AnswerHistory({ history }: { history: HistoryEntry[] })` — `history` が空なら何も出さない。1 行に `formatHistoryEntry` の結果を並べる。1 ファイル 1 コンポーネント（条件の分岐があるため）。
-  - `GuestScreen` の変更: `question`（`status === "closed"` のとき）、`reveal`、`results_pending` で `<AnswerHistory history={view.history} />` を出す。`open` の間は出さない（回答に集中させる）。`lobby` は履歴がないので出さない。`results_pending` の見出しは今の「結果発表中…」のまま（順位は出さない）。`final` 分岐は削除。
+  - 差し込み箇所（コンポーネントごと）:
+    - `question`（`status === "closed"`）: `views/QuestionView.tsx` → `views/QuestionClosed.tsx` の中で `<AnswerHistory history={...} />` を出す（`QuestionView` から `history` を渡す）。`open` の間は出さない（回答に集中させる）。
+    - `reveal` と `results_pending`: `GuestScreen.tsx` の該当 `case` で出す。`results_pending` の見出しは今の「結果発表中…」のまま（順位は出さない）。
+    - `lobby`: 履歴がないので出さない。
+    - `final` 分岐の削除は Task 1 で済んでいる。
 
 - [ ] **Step 1: 失敗するテストを書く**（`guest-history.test.ts`, Node 環境）
   - 「`{ index: 0, choice: 1, correct: true }` → `{ question: "問 1", choice: "B", mark: "○" }`」
@@ -152,9 +157,19 @@ apps/live/
 
 ## ユーザーに確認すること
 
-1. **結果発表のあとも、参列者の画面に自分の順位を出さなくてよいか**（既定は出さない）。要件は「自分の順位は最後まで出さない」。この計画は「参列者の画面には順位を一切出さず、順位は投影画面で発表する」と解釈して `final` を廃止する。式の最後に順位を手元で見せたい場合は、「発表の終わり」をサーバーが知る仕組み（幹事の「終了」操作など）が別途要る。順位の発表順を幹事が自由に決める設計（計画 2）とは相性が悪いので、MVP では出さない案を推奨。
-2. **途中参加者の参加前の問題**: 「未回答 ×」と出す（既定）か、一覧に出さず参加後の問題だけにするか。
-3. **正解発表の画面（`reveal`）に累計点（`score`）を残すか**（既定は残す）。「点数は正解数」なので、一覧の ○ の数と一致する。順位ではないため要件には反しない。
+### 決定済みの解釈（確認ではなく、前提として置いたもの）
+
+- **参列者の画面には順位を一切出さない**。設計書 8 章「決定済み（2026-11-07）」に「参列者画面には各問の自分の回答と正誤を一覧で見せる。順位は見せない」とあるので、`final`（順位つき）を廃止する。順位は投影画面で発表する。
+  - 将来案として残す余地: 「式の最後に自分の順位を手元で見せたい」となった場合は、「発表の終わり」をサーバーが知る仕組み（幹事の「終了」操作など）が別途要る。順位の発表順を幹事が自由に決める設計（計画 2）とは相性が悪いので、MVP の範囲には入れない。
+
+### 確認すること
+
+1. **途中参加者の参加前の問題**
+   - **A. 「未回答 ×」と出す（推奨）**: 一覧の行数が全員そろい、「参加前の問題は 0 点」（設計書 4.3）と整合する。
+   - B. 一覧に出さず、参加後の問題だけにする: 見た目はすっきりするが、人によって行数が違い、サーバー側で参加時点の問題番号を持つ必要がある（`Player` に `joinedAtIndex` を足す。作業量 +30 分程度）。
+2. **正解発表の画面（`reveal`）に累計点（`score`）を残すか**
+   - **A. 残す（推奨）**: 「点数は正解数」なので、一覧の ○ の数と一致する。順位ではないため要件に反しない。変更が増えない。
+   - B. 外す: 一覧の ○ の数で分かるので画面は簡素になるが、`GuestView.reveal` の `score` を消す変更が増える。
 
 ## 作業量の見積もり
 
