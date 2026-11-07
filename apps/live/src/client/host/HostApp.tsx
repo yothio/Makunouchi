@@ -1,4 +1,4 @@
-import { OPEN_FAILURE_RELOGIN_THRESHOLD } from "./open-failure-counter";
+import { shouldOfferRelogin } from "./open-failure-counter";
 import { HostPanel } from "./HostPanel";
 import { useHostSession } from "./useHostSession";
 
@@ -13,7 +13,7 @@ export const HostApp = ({
 }) => {
   const { view, connected, neverOpened, label, canAdvance, advance, sendResultsAction, resultsLocked } =
     useHostSession(sessionId, token);
-  const offerRelogin = onRelogin && neverOpened >= OPEN_FAILURE_RELOGIN_THRESHOLD;
+  const offerRelogin = Boolean(onRelogin) && shouldOfferRelogin({ neverOpened });
 
   return (
     <div className="host">

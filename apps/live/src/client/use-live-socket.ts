@@ -28,6 +28,8 @@ export const useLiveSocket = (
   const [last, setLast] = useState<ServerMessage | null>(null);
   const [connected, setConnected] = useState(false);
   const sockRef = useRef<ReconnectingSocket | null>(null);
+  // Capture opt-in once at mount so guests/screens never arm the never-opened path.
+  const neverOpenedEnabledRef = useRef(Boolean(options.onNeverOpened));
   // Always call the latest url / onMessage without re-creating the socket when their identity changes.
   const getUrl = useEffectEvent(() => (typeof url === "function" ? url() : url));
   const onMessage = useEffectEvent((m: ServerMessage) => options.onMessage?.(m));
@@ -41,7 +43,9 @@ export const useLiveSocket = (
         setLast(m);
       },
       onStatus: setConnected,
-      onNeverOpened: (failures) => onNeverOpened(failures),
+      ...(neverOpenedEnabledRef.current
+        ? { onNeverOpened: (failures: number) => onNeverOpened(failures) }
+        : {}),
     });
     sockRef.current = sock;
     const onVisible = () => {

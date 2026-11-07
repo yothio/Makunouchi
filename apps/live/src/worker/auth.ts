@@ -44,7 +44,7 @@ export const isValidSessionId = (id: string): boolean => {
   return SESSION_ID_PATTERN.test(id);
 };
 
-/** Constant-time string comparison (length difference is not hidden). */
+/** Constant-time comparison for equal-length byte strings (tokens, secrets, hash b64). Length mismatch returns false immediately. */
 export const safeEqual = (a: string, b: string): boolean => {
   const x = encoder.encode(a);
   const y = encoder.encode(b);
@@ -52,6 +52,24 @@ export const safeEqual = (a: string, b: string): boolean => {
   let diff = 0;
   for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
   return diff === 0;
+};
+
+const digestEqual = (a: Uint8Array, b: Uint8Array): boolean => {
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+};
+
+/**
+ * Constant-time equality for variable-length strings (e.g. loginId): compare SHA-256 digests
+ * so a length mismatch does not return early.
+ */
+export const safeEqualDigest = async (a: string, b: string): Promise<boolean> => {
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(a)),
+    crypto.subtle.digest("SHA-256", encoder.encode(b)),
+  ]);
+  return digestEqual(new Uint8Array(ha), new Uint8Array(hb));
 };
 
 export const verifyBearer = (req: Request, secret: string): boolean => {

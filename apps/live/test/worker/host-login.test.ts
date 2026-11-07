@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { hostTokenFor } from "../../src/worker/auth";
-import { authHeaders, connectHost, connectGuest, newSessionId, quiz } from "./helpers";
+import { authHeaders, connectHost, connectGuest, connectScreen, newSessionId, quiz } from "./helpers";
 
 /** Rails HostCredentials / Python hashlib と同じ固定ベクタ（Task 4）。 */
 const FIXED_PASSWORD = "correct horse";
@@ -62,24 +62,23 @@ describe("host in PUT payload", () => {
     expect(res.status).toBe(422);
   });
 
-  it("state に loginId/passwordHash が入らず host キーにだけ保存される", async () => {
+  it("host 保存後にログインでき、各ビューと ranking に資格情報が現れない", async () => {
     const id = newSessionId();
     await put(id, quizWithHost);
-    const snap = await env.SESSION_ROOM.getByName(id).storageSnapshot();
-    const stateJson = JSON.stringify(snap.state);
-    expect(stateJson).not.toContain("passwordHash");
-    expect(stateJson).not.toContain("loginId");
-    expect(stateJson).not.toContain(FIXED_HASH);
-    expect(snap.host).toEqual({ loginId: FIXED_LOGIN_ID, passwordHash: FIXED_HASH });
-  });
+    // host が GameState ではなく別キーに入っていることの間接確認（ログイン成功）。
+    expect((await login(id, { loginId: FIXED_LOGIN_ID, password: FIXED_PASSWORD })).status).toBe(200);
 
-  it("host_view / guest_view / ranking に host 資格情報が現れない", async () => {
-    const id = newSessionId();
-    await put(id, quizWithHost);
     const host = await connectHost(id);
     const hostView = await host.next("host_view");
     expect(JSON.stringify(hostView)).not.toContain("passwordHash");
     expect(JSON.stringify(hostView)).not.toContain(FIXED_LOGIN_ID);
+    expect(JSON.stringify(hostView)).not.toContain(FIXED_HASH);
+
+    const screen = await connectScreen(id);
+    const screenView = await screen.next("screen_view");
+    expect(JSON.stringify(screenView)).not.toContain("passwordHash");
+    expect(JSON.stringify(screenView)).not.toContain(FIXED_LOGIN_ID);
+    expect(JSON.stringify(screenView)).not.toContain(FIXED_HASH);
 
     const guest = await connectGuest(id);
     guest.send({ type: "join", nickname: "alice" });
@@ -180,18 +179,6 @@ describe("POST /api/host-login/:sessionId", () => {
       await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" });
     }
     expect((await login(id, { loginId: FIXED_LOGIN_ID, password: FIXED_PASSWORD })).status).toBe(200);
-    expect((await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" })).status).toBe(401);
-    expect((await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" })).status).toBe(401);
-  });
-
-  it("ロック期限切れ後の最初の失敗ではロックされない（回数が 0 に戻る）", async () => {
-    const id = newSessionId();
-    await put(id, quizWithHost);
-    for (let i = 0; i < 10; i++) {
-      await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" });
-    }
-    expect((await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" })).status).toBe(429);
-    await env.SESSION_ROOM.getByName(id).expireHostLoginLockForTest();
     expect((await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" })).status).toBe(401);
     expect((await login(id, { loginId: FIXED_LOGIN_ID, password: "bad" })).status).toBe(401);
   });

@@ -4,6 +4,8 @@ import {
   isUsableSecret,
   isValidSessionId,
   MIN_ADMIN_SECRET_LENGTH,
+  safeEqual,
+  safeEqualDigest,
   screenTokenFor,
   verifyBearer,
   verifyPbkdf2,
@@ -67,6 +69,19 @@ describe("isValidSessionId", () => {
   });
   test.each(["screen:abc", "", "x".repeat(101), "a/b", "a b", "a?b", "日本語"])("rejects %s", (id) => {
     expect(isValidSessionId(id)).toBe(false);
+  });
+});
+
+describe("safeEqualDigest", () => {
+  test("同じ文字列は true、違う文字列は false（長さが違っても早期 return しない経路）", async () => {
+    expect(await safeEqualDigest("hostdemo", "hostdemo")).toBe(true);
+    expect(await safeEqualDigest("ab", "hostdemo")).toBe(false);
+    expect(await safeEqualDigest("hostdemo1", "hostdemo")).toBe(false);
+  });
+
+  test("safeEqual は長さ違いで即座に false（digest 版との役割分担）", () => {
+    expect(safeEqual("ab", "hostdemo")).toBe(false);
+    expect(safeEqual("hostdemo", "hostdemo")).toBe(true);
   });
 });
 

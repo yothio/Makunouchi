@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
-import { safeEqual, verifyPbkdf2 } from "./auth";
+import { safeEqualDigest, verifyPbkdf2 } from "./auth";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { rankPlayers, type RankedPlayer } from "./game/ranking";
@@ -51,27 +51,13 @@ export class SessionRoom extends DurableObject<Env> {
     if (reserved.outcome === "locked") return "locked";
 
     const passwordOk = await verifyPbkdf2(password, host.passwordHash);
-    const loginIdOk = safeEqual(loginId, host.loginId);
+    // Digest compare so loginId length does not short-circuit (safeEqual alone would).
+    const loginIdOk = await safeEqualDigest(loginId, host.loginId);
     if (loginIdOk && passwordOk) {
       this.ctx.storage.kv.delete("hostAttempts");
       return "ok";
     }
     return "invalid";
-  }
-
-  /** Test helper: inspect kv without exposing credentials on HTTP. */
-  async storageSnapshot(): Promise<{ state: GameState | null; host: HostCredentials | null }> {
-    return {
-      state: this.ctx.storage.kv.get<GameState>("state") ?? null,
-      host: this.ctx.storage.kv.get<HostCredentials>("host") ?? null,
-    };
-  }
-
-  /** Test helper: pretend the lock window already ended. */
-  async expireHostLoginLockForTest(): Promise<void> {
-    const attempts = this.ctx.storage.kv.get<HostAttempts>("hostAttempts");
-    if (!attempts) return;
-    this.ctx.storage.kv.put("hostAttempts", { failures: attempts.failures, lockedUntil: 0 });
   }
 
   async ranking(): Promise<RankingResult | null> {
