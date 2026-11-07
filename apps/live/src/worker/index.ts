@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { hostTokenFor, isUsableSecret, safeEqual, verifyBearer } from "./auth";
+import { hostTokenFor, isUsableSecret, isValidSessionId, safeEqual, verifyBearer } from "./auth";
 import { quizPayloadSchema } from "./payload";
 import { ROLE_HEADER } from "./role";
 
@@ -30,6 +30,7 @@ app.use("/api/sessions/*", requireAdminSecret, async (c, next) => {
 });
 
 app.put("/api/sessions/:sessionId", async (c) => {
+  if (!isValidSessionId(c.req.param("sessionId"))) return c.json({ error: "invalid_session_id" }, 400);
   let body: unknown;
   try {
     body = await c.req.json();

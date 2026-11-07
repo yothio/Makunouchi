@@ -26,6 +26,24 @@ export const hostTokenFor = (secret: string, sessionId: string): Promise<string>
   return hmacHex(secret, sessionId);
 };
 
+/**
+ * Read-only credential for the projector screen. The input is `"screen:" + sessionId`, so it can never equal
+ * a host token input as long as session ids contain no ":" (see `isValidSessionId`, enforced at session creation).
+ */
+export const screenTokenFor = (secret: string, sessionId: string): Promise<string> => {
+  if (!isUsableSecret(secret)) {
+    throw new Error(`ADMIN_API_SECRET must be at least ${MIN_ADMIN_SECRET_LENGTH} characters`);
+  }
+  return hmacHex(secret, `screen:${sessionId}`);
+};
+
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** Session ids are issued by Rails (UUIDs). ":" is excluded so host / screen token inputs cannot collide. */
+export const isValidSessionId = (id: string): boolean => {
+  return SESSION_ID_PATTERN.test(id);
+};
+
 /** Constant-time string comparison (length difference is not hidden). */
 export const safeEqual = (a: string, b: string): boolean => {
   const x = encoder.encode(a);
