@@ -16,6 +16,7 @@ class SessionFixationTest < ActionController::TestCase
 
   test "ログアウトでセッションの中身は全部消える" do
     @request.session[:user_id] = users(:organizer).id
+    @request.session[:login_at] = Authentication.micros(Time.current)
     @request.session[:marker] = "x"
 
     delete :destroy

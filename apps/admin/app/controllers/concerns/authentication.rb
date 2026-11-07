@@ -15,8 +15,18 @@ module Authentication
   end
 
   # セッションからユーザーを引く。無ければ nil。
+  # ログイン時刻（マイクロ秒の整数）が users.sessions_valid_after より前のセッションは無効
+  # （ログアウトで更新するので、控えておいた古い cookie を再送しても入れない）。
   def self.user_from(session)
-    User.find_by(id: session[:user_id]) if session[:user_id]
+    user = User.find_by(id: session[:user_id]) if session[:user_id]
+    return unless user && session[:login_at]
+
+    valid_after = user.sessions_valid_after
+    return user if valid_after.nil? || session[:login_at] >= micros(valid_after)
+  end
+
+  def self.micros(time)
+    (time.to_r * 1_000_000).to_i
   end
 
   private
@@ -37,10 +47,13 @@ module Authentication
   def start_session_for(user)
     reset_session
     session[:user_id] = user.id
+    session[:login_at] = Authentication.micros(Time.current)
     Current.user = user
   end
 
+  # 同じユーザーの、これより前のセッション（他の端末を含む）もすべて無効になる。
   def end_session
+    current_user&.update_column(:sessions_valid_after, Time.current)
     reset_session
     Current.user = nil
   end

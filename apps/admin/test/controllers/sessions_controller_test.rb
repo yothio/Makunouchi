@@ -51,6 +51,45 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_session_path
   end
 
+  test "ログアウト後に控えておいた古い cookie を再送しても入れない" do
+    sign_in_as users(:organizer)
+    old_cookie = cookies[Rails.application.config.session_options[:key]]
+    get root_path
+    assert_response :success
+
+    delete session_path
+    cookies[Rails.application.config.session_options[:key]] = old_cookie
+
+    get root_path
+    assert_redirected_to new_session_path
+  end
+
+  test "ログアウト後に入り直せば、新しいセッションは使える" do
+    sign_in_as users(:organizer)
+    delete session_path
+    sign_in_as users(:organizer)
+
+    get root_path
+    assert_response :success
+  end
+
+  test "ログイン時刻の無い古い形式のセッションは受け付けない" do
+    user = users(:organizer)
+
+    assert_nil Authentication.user_from({ user_id: user.id })
+    assert_nil Authentication.user_from({ user_id: user.id, login_at: nil })
+  end
+
+  test "sessions_valid_after より前のログインは無効、それ以降は有効" do
+    user = users(:organizer)
+    cutoff = Time.current
+    user.update_column(:sessions_valid_after, cutoff)
+    micros = ->(time) { (time.to_r * 1_000_000).to_i }
+
+    assert_nil Authentication.user_from({ user_id: user.id, login_at: micros.call(cutoff - 1.second) })
+    assert_equal user, Authentication.user_from({ user_id: user.id, login_at: micros.call(cutoff + 1.second) })
+  end
+
   test "ログイン試行は IP ごとに 3 分で 10 回まで。超えたら 429" do
     10.times do
       post session_path, params: { email: "nobody@example.com", password: "wrong" }

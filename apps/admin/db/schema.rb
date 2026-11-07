@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_07_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_07_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -20,7 +20,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_07_130000) do
     t.string "role", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "sessions_valid_after"
     t.index ["email"], name: "index_users_on_email", unique: true
-    t.check_constraint "role::text = ANY (ARRAY['system_admin'::character varying, 'organizer'::character varying]::text[])", name: "users_role_check"
+    t.check_constraint "role::text = ANY (ARRAY['system_admin'::character varying::text, 'organizer'::character varying::text])", name: "users_role_check"
   end
 end
