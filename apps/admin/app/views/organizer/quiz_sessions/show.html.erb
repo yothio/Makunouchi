@@ -40,5 +40,9 @@
     <% end %>
   </ol>
 
+  <% if @quiz_session.pending? %>
+    <%= button_to "もう一度送る", register_organizer_quiz_session_path(@quiz_session), method: :post, form: { class: "register-again" } %>
+  <% end %>
+
   <p><%= link_to "トップへ戻る", root_path %></p>
 </main>

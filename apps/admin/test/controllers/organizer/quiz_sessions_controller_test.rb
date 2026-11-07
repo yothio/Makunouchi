@@ -1,6 +1,29 @@
 require "test_helper"
 
 class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
+  class FakeLiveClient
+    attr_reader :calls
+
+    def initialize(result = :created)
+      @result = result
+      @calls = []
+    end
+
+    def create_session(session_id, payload)
+      @calls << [ session_id, payload.deep_dup ]
+      @result.is_a?(Proc) ? @result.call(session_id, payload) : @result
+    end
+  end
+
+  setup do
+    @fake_live = FakeLiveClient.new(:created)
+    QuizSessionRegistrar.client_factory = -> { @fake_live }
+  end
+
+  teardown do
+    QuizSessionRegistrar.client_factory = nil
+  end
+
   def add_questions(user, count)
     user.questions.destroy_all
     count.times do |i|
@@ -26,7 +49,7 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", root_path
   end
 
-  test "問題が 5 問以上あれば作成でき、詳細に幹事の ID/PASS と作成時の質問解答が出る" do
+  test "問題が 5 問以上あれば作成でき、live 登録成功で ready になり詳細に幹事の ID/PASS が出る" do
     user = users(:organizer)
     add_questions(user, 5)
     sign_in_as user
@@ -35,6 +58,11 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
       post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
     end
     created = user.quiz_sessions.order(:id).last
+    assert created.ready?
+    assert_equal 1, @fake_live.calls.size
+    assert_equal created.public_id, @fake_live.calls.first[0]
+    assert_equal created.host_password_hash, @fake_live.calls.first[1].dig(:host, :passwordHash)
+    assert_not @fake_live.calls.first[1].key?(:points)
     assert_redirected_to organizer_quiz_session_path(created)
     follow_redirect!
 
@@ -44,6 +72,48 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_select "li.snapshot-question", 5
     assert_match(/問題0/, response.body)
     assert_select "a[href=?]", root_path
+    assert_select "form.register-again", false
+  end
+
+  test "live が host: true を返さないと host_missing になり ready にも register の PUT にも進まない" do
+    user = users(:organizer)
+    add_questions(user, 5)
+    sign_in_as user
+    @fake_live = FakeLiveClient.new(:host_not_registered)
+    QuizSessionRegistrar.client_factory = -> { @fake_live }
+
+    post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
+    created = user.quiz_sessions.order(:id).last
+
+    assert created.host_missing?
+    assert_equal 1, @fake_live.calls.size
+    follow_redirect!
+    assert_match(/幹事の認証情報に未対応/, response.body)
+    assert_select "form.register-again", false
+
+    @fake_live.calls.clear
+    post register_organizer_quiz_session_path(created)
+
+    assert_empty @fake_live.calls
+    assert created.reload.host_missing?
+  end
+
+  test "pending の開催回はもう一度送るで同じ public_id・同じハッシュを再送する" do
+    user = users(:organizer)
+    add_questions(user, 5)
+    session = QuizSession.prepare(user: user, title: "本番").tap(&:save!)
+    sign_in_as user
+    assert session.pending?
+
+    get organizer_quiz_session_path(session)
+    assert_select "form.register-again"
+
+    post register_organizer_quiz_session_path(session)
+
+    assert session.reload.ready?
+    assert_equal 1, @fake_live.calls.size
+    assert_equal session.public_id, @fake_live.calls.first[0]
+    assert_equal session.host_password_hash, @fake_live.calls.first[1].dig(:host, :passwordHash)
   end
 
   test "詳細に投影画面の URL（screen トークン付き）が出る。秘密そのものは出さない" do
@@ -80,6 +150,7 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
       assert_response :unprocessable_entity
       assert_select ".error li", text: /5〜15/
     end
+    assert_empty @fake_live.calls
   end
 
   test "params の user_id・status・public_id・幹事 ID は受け付けない" do
@@ -88,12 +159,12 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
     sign_in_as user
 
     post organizer_quiz_sessions_path, params: { quiz_session: {
-      title: "本番", user_id: users(:other_organizer).id, status: "ready", public_id: "mine", host_login_id: "attacker1"
+      title: "本番", user_id: users(:other_organizer).id, status: "pending", public_id: "mine", host_login_id: "attacker1"
     } }
 
     created = QuizSession.order(:id).last
     assert_equal user, created.user
-    assert created.pending?
+    assert created.ready?
     assert_not_equal "mine", created.public_id
     assert_not_equal "attacker1", created.host_login_id
   end
@@ -105,7 +176,9 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
     sign_in_as users(:organizer)
 
     get organizer_quiz_session_path(session)
+    assert_response :not_found
 
+    post register_organizer_quiz_session_path(session)
     assert_response :not_found
   end
 
