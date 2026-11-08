@@ -247,6 +247,18 @@ describe("SessionRoom sockets", () => {
     expect(guest.ws.readyState).not.toBe(WebSocket.OPEN);
     expect((await rankingOf(id)).body.players).toHaveLength(1);
   });
+
+  it("oversized ArrayBuffer frame closes the sender without changing state", async () => {
+    const { id } = await setup();
+    const { guest } = await joinGuest(id, "Taro");
+    guest.ws.send(new ArrayBuffer(MAX_MESSAGE_BYTES + 1));
+    const deadline = Date.now() + 3000;
+    while (guest.ws.readyState === WebSocket.OPEN && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(guest.ws.readyState).not.toBe(WebSocket.OPEN);
+    expect((await rankingOf(id)).body.players).toHaveLength(1);
+  });
 });
 
 describe("SessionRoom connection caps", () => {
@@ -273,6 +285,31 @@ describe("SessionRoom connection caps", () => {
     screen.ws.close();
     guests.forEach((g) => g.ws.close());
     host2.ws.close();
+  }, 60_000);
+
+  it("after a guest at the cap closes, a new guest can connect again", async () => {
+    const { id, host } = await setup();
+    const guests = await Promise.all(
+      Array.from({ length: MAX_WEBSOCKETS - 1 }, () => connectGuest(id)),
+    );
+    const rejected = await exports.default.fetch(`https://x/ws/${id}/guest`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(rejected.status).toBe(503);
+
+    guests[0]!.ws.close();
+    const deadline = Date.now() + 3000;
+    while (guests[0]!.ws.readyState !== WebSocket.CLOSED && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const again = await connectGuest(id);
+    await again.next("need_join");
+    expect(again.ws.readyState).toBe(WebSocket.OPEN);
+
+    again.ws.close();
+    guests.forEach((g) => g.ws.close());
+    host.ws.close();
   }, 60_000);
 });
 

@@ -9,9 +9,9 @@ export const MAX_PLAYERS = 150;
 
 /**
  * Concurrent WebSocket cap in a session room.
- * 150 guests + host + screen + reconnect overlap (old socket not yet closed).
+ * 150 guests + host + screen + generous reconnect overlap after a venue Wi-Fi blip.
  */
-export const MAX_WEBSOCKETS = 170;
+export const MAX_WEBSOCKETS = 200;
 
 /** Drop inbound frames larger than this before JSON parse (UTF-8 byte length). */
 export const MAX_MESSAGE_BYTES = 8 * 1024;

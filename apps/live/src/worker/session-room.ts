@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
 import { safeEqualDigest, verifyPbkdf2 } from "./auth";
-import { MAX_MESSAGE_BYTES, MAX_WEBSOCKETS } from "./game/rules";
+import { isGuestAtConnectionCap, isInboundMessageTooLarge } from "./connection-caps";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { rankPlayers, type RankedPlayer } from "./game/ranking";
@@ -10,8 +10,6 @@ import { parseClientMessage } from "./messages";
 import type { HostCredentials } from "./payload";
 import { isRole, ROLE_HEADER } from "./role";
 import { guestView, hostView, screenView } from "./game/views";
-
-const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).byteLength;
 
 type GuestAttachment = { role: "guest"; playerId: string | null };
 type Attachment = { role: "host" } | { role: "screen" } | GuestAttachment;
@@ -78,7 +76,8 @@ export class SessionRoom extends DurableObject<Env> {
     if (!isRole(role)) return new Response("bad role", { status: 400 });
 
     // Guests are capped; host/screen must still connect so the day can be run.
-    if (role === "guest" && this.ctx.getWebSockets().length >= MAX_WEBSOCKETS) {
+    // CLOSING/CLOSED sockets are excluded so a Wi-Fi blip's overlapping reconnects are less likely to 503.
+    if (isGuestAtConnectionCap(role, this.ctx.getWebSockets())) {
       return new Response("too many connections", { status: 503 });
     }
 
@@ -103,14 +102,15 @@ export class SessionRoom extends DurableObject<Env> {
   }
 
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
-    if (!this.state || typeof raw !== "string") return;
-    if (utf8ByteLength(raw) > MAX_MESSAGE_BYTES) {
+    if (!this.state) return;
+    if (isInboundMessageTooLarge(raw)) {
       try {
         ws.close(1009, "message too large");
       } catch {
       }
       return;
     }
+    if (typeof raw !== "string") return;
     const msg = parseClientMessage(raw);
     const att = attachmentOf(ws);
     if (!msg || !att) return;
