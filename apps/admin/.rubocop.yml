@@ -1,8 +1,17 @@
 # Omakase Ruby styling for Rails
+# ルールの足し引きはせず、omakase の標準をそのまま使う。
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
-# Overwrite or add rules to create your own house style
-#
-# # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
-# Layout/SpaceInsideArrayLiteralBrackets:
-#   Enabled: false
+AllCops:
+  # .ruby-version（ruby-4.0.6）に合わせる。RuboCop が .ruby-version から自動で読むため、
+  # TargetRubyVersion はここでは固定しない。
+  # 生成物・外部由来のファイルは検査しない。
+  Exclude:
+    - "bin/**/*"          # Rails / bundler が生成する binstub
+    - "db/schema.rb"      # マイグレーションから自動生成される
+    - "node_modules/**/*"
+    - "public/**/*"
+    - "storage/**/*"
+    - "tmp/**/*"
+    - "log/**/*"
+    - "vendor/**/*"
