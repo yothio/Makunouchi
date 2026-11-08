@@ -1,6 +1,6 @@
 <% content_for :title, "質問解答の編集" %>
-<main>
-  <h1>質問解答の編集</h1>
+<main id="main" class="page">
+  <h1 class="page-title">質問解答の編集</h1>
   <%= render "form", question: @question, url: organizer_question_path(@question) %>
-  <p><%= link_to "一覧へ戻る", organizer_questions_path %></p>
+  <p class="back-link"><%= link_to "一覧へ戻る", organizer_questions_path %></p>
 </main>
