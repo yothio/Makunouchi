@@ -44,7 +44,7 @@
   --content-width-narrow: 30rem;
 }
 
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root {
     --color-bg: #121714;
     --color-surface: #1b221e;
