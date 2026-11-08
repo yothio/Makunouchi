@@ -10,6 +10,7 @@
 ## 報告方法
 
 脆弱性を見つけた場合は、公開の Issue に書かず、GitHub の Private vulnerability reporting から報告してください（リポジトリを public にしたあとに有効化します）。
+Private vulnerability reporting が有効になるまでは、ほかの報告窓口は用意しません。公開の Issue にも書かないでください。
 
 ## 報告に含めてほしいこと
 
