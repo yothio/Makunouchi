@@ -37,6 +37,13 @@ jobs:
           number="${WORKLOAD_IDENTITY_PROVIDER#projects/}"
           number="${number%%/*}"
           echo "::add-mask::$number"
+          # 取り出した値が数字だけでなければ、値を出さずに止める
+          case "$number" in
+            ""|*[!0-9]*)
+              echo "::error::GCP_WORKLOAD_IDENTITY_PROVIDER からプロジェクト番号を取り出せなかった（形式は projects/<番号>/locations/...）"
+              exit 1
+              ;;
+          esac
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
