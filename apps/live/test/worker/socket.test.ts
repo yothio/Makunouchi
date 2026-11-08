@@ -3,6 +3,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { SessionRoom } from "../../src/worker/session-room";
 import { screenTokenFor } from "../../src/worker/auth";
+import { MAX_MESSAGE_BYTES, MAX_PLAYERS, MAX_WEBSOCKETS } from "../../src/worker/game/rules";
 import {
   connectGuest,
   connectHost,
@@ -202,6 +203,77 @@ describe("SessionRoom sockets", () => {
       expect(await fresh.ranking()).toEqual(before);
     });
   });
+
+  it("join_error full when roster is at MAX_PLAYERS; token reconnect still works", async () => {
+    const { id } = await setup();
+    const { guest, token } = await joinGuest(id, "First");
+    const stub = env.SESSION_ROOM.getByName(id);
+    await runInDurableObject(stub, async (inst, ctx) => {
+      const room = inst as unknown as {
+        state: {
+          quiz: unknown;
+          phase: unknown;
+          players: { id: string; token: string; nickname: string; answers: Record<string, never> }[];
+        } | null;
+      };
+      const state = room.state!;
+      const players = [{ id: state.players[0].id, token, nickname: "First", answers: {} }];
+      for (let i = 1; i < MAX_PLAYERS; i++) {
+        players.push({ id: `id${i}`, token: `t${i}`, nickname: `n${i}`, answers: {} });
+      }
+      const next = { ...state, players };
+      room.state = next;
+      ctx.storage.kv.put("state", next);
+    });
+    const late = await connectGuest(id);
+    await late.next("need_join");
+    late.send({ type: "join", nickname: "Overflow" });
+    const err = await late.next("join_error");
+    expect(err.reason).toBe("full");
+    guest.ws.close();
+    const again = await connectGuest(id, token);
+    const gv = await again.next("guest_view");
+    expect(gv.view).toMatchObject({ kind: "lobby", nickname: "First" });
+  });
+
+  it("oversized inbound message is dropped and the sender is closed", async () => {
+    const { id } = await setup();
+    const { guest } = await joinGuest(id, "Taro");
+    guest.ws.send("x".repeat(MAX_MESSAGE_BYTES + 1));
+    const deadline = Date.now() + 3000;
+    while (guest.ws.readyState === WebSocket.OPEN && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(guest.ws.readyState).not.toBe(WebSocket.OPEN);
+    expect((await rankingOf(id)).body.players).toHaveLength(1);
+  });
+});
+
+describe("SessionRoom connection caps", () => {
+  it("rejects guest upgrade with 503 at MAX_WEBSOCKETS but still accepts host and screen", async () => {
+    const { id, host } = await setup();
+    const guests = await Promise.all(
+      Array.from({ length: MAX_WEBSOCKETS - 1 }, () => connectGuest(id)),
+    );
+    const rejected = await exports.default.fetch(`https://x/ws/${id}/guest`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(rejected.status).toBe(503);
+    expect(rejected.webSocket).toBeNull();
+
+    const screen = await connectScreen(id);
+    await screen.next("screen_view");
+    expect(screen.ws.readyState).toBe(WebSocket.OPEN);
+
+    host.ws.close();
+    const host2 = await connectHost(id);
+    await host2.next("host_view");
+    expect(host2.ws.readyState).toBe(WebSocket.OPEN);
+
+    screen.ws.close();
+    guests.forEach((g) => g.ws.close());
+    host2.ws.close();
+  }, 60_000);
 });
 
 describe("SessionRoom screen", () => {

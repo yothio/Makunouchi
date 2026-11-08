@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
 import { safeEqualDigest, verifyPbkdf2 } from "./auth";
+import { MAX_MESSAGE_BYTES, MAX_WEBSOCKETS } from "./game/rules";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { rankPlayers, type RankedPlayer } from "./game/ranking";
@@ -9,6 +10,8 @@ import { parseClientMessage } from "./messages";
 import type { HostCredentials } from "./payload";
 import { isRole, ROLE_HEADER } from "./role";
 import { guestView, hostView, screenView } from "./game/views";
+
+const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).byteLength;
 
 type GuestAttachment = { role: "guest"; playerId: string | null };
 type Attachment = { role: "host" } | { role: "screen" } | GuestAttachment;
@@ -74,6 +77,11 @@ export class SessionRoom extends DurableObject<Env> {
     const role = request.headers.get(ROLE_HEADER);
     if (!isRole(role)) return new Response("bad role", { status: 400 });
 
+    // Guests are capped; host/screen must still connect so the day can be run.
+    if (role === "guest" && this.ctx.getWebSockets().length >= MAX_WEBSOCKETS) {
+      return new Response("too many connections", { status: 503 });
+    }
+
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
@@ -96,6 +104,13 @@ export class SessionRoom extends DurableObject<Env> {
 
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
     if (!this.state || typeof raw !== "string") return;
+    if (utf8ByteLength(raw) > MAX_MESSAGE_BYTES) {
+      try {
+        ws.close(1009, "message too large");
+      } catch {
+      }
+      return;
+    }
     const msg = parseClientMessage(raw);
     const att = attachmentOf(ws);
     if (!msg || !att) return;

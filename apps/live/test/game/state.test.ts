@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { QuizPayload } from "../../src/shared/types";
+import { MAX_PLAYERS } from "../../src/worker/game/rules";
 import { scoreOf } from "../../src/worker/game/scoring";
 import type { GameState } from "../../src/worker/game/types";
 import {
   advance,
   createGameState,
   joinPlayer,
+  normalizeNickname,
   phaseKey,
   presentResults,
   submitAnswer,
@@ -144,6 +146,33 @@ describe("joinPlayer", () => {
     const s = walk(createGameState(quiz), 7);
     expect(s.phase.type).toBe("results");
     expect(joinPlayer(s, "late", { id: "p9", token: "t9" })).toEqual({ ok: false, reason: "closed" });
+  });
+  test(`参加人数は ${MAX_PLAYERS} 人ちょうどまで可、超えると full`, () => {
+    let s = createGameState(quiz);
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      const r = joinPlayer(s, `n${i}`, { id: `id${i}`, token: `t${i}` });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      s = r.state;
+    }
+    expect(s.players).toHaveLength(MAX_PLAYERS);
+    expect(joinPlayer(s, "overflow", { id: "over", token: "tover" })).toEqual({ ok: false, reason: "full" });
+  });
+  test("制御文字・書式文字は除去してから長さと重複を判定する", () => {
+    const s = withPlayer("TARO");
+    expect(normalizeNickname("TA\u0000RO\u200B")).toBe("TARO");
+    expect(joinPlayer(s, "TA\u0000RO\u200B", { id: "p2", token: "t2" })).toEqual({
+      ok: false,
+      reason: "nickname_taken",
+    });
+    expect(joinPlayer(createGameState(quiz), "\u0000\u200B", { id: "a", token: "b" })).toEqual({
+      ok: false,
+      reason: "nickname_invalid",
+    });
+  });
+  test("ZWJ を含む絵文字結合は分解されて保存される", () => {
+    const r = joinPlayer(createGameState(quiz), "👨\u200D👩", { id: "p1", token: "t1" });
+    expect(r.ok && r.player.nickname).toBe("👨👩");
   });
 });
 
