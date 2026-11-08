@@ -1,0 +1,62 @@
+name: admin-test
+
+on:
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin-test.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rspec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/admin
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RAILS_ENV: test
+      # database.yml は TEST_DATABASE_URL が無ければ admin_test に PG* の環境変数でつなぐ。
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # system spec は rack_test（ブラウザ不要）なので、ヘッドレスブラウザの準備は要らない。
+      # ruby-version は未指定のままにして、working-directory の .ruby-version を読ませる。
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        with:
+          bundler-cache: true
+          working-directory: apps/admin
+
+      - name: テスト用 DB を作る
+        run: bin/rails db:create db:schema:load
+
+      - name: RSpec
+        run: bundle exec rspec
