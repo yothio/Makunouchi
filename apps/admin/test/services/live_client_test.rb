@@ -66,7 +66,6 @@ class LiveClientTest < ActiveSupport::TestCase
   end
 
   test "PUT は Bearer と JSON を付け、ranking は呼ばない" do
-
     calls = []
     client = LiveClient.new(
       base_url: "https://live.example.com",

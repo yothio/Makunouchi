@@ -45,4 +45,3 @@ class QuizPayloadBuilder
     url
   end
 end
-
