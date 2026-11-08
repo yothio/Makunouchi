@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
     <title><%= content_for(:title) || "Admin" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -20,8 +20,22 @@
   </head>
 
   <body>
-    <% if notice.present? %><p class="notice" role="status"><%= notice %></p><% end %>
-    <% if alert.present? %><p class="alert" role="alert"><%= alert %></p><% end %>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <%= link_to "幕の内", root_path, class: "site-header__brand" %>
+        <% if current_user %>
+          <div class="site-header__user">
+            <span class="site-header__email"><%= current_user.email %></span>
+            <%= button_to "ログアウト", session_path, method: :delete, class: "btn btn--secondary btn--small" %>
+          </div>
+        <% end %>
+      </div>
+    </header>
+    <div class="flashes">
+      <% if notice.present? %><p class="flash flash--notice notice" role="status"><%= notice %></p><% end %>
+      <% if alert.present? %><p class="flash flash--alert alert" role="alert"><%= alert %></p><% end %>
+    </div>
     <%= yield %>
   </body>
 
