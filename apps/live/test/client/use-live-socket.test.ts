@@ -174,12 +174,17 @@ describe("createReconnectingSocket", () => {
     expect(permanent).toEqual([WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED]);
   });
 
-  test("一時的な切断（1006 など）では今までどおり再接続する", () => {
+  test("一時的な切断（1006 / 1001）では今までどおり再接続する", () => {
     make();
     last().open();
     last().drop(1006);
     vi.advanceTimersByTime(500);
     expect(FakeWebSocket.instances).toHaveLength(2);
+
+    last().open();
+    last().drop(1001);
+    vi.advanceTimersByTime(500);
+    expect(FakeWebSocket.instances).toHaveLength(3);
   });
 });
 

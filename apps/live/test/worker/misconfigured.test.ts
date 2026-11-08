@@ -1,11 +1,29 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { WS_CLOSE_SESSION_NOT_FOUND } from "../../src/shared/ws-close";
 import app from "../../src/worker/index";
 import { newSessionId, quiz } from "./helpers";
 
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
 const call = (secret: string | undefined, path: string, init?: RequestInit) => {
   return app.fetch(new Request(`https://x${path}`, init), { ...env, ADMIN_API_SECRET: secret } as Env, ctx);
+};
+
+const closeCodeOf = async (res: Response): Promise<number> => {
+  if (res.status !== 101 || !res.webSocket) {
+    throw new Error(`expected 101 with webSocket, got ${res.status}`);
+  }
+  const ws = res.webSocket;
+  const closed = new Promise<number>((resolve) => {
+    ws.addEventListener("close", (e) => resolve(e.code));
+  });
+  ws.accept();
+  return Promise.race([
+    closed,
+    new Promise<number>((_, reject) => {
+      setTimeout(() => reject(new Error("timed out waiting for close")), 3000);
+    }),
+  ]);
 };
 
 describe.each([
@@ -45,7 +63,7 @@ describe.each([
     const guest = await call(secret, `/ws/${id}/guest`, { headers: { Upgrade: "websocket" } });
     // Uncreated session: accept then close 4404 (permanent). Must not report misconfigured.
     expect(guest.status).toBe(101);
-    expect(guest.webSocket).toBeTruthy();
+    expect(await closeCodeOf(guest)).toBe(WS_CLOSE_SESSION_NOT_FOUND);
     expect((await call(secret, "/api/health")).status).toBe(200);
   });
 });
