@@ -56,5 +56,9 @@
       ],
       "correctIndex": 0
     }
-  ]
+  ],
+  "host": {
+    "loginId": "seedhost",
+    "passwordHash": "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk="
+  }
 }

@@ -14,6 +14,11 @@ export type ReconnectingSocketOptions = {
   getUrl: () => string;
   onMessage: (msg: ServerMessage) => void;
   onStatus: (connected: boolean) => void;
+  /**
+   * Opt-in: called when a connection attempt ends without ever opening, with the consecutive
+   * never-opened failure count (resets to 0 after any successful open). Guests/screens omit this.
+   */
+  onNeverOpened?: (failures: number) => void;
   WebSocketImpl?: typeof WebSocket;
 };
 
@@ -36,6 +41,9 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
   let lastReceived = 0;
   let delay = MIN_DELAY;
   let closed = false;
+  let neverOpenedFailures = 0;
+  /** Whether the current `ws` has fired onopen. */
+  let currentOpened = false;
 
   const clearConnTimers = () => {
     if (connectTimer) clearTimeout(connectTimer);
@@ -47,7 +55,9 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
   /** Tear down `sock` without waiting for its (possibly never-arriving) close event. */
   const drop = (sock: WebSocket, reconnectAfter: number | null) => {
     if (ws !== sock) return;
+    const opened = currentOpened;
     ws = null;
+    currentOpened = false;
     clearConnTimers();
     sock.onopen = sock.onmessage = sock.onclose = null;
     try {
@@ -56,6 +66,10 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
       // already dead
     }
     opts.onStatus(false);
+    if (!opened && !closed) {
+      neverOpenedFailures += 1;
+      opts.onNeverOpened?.(neverOpenedFailures);
+    }
     if (closed) return;
     if (reconnectAfter === null) {
       connect();
@@ -75,9 +89,12 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
     if (closed) return;
     const sock = new Impl(opts.getUrl());
     ws = sock;
+    currentOpened = false;
     connectTimer = setTimeout(() => drop(sock, delay), CONNECT_TIMEOUT);
     sock.onopen = () => {
       if (ws !== sock) return;
+      currentOpened = true;
+      neverOpenedFailures = 0;
       delay = MIN_DELAY;
       if (connectTimer) clearTimeout(connectTimer);
       connectTimer = null;

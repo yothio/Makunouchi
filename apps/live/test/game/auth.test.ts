@@ -1,5 +1,15 @@
 import { describe, expect, test } from "vitest";
-import { hostTokenFor, isUsableSecret, isValidSessionId, MIN_ADMIN_SECRET_LENGTH, screenTokenFor, verifyBearer } from "../../src/worker/auth";
+import {
+  hostTokenFor,
+  isUsableSecret,
+  isValidSessionId,
+  MIN_ADMIN_SECRET_LENGTH,
+  safeEqual,
+  safeEqualDigest,
+  screenTokenFor,
+  verifyBearer,
+  verifyPbkdf2,
+} from "../../src/worker/auth";
 
 const good = "x".repeat(MIN_ADMIN_SECRET_LENGTH);
 const short = "x".repeat(MIN_ADMIN_SECRET_LENGTH - 1);
@@ -59,5 +69,36 @@ describe("isValidSessionId", () => {
   });
   test.each(["screen:abc", "", "x".repeat(101), "a/b", "a b", "a?b", "日本語"])("rejects %s", (id) => {
     expect(isValidSessionId(id)).toBe(false);
+  });
+});
+
+describe("safeEqualDigest", () => {
+  test("同じ文字列は true、違う文字列は false（長さが違っても早期 return しない経路）", async () => {
+    expect(await safeEqualDigest("hostdemo", "hostdemo")).toBe(true);
+    expect(await safeEqualDigest("ab", "hostdemo")).toBe(false);
+    expect(await safeEqualDigest("hostdemo1", "hostdemo")).toBe(false);
+  });
+
+  test("safeEqual は長さ違いで即座に false（digest 版との役割分担）", () => {
+    expect(safeEqual("ab", "hostdemo")).toBe(false);
+    expect(safeEqual("hostdemo", "hostdemo")).toBe(true);
+  });
+});
+
+describe("verifyPbkdf2", () => {
+  // Rails HostCredentials / Python hashlib と同じ固定ベクタ。
+  const VECTOR =
+    "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=";
+
+  test("固定ベクタのパスワードで true", async () => {
+    expect(await verifyPbkdf2("correct horse", VECTOR)).toBe(true);
+  });
+
+  test("違うパスワードは false", async () => {
+    expect(await verifyPbkdf2("wrong horse", VECTOR)).toBe(false);
+  });
+
+  test("壊れた形式は false", async () => {
+    expect(await verifyPbkdf2("correct horse", "not-a-hash")).toBe(false);
   });
 });

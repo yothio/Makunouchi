@@ -77,4 +77,46 @@ describe("quizPayloadSchema", () => {
     expect(ok("javascript:alert(1)")).toBe(false);
     expect(ok("not a url")).toBe(false);
   });
+
+  const goodHost = {
+    loginId: "hostdemo",
+    passwordHash:
+      "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=",
+  };
+
+  test("host は省略できる", () => {
+    const result = quizPayloadSchema.safeParse(payload());
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).not.toHaveProperty("host");
+  });
+
+  test("host ありは受理する", () => {
+    const result = quizPayloadSchema.safeParse(payload({ host: goodHost }));
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.host).toEqual(goodHost);
+  });
+
+  test("host.passwordHash の形式違反は拒否", () => {
+    const bad = (passwordHash: string) =>
+      quizPayloadSchema.safeParse(payload({ host: { loginId: "hostdemo", passwordHash } })).success;
+    expect(bad("sha256$1$aa$bb")).toBe(false);
+    expect(bad("pbkdf2-sha256$0$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=")).toBe(
+      false,
+    );
+    expect(bad("pbkdf2-sha256$100001$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=")).toBe(
+      false,
+    );
+    expect(bad("pbkdf2-sha256$100000$AA==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=")).toBe(false);
+    expect(bad(goodHost.passwordHash)).toBe(true);
+  });
+
+  test("host.loginId は 4〜50 の英数字 _ -", () => {
+    const bad = (loginId: string) =>
+      quizPayloadSchema.safeParse(payload({ host: { loginId, passwordHash: goodHost.passwordHash } })).success;
+    expect(bad("abc")).toBe(false);
+    expect(bad("host demo")).toBe(false);
+    expect(bad("hostdemo")).toBe(true);
+  });
 });

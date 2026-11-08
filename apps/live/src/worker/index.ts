@@ -29,6 +29,29 @@ const requireAdminSecret = createMiddleware<{ Bindings: Env }>(async (c, next) =
   await next();
 });
 
+// Outside `/api/sessions/*` so the browser can call it without Bearer (browsers never hold ADMIN_API_SECRET).
+app.post("/api/host-login/:sessionId", requireAdminSecret, async (c) => {
+  const sessionId = c.req.param("sessionId");
+  if (!isValidSessionId(sessionId)) return c.json({ error: "invalid_session_id" }, 400);
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_body" }, 400);
+  }
+  if (!body || typeof body !== "object") return c.json({ error: "invalid_body" }, 400);
+  const loginId = (body as { loginId?: unknown }).loginId;
+  const password = (body as { password?: unknown }).password;
+  if (typeof loginId !== "string" || typeof password !== "string") {
+    return c.json({ error: "invalid_body" }, 400);
+  }
+  const result = await roomFor(c.env, sessionId).hostLogin(loginId, password);
+  if (result === "missing") return c.json({ error: "not_found" }, 404);
+  if (result === "locked") return c.json({ error: "too_many_attempts" }, 429);
+  if (result === "invalid") return c.json({ error: "invalid_credentials" }, 401);
+  return c.json({ token: await hostTokenFor(c.env.ADMIN_API_SECRET, sessionId) });
+});
+
 app.use("/api/sessions/*", requireAdminSecret, async (c, next) => {
   if (!verifyBearer(c.req.raw, c.env.ADMIN_API_SECRET)) return c.json({ error: "unauthorized" }, 401);
   await next();
@@ -44,8 +67,11 @@ app.put("/api/sessions/:sessionId", async (c) => {
   }
   const parsed = quizPayloadSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_payload", issues: parsed.error.issues }, 422);
-  const result = await roomFor(c.env, c.req.param("sessionId")).init(parsed.data);
-  return result === "created" ? c.json({ ok: true }, 201) : c.json({ error: "exists" }, 409);
+  // Keep host credentials out of GameState ("state" kv key).
+  const { host, ...quiz } = parsed.data;
+  const result = await roomFor(c.env, c.req.param("sessionId")).init(quiz, host);
+  if (result !== "created") return c.json({ error: "exists" }, 409);
+  return host ? c.json({ ok: true, host: true }, 201) : c.json({ ok: true }, 201);
 });
 
 app.get("/api/sessions/:sessionId/ranking", async (c) => {
