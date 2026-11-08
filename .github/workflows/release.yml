@@ -13,10 +13,9 @@ on:
           - app
           - live
 
-# contents: タグと Release。actions: 必須チェック確認の API。id-token: 呼び出し先の admin-deploy が Workload Identity に使う
+# contents: タグと Release。id-token: 呼び出し先の admin-deploy が Workload Identity に使う
 permissions:
   contents: write
-  actions: read
   id-token: write
 
 concurrency:
@@ -41,7 +40,6 @@ jobs:
         with:
           fetch-depth: 0
 
-
       - name: タグ名を決める
         id: tag
         env:
@@ -55,98 +53,6 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "次のタグ: $TAG"
-
-      - name: 必須チェックが成功しているか確かめる
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
-          TARGET: ${{ inputs.target }}
-          REPO: ${{ github.repository }}
-        run: |
-          success_count() {
-            NAME="$1"
-            CHECK_SHA="$2"
-            gh api "repos/$REPO/actions/runs?head_sha=$CHECK_SHA&status=completed&per_page=100" \
-              --jq "[.workflow_runs[] | select(.name == \"$NAME\" and .conclusion == \"success\")] | length"
-          }
-
-          completed_count() {
-            NAME="$1"
-            CHECK_SHA="$2"
-            gh api "repos/$REPO/actions/runs?head_sha=$CHECK_SHA&status=completed&per_page=100" \
-              --jq "[.workflow_runs[] | select(.name == \"$NAME\")] | length"
-          }
-
-          require_success_on_sha() {
-            NAME="$1"
-            COUNT="$(success_count "$NAME" "$SHA")"
-            if [ "$COUNT" -eq 0 ]; then
-              echo "::error::コミット $SHA にワークフロー $NAME の success が無い"
-              exit 1
-            fi
-            echo "$NAME: success（$COUNT 件）"
-          }
-
-          require_success_on_sha "test"
-
-          if [ "$TARGET" != "app" ]; then
-            exit 0
-          fi
-
-          AT_OK="$(success_count "admin-test" "$SHA")"
-          AL_OK="$(success_count "admin-lint" "$SHA")"
-          if [ "$AT_OK" -gt 0 ] && [ "$AL_OK" -gt 0 ]; then
-            echo "admin-test: success（$AT_OK 件）"
-            echo "admin-lint: success（$AL_OK 件）"
-            exit 0
-          fi
-
-          AT_DONE="$(completed_count "admin-test" "$SHA")"
-          AL_DONE="$(completed_count "admin-lint" "$SHA")"
-          if [ "$AT_DONE" -gt 0 ] && [ "$AT_OK" -eq 0 ]; then
-            echo "::error::コミット $SHA の admin-test に success が無い"
-            exit 1
-          fi
-          if [ "$AL_DONE" -gt 0 ] && [ "$AL_OK" -eq 0 ]; then
-            echo "::error::コミット $SHA の admin-lint に success が無い"
-            exit 1
-          fi
-
-          # パスフィルタで記録が無いとき: 両方 success の直近祖先を探し、以降に admin 差分が無ければ通す
-          ANCESTOR=""
-          CANDS="$(gh api "repos/$REPO/actions/workflows/admin-test.yml/runs?branch=main&status=completed&per_page=30" \
-            --jq '.workflow_runs[] | select(.conclusion == "success") | .head_sha')"
-          for CAND in $CANDS; do
-            if [ -z "$CAND" ] || [ "$CAND" = "$SHA" ]; then
-              continue
-            fi
-            if ! git merge-base --is-ancestor "$CAND" "$SHA"; then
-              continue
-            fi
-            if [ "$(success_count "admin-lint" "$CAND")" -gt 0 ]; then
-              ANCESTOR="$CAND"
-              break
-            fi
-          done
-
-          if [ -z "$ANCESTOR" ]; then
-            echo "::error::admin-test と admin-lint がどちらも success の祖先コミットが見つからない"
-            exit 1
-          fi
-
-
-          CHANGED="$(git diff --name-only "$ANCESTOR" "$SHA" -- \
-            apps/admin \
-            .github/workflows/admin-test.yml \
-            .github/workflows/admin-lint.yml \
-            .github/workflows/admin-deploy.yml)"
-          if [ -n "$CHANGED" ]; then
-            echo "::error::直近の admin CI success（$ANCESTOR）からタグ対象（$SHA）までに apps/admin または admin 用ワークフローの差分がある"
-            echo "$CHANGED"
-            exit 1
-          fi
-
-          echo "admin-test / admin-lint: 祖先 $ANCESTOR の success を採用（以降に admin 差分なし）"
 
       - name: タグを打ち GitHub Release を作る
         env:

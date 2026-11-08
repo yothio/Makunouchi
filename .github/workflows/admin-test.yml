@@ -10,13 +10,20 @@ on:
     paths:
       - "apps/admin/**"
       - ".github/workflows/admin-test.yml"
+  workflow_call:
+    inputs:
+      ref:
+        description: "checkout する ref（タグや SHA。空なら呼び出し元の既定）"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
 
 jobs:
   rspec:
@@ -46,6 +53,9 @@ jobs:
       PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+
 
       # system spec は rack_test（ブラウザ不要）なので、ヘッドレスブラウザの準備は要らない。
       # defaults.run.working-directory は uses に効かないので、ここで指定する

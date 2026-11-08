@@ -19,7 +19,6 @@ on:
         required: true
         type: string
 
-
 permissions:
   contents: read
   id-token: write
@@ -30,10 +29,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: production
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.target.outputs.tag }}
     steps:
       - name: タグ名を決める
         id: target
@@ -53,7 +53,6 @@ jobs:
               exit 1
               ;;
           esac
-
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,7 +70,31 @@ jobs:
             echo "::error::タグ $TAG のコミットが main に含まれない"
             exit 1
           fi
-          echo "sha=$TAG_SHA" >> "$GITHUB_ENV"
+
+  rspec:
+    needs: prepare
+    uses: ./.github/workflows/admin-test.yml
+    with:
+      ref: ${{ needs.prepare.outputs.tag }}
+
+  rubocop:
+    needs: prepare
+    uses: ./.github/workflows/admin-lint.yml
+    with:
+      ref: ${{ needs.prepare.outputs.tag }}
+
+  deploy:
+    needs: [prepare, rspec, rubocop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: デプロイ対象の SHA を決める
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       # secrets に登録していない値はログで伏せられない。プロジェクト番号は GCP_PROJECT_NUMBER を参照する
       - name: プロジェクト番号をログで伏せる

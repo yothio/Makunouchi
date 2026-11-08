@@ -181,11 +181,11 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
 
 1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`）
 2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
-3. そのコミットで `test` が success であることを確かめる
-4. `main` の先頭にタグを打ち、GitHub Release を作る
-5. 同じ実行から `live-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
+3. `main` の先頭にタグを打ち、GitHub Release を作る
+4. 同じ実行から `live-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
 
-`live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、テスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
+`live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、そのタグでテスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
+
 
 手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限してください。
 

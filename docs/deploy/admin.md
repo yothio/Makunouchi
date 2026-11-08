@@ -96,29 +96,21 @@ admin の本番デプロイは release タグ `app-YYYYMMDD-HHMM`（例: `app-20
 
 1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `app`）
 2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
-3. 必須チェックの success を確かめる（下の「必須チェック」）
-4. `main` の先頭にタグを打ち、GitHub Release を作る
-5. 同じ実行から `admin-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
+3. `main` の先頭にタグを打ち、GitHub Release を作る
+4. 同じ実行から `admin-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
 
-`admin-deploy.yml` は次を順に流します。どこかで失敗したら以降は動きません（migrate が失敗したらサービスはデプロイされません）。
+`admin-deploy.yml` は次を順に流します。どこかで失敗したら以降は動きません（rspec / rubocop が失敗したらイメージは出さず、migrate が失敗したらサービスはデプロイされません）。
 
 1. タグのコミットが `main` に含まれることを確かめる
-2. `apps/admin` のイメージを `linux/amd64` でビルドし、タグを git の SHA にして Artifact Registry（`<AR_REPOSITORY>/admin`）へ push
-3. `<MIGRATE_JOB>` のイメージをその SHA に更新し、実行して完了を待つ
-4. `<SERVICE_NAME>` を同じイメージでデプロイ
+2. そのタグで `admin-test.yml`（rspec）と `admin-lint.yml`（rubocop）を `workflow_call` で流す
+3. `apps/admin` のイメージを `linux/amd64` でビルドし、タグを git の SHA にして Artifact Registry（`<AR_REPOSITORY>/admin`）へ push
+4. `<MIGRATE_JOB>` のイメージをその SHA に更新し、実行して完了を待つ
+5. `<SERVICE_NAME>` を同じイメージでデプロイ
 
 手で `app-YYYYMMDD-HHMM` タグを push した場合も `admin-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。
 
-**必須チェック**
+**運用ルール**: **main は PR 経由でのみ更新**し（直接 push しない）、`admin-test.yml` と `admin-lint` と `test` を required check にして、通ったものだけをマージしてください。デプロイ時にも同じ rspec / rubocop をタグのコミットで流します。
 
-- `test` はタグを打つコミット自体に success が 1 件以上必要（最新 1 件だけ見ない。再実行のキャンセルがあっても、success があれば通る）
-- `admin-test` / `admin-lint` は `apps/admin/**` などの変更時だけ main で走る。タグを打つコミットに両方の success があればそのまま通る
-- どちらも記録が無いとき（live や docs だけのマージのあとの HEAD など）は、`main` 上の祖先で両方とも success の直近コミットを探す。そのコミットからタグ対象までに `apps/admin` と admin 用ワークフロー（`admin-test.yml` / `admin-lint.yml` / `admin-deploy.yml`）の差分が無ければ通し、差分があれば止める
-- タグ対象のコミットに完了記録はあるが success が無いときは止め、祖先へフォールバックしない
-
-詰まる例: 直近の admin CI success のあと、まだ admin の変更を含むコミットが main に乗っているのに、そのコミットでは admin CI が走っていない／失敗している。このときは admin の修正をマージして CI を通してからリリースする。
-
-**運用ルール**: **main は PR 経由でのみ更新**し（直接 push しない）、`admin-test.yml` と `admin-lint` と `test` を required check にして、通ったものだけをマージしてください。
 
 
 CI が変えるのはイメージだけです。環境変数・Secret・Job の args・probe は、サービスと Job に設定済みのものがそのまま使われます。認証は Workload Identity 連携（鍵ファイルは作らない）。同時に 2 つは動かず（`concurrency`）、実行中のデプロイは取り消しません。
