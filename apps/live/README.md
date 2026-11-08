@@ -73,7 +73,8 @@ pnpm exec wrangler secret put ADMIN_API_SECRET --name makunouchi-live
 1. Cloudflare ダッシュボードの Account API tokens で、トークンを作る。
    - 権限のテンプレートは「Edit Cloudflare Workers」（公式の GitHub Actions の手順が使うもの）。
    - 対象のアカウントは、デプロイ先の 1 つに限定する。
-   - 追加の権限は付けない。トークンの値は作成時に一度だけ表示される。
+   - テンプレートには、Workers Scripts の編集（Account）のほか、Workers Routes の編集（Zone）、Workers KV Storage・Workers R2 Storage の編集、Workers Tail の読み取り、Account Settings の読み取り（Account）、User Details・User Memberships の読み取り（User）が含まれる。このリポジトリのデプロイが使うのは主に Workers Scripts の編集なので、絞りたいときはカスタムトークンで必要な権限だけにする（絞ったら初回の手動起動で通ることを確かめる）。テンプレートに権限は足さない。
+   - トークンの値は作成時に一度だけ表示される。
 2. GitHub に repository secrets を登録する。値は対話入力で渡し、コマンドに書かない。
 
    ```
@@ -85,7 +86,21 @@ pnpm exec wrangler secret put ADMIN_API_SECRET --name makunouchi-live
    ```
 
    アカウント ID はダッシュボードのアカウントのメニューか `wrangler whoami` で確かめる。
-3. ワークフローは `environment: production` で動く。リポジトリの Settings → Environments に `production` があることを確かめる（admin のデプロイと共用）。
+3. ワークフローは `environment: production` で動く（admin のデプロイと共用）。`production` の Deployment branches を `main` だけに限定する。ワークフローの `main` 検査は、検査を消したワークフローファイルを別ブランチから起動されると回避できるので、environment 側でも止める。
+
+   画面から: リポジトリの Settings → Environments → `production` → Deployment branches and tags で「Selected branches and tags」を選び、`main` を追加する。
+
+   コマンドから（既存の environment の設定は、ここで指定しない項目が変わることがあるので、先に画面で現状を見る）:
+
+   ```
+   gh api --method PUT repos/yothio/Makunouchi/environments/production -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
+   ```
+
+   ```
+   gh api --method POST repos/yothio/Makunouchi/environments/production/deployment-branch-policies -f name=main -f type=branch
+   ```
+
+   admin のデプロイは `main` への push と手動起動で動くので、この限定の影響を受けない。
 
 ### 起動のしかた
 
