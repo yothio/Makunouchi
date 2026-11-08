@@ -24,12 +24,15 @@
     <span data-image-preview-target="status" role="status"></span>
   </p>
 
-  <% %w[a b c d].each do |letter| %>
-    <p>
-      <%= form.label "choice_#{letter}", "選択肢 #{letter.upcase}" %><br>
-      <%= form.text_field "choice_#{letter}", required: true, maxlength: 50, size: 40 %>
-    </p>
-  <% end %>
+  <div class="choices">
+    <% %w[a b c d].each do |letter| %>
+      <%# p だと、検証エラーで入力欄を包む div（field_with_errors）が入ったときにブラウザが p を閉じて並びが崩れるので div にする %>
+      <div class="choice">
+        <%= form.label "choice_#{letter}", "選択肢 #{letter.upcase}" %><br>
+        <%= form.text_field "choice_#{letter}", required: true, maxlength: 50, size: 40 %>
+      </div>
+    <% end %>
+  </div>
 
   <fieldset>
     <legend>正解の選択肢</legend>
@@ -39,5 +42,5 @@
     <% end %>
   </fieldset>
 
-  <p><%= form.submit "保存" %></p>
+  <p class="form-actions"><%= form.submit "保存" %></p>
 <% end %>

@@ -39,6 +39,20 @@ class Organizer::QuestionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, users(:organizer).questions.order(:id).last.correct_index
   end
 
+  test "保存ボタンは画面下に固定され、選択肢は 2 列に並ぶ（1280x800 で見切れない）" do
+    sign_in_as users(:organizer)
+
+    get new_organizer_question_path
+
+    assert_select "form .choices > .choice input[type=text]", 4
+    assert_select "form p.form-actions input[type=submit][value=保存]"
+
+    css = Rails.root.join("app/assets/stylesheets/application.css").read
+    assert_match(/\.form-actions\s*\{[^}]*position:\s*sticky/, css)
+    assert_match(/\.choices\s*\{[^}]*grid-template-columns/, css)
+    assert_match(/\.field_with_errors\s*\{[^}]*display:\s*contents/, css)
+  end
+
   test "user_id は params から受けず、必ずログイン中のユーザーになる" do
     sign_in_as users(:organizer)
 
@@ -67,6 +81,8 @@ class Organizer::QuestionsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".error li", text: "選択肢 Aは他の選択肢と同じ文言です。違う文言にしてください"
     assert_select ".error li", text: "選択肢 Bは他の選択肢と同じ文言です。違う文言にしてください"
     assert_no_match(/is not a number|translation missing/i, response.body)
+    # エラー表示でも選択肢 4 つが 2 列の並びのまま（p の中に div が入ってブラウザに閉じられない）
+    assert_select ".choices > .choice", 4
   end
 
   test "編集と更新ができる。画像を送らなければ今の画像を残す" do
