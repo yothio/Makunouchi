@@ -43,8 +43,9 @@ describe.each([
 
   it("guest WebSocket and health do not need the secret", async () => {
     const guest = await call(secret, `/ws/${id}/guest`, { headers: { Upgrade: "websocket" } });
-    expect(guest.status).toBe(404);
-    expect(await guest.text()).not.toContain("misconfigured");
+    // Uncreated session: accept then close 4404 (permanent). Must not report misconfigured.
+    expect(guest.status).toBe(101);
+    expect(guest.webSocket).toBeTruthy();
     expect((await call(secret, "/api/health")).status).toBe(200);
   });
 });

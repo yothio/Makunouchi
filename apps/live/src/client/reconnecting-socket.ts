@@ -1,4 +1,5 @@
 import type { ClientMessage, ServerMessage } from "../shared/types";
+import { isPermanentWsClose } from "../shared/ws-close";
 
 const MIN_DELAY = 500;
 const MAX_DELAY = 5000;
@@ -16,8 +17,11 @@ export type ReconnectingSocketOptions = {
   /**
    * Opt-in: called when a connection attempt ends without ever opening, with the consecutive
    * never-opened failure count (resets to 0 after any successful open). Guests/screens omit this.
+   * Not called for permanent close codes (4404 / 4401); those use onPermanentClose instead.
    */
   onNeverOpened?: (failures: number) => void;
+  /** Called once when the server closes with a permanent application code; no further reconnects. */
+  onPermanentClose?: (code: number) => void;
   WebSocketImpl?: typeof WebSocket;
 };
 
@@ -113,7 +117,20 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
       } catch {
       }
     };
-    sock.onclose = () => drop(sock, delay);
+    sock.onclose = (event) => {
+      if (ws !== sock) return;
+      if (isPermanentWsClose(event.code)) {
+        closed = true;
+        ws = null;
+        currentOpened = false;
+        clearConnTimers();
+        sock.onopen = sock.onmessage = sock.onclose = null;
+        opts.onStatus(false);
+        opts.onPermanentClose?.(event.code);
+        return;
+      }
+      drop(sock, delay);
+    };
   };
 
   connect();

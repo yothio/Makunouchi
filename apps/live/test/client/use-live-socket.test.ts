@@ -7,6 +7,7 @@ import {
   type TokenStore,
 } from "../../src/client/guest/guest-socket";
 import type { ServerMessage } from "../../src/shared/types";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../../src/shared/ws-close";
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -14,7 +15,7 @@ class FakeWebSocket {
   readyState = 0;
   sent: string[] = [];
   onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((e: { code: number; reason: string }) => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   constructor(public url: string) {
@@ -23,17 +24,17 @@ class FakeWebSocket {
   send(d: string) {
     this.sent.push(d);
   }
-  close() {
+  close(code = 1000, reason = "") {
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.({ code, reason });
   }
   open() {
     this.readyState = 1;
     this.onopen?.();
   }
-  drop() {
+  drop(code = 1006) {
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.({ code, reason: "" });
   }
   receiveRaw(data: string) {
     this.onmessage?.({ data });
@@ -59,13 +60,21 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-const make = (getUrl: () => string = () => "ws://x/a") => {
+const make = (
+  getUrl: () => string = () => "ws://x/a",
+  extra: {
+    onNeverOpened?: (failures: number) => void;
+    onPermanentClose?: (code: number) => void;
+  } = {},
+) => {
   const messages: ServerMessage[] = [];
   const statuses: boolean[] = [];
   const s = createReconnectingSocket({
     getUrl,
     onMessage: (m) => messages.push(m),
     onStatus: (c) => statuses.push(c),
+    onNeverOpened: extra.onNeverOpened,
+    onPermanentClose: extra.onPermanentClose,
     WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket,
   });
   return { s, messages, statuses };
@@ -138,6 +147,39 @@ describe("createReconnectingSocket", () => {
     s.close();
     vi.advanceTimersByTime(10000);
     expect(FakeWebSocket.instances).toHaveLength(1);
+  });
+
+  test("4404 / 4401 で閉じられたら再接続せず onPermanentClose を呼ぶ", () => {
+    const permanent: number[] = [];
+    const neverOpened: number[] = [];
+    make(() => "ws://x/a", {
+      onPermanentClose: (code) => permanent.push(code),
+      onNeverOpened: (n) => neverOpened.push(n),
+    });
+    last().open();
+    last().drop(WS_CLOSE_SESSION_NOT_FOUND);
+    vi.advanceTimersByTime(10000);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(permanent).toEqual([WS_CLOSE_SESSION_NOT_FOUND]);
+    expect(neverOpened).toEqual([]);
+
+    FakeWebSocket.instances = [];
+    make(() => "ws://x/b", {
+      onPermanentClose: (code) => permanent.push(code),
+    });
+    last().open();
+    last().drop(WS_CLOSE_UNAUTHORIZED);
+    vi.advanceTimersByTime(10000);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(permanent).toEqual([WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED]);
+  });
+
+  test("一時的な切断（1006 など）では今までどおり再接続する", () => {
+    make();
+    last().open();
+    last().drop(1006);
+    vi.advanceTimersByTime(500);
+    expect(FakeWebSocket.instances).toHaveLength(2);
   });
 });
 

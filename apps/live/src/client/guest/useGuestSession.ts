@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Choice, GuestView } from "../../shared/types";
+import { permanentWsErrorFromCode, type PermanentWsError } from "../permanent-ws-error";
 import { useLiveSocket } from "../use-live-socket";
 import { buildGuestUrl, handleGuestMessage, localTokenStore } from "./guest-socket";
 import type { JoinError, PendingAnswer } from "./types";
@@ -9,6 +10,7 @@ export const useGuestSession = (sessionId: string) => {
   const [needJoin, setNeedJoin] = useState(false);
   const [joinError, setJoinError] = useState<JoinError | null>(null);
   const [pending, setPending] = useState<PendingAnswer | null>(null);
+  const [permanentError, setPermanentError] = useState<PermanentWsError | null>(null);
 
   const { send, connected } = useLiveSocket(
     () => buildGuestUrl(window.location, sessionId, localTokenStore),
@@ -27,6 +29,10 @@ export const useGuestSession = (sessionId: string) => {
           setJoinError(msg.reason);
         }
       },
+      onPermanentClose: (code) => {
+        const error = permanentWsErrorFromCode(code);
+        if (error) setPermanentError(error);
+      },
     },
   );
 
@@ -36,5 +42,5 @@ export const useGuestSession = (sessionId: string) => {
   };
   const join = (nickname: string) => send({ type: "join", nickname });
 
-  return { view, needJoin, joinError, pending, connected, answer, join };
+  return { view, needJoin, joinError, pending, connected, permanentError, answer, join };
 };

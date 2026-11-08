@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../shared/ws-close";
 import { hostTokenFor, isUsableSecret, isValidSessionId, safeEqual, screenTokenFor, verifyBearer } from "./auth";
 import { quizPayloadSchema } from "./payload";
 import { isRole, ROLE_HEADER, type Role } from "./role";
+import { rejectWebSocket } from "./ws-reject";
 
 export { SessionRoom } from "./session-room";
 
@@ -88,11 +90,18 @@ app.get(
   },
   async (c) => {
     const { sessionId, role } = c.req.param();
-    if (!isRole(role) || !isValidSessionId(sessionId)) return c.json({ error: "not_found" }, 404);
-    if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
+    const wantsSocket = c.req.header("Upgrade") === "websocket";
+    if (!isRole(role) || !isValidSessionId(sessionId)) {
+      if (wantsSocket) return rejectWebSocket(WS_CLOSE_SESSION_NOT_FOUND, "not found");
+      return c.json({ error: "not_found" }, 404);
+    }
+    if (!wantsSocket) return c.json({ error: "expected_websocket" }, 426);
     if (role !== "guest") {
       const expected = await tokenFor(role, c.env.ADMIN_API_SECRET, sessionId);
-      if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
+      if (!safeEqual(c.req.query("token") ?? "", expected)) {
+        // Token check stays in the Worker so a bad token never wakes the DO.
+        return rejectWebSocket(WS_CLOSE_UNAUTHORIZED, "unauthorized");
+      }
     }
     // The role is decided here; the DO only reads this header (overwriting any client-supplied value).
     const forwarded = new Request(c.req.raw);

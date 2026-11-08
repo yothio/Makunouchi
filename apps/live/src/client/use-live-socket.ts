@@ -7,6 +7,8 @@ export type UseLiveSocketOptions = {
   onMessage?: (msg: ServerMessage) => void;
   /** Opt-in never-opened failure counter (host relogin path). */
   onNeverOpened?: (failures: number) => void;
+  /** Permanent close codes (4404 / 4401); socket stops reconnecting. */
+  onPermanentClose?: (code: number) => void;
 };
 
 export type LiveSocket = {
@@ -29,10 +31,12 @@ export const useLiveSocket = (
   const sockRef = useRef<ReconnectingSocket | null>(null);
   // Capture opt-in once at mount so guests/screens never arm the never-opened path.
   const neverOpenedEnabledRef = useRef(Boolean(options.onNeverOpened));
+  const permanentCloseEnabledRef = useRef(Boolean(options.onPermanentClose));
   // Always call the latest url / onMessage without re-creating the socket when their identity changes.
   const getUrl = useEffectEvent(() => (typeof url === "function" ? url() : url));
   const onMessage = useEffectEvent((m: ServerMessage) => options.onMessage?.(m));
   const onNeverOpened = useEffectEvent((failures: number) => options.onNeverOpened?.(failures));
+  const onPermanentClose = useEffectEvent((code: number) => options.onPermanentClose?.(code));
 
   useEffect(() => {
     const sock = createReconnectingSocket({
@@ -44,6 +48,9 @@ export const useLiveSocket = (
       onStatus: setConnected,
       ...(neverOpenedEnabledRef.current
         ? { onNeverOpened: (failures: number) => onNeverOpened(failures) }
+        : {}),
+      ...(permanentCloseEnabledRef.current
+        ? { onPermanentClose: (code: number) => onPermanentClose(code) }
         : {}),
     });
     sockRef.current = sock;

@@ -1,7 +1,19 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
-import { authHeaders, connectHost, createSession, driveToResults, newSessionId, quiz } from "./helpers";
+import {
+  WS_CLOSE_SESSION_NOT_FOUND,
+  WS_CLOSE_UNAUTHORIZED,
+} from "../../src/shared/ws-close";
+import {
+  authHeaders,
+  connectExpectingClose,
+  connectHost,
+  createSession,
+  driveToResults,
+  newSessionId,
+  quiz,
+} from "./helpers";
 
 const put = (id: string, body: unknown, headers: Record<string, string> = authHeaders) =>
   exports.default.fetch(`https://x/api/sessions/${id}`, { method: "PUT", headers, body: JSON.stringify(body) });
@@ -87,27 +99,31 @@ describe("sessions API", () => {
     expect(await done.json()).toMatchObject({ phaseKey: "r:list", final: true, players: [] });
   });
 
-  it("host WebSocket with wrong token is 401", async () => {
+  it("host WebSocket with wrong token upgrades then closes with 4401", async () => {
     const id = newSessionId();
     await createSession(id);
-    const res = await exports.default.fetch(`https://x/ws/${id}/host?token=bad`, { headers: { Upgrade: "websocket" } });
-    expect(res.status).toBe(401);
+    const closed = await connectExpectingClose(`/ws/${id}/host?token=bad`);
+    expect(closed).toEqual({ status: 101, code: WS_CLOSE_UNAUTHORIZED });
   });
 
-  it("host WebSocket without token is 401", async () => {
+  it("host WebSocket without token upgrades then closes with 4401", async () => {
     const id = newSessionId();
     await createSession(id);
-    const res = await exports.default.fetch(`https://x/ws/${id}/host`, { headers: { Upgrade: "websocket" } });
-    expect(res.status).toBe(401);
+    const closed = await connectExpectingClose(`/ws/${id}/host`);
+    expect(closed).toEqual({ status: 101, code: WS_CLOSE_UNAUTHORIZED });
   });
 
-  it("screen WebSocket without a token or with a wrong token is 401", async () => {
+  it("screen WebSocket without a token or with a wrong token upgrades then closes with 4401", async () => {
     const id = newSessionId();
     await createSession(id);
-    const none = await exports.default.fetch(`https://x/ws/${id}/screen`, { headers: { Upgrade: "websocket" } });
-    expect(none.status).toBe(401);
-    const bad = await exports.default.fetch(`https://x/ws/${id}/screen?token=bad`, { headers: { Upgrade: "websocket" } });
-    expect(bad.status).toBe(401);
+    expect(await connectExpectingClose(`/ws/${id}/screen`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_UNAUTHORIZED,
+    });
+    expect(await connectExpectingClose(`/ws/${id}/screen?token=bad`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_UNAUTHORIZED,
+    });
   });
 
   it("the host token cannot open the screen, and the screen token cannot open the host", async () => {
@@ -115,33 +131,41 @@ describe("sessions API", () => {
     await createSession(id);
     const hostToken = await hostTokenFor(env.ADMIN_API_SECRET, id);
     const screenToken = await screenTokenFor(env.ADMIN_API_SECRET, id);
-    const screenWithHostToken = await exports.default.fetch(`https://x/ws/${id}/screen?token=${hostToken}`, {
-      headers: { Upgrade: "websocket" },
+    expect(await connectExpectingClose(`/ws/${id}/screen?token=${hostToken}`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_UNAUTHORIZED,
     });
-    expect(screenWithHostToken.status).toBe(401);
-    const hostWithScreenToken = await exports.default.fetch(`https://x/ws/${id}/host?token=${screenToken}`, {
-      headers: { Upgrade: "websocket" },
+    expect(await connectExpectingClose(`/ws/${id}/host?token=${screenToken}`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_UNAUTHORIZED,
     });
-    expect(hostWithScreenToken.status).toBe(401);
   });
 
-  it("WebSocket to an invalid session id is 404 for every role", async () => {
+  it("WebSocket to an invalid session id upgrades then closes with 4404 for every role", async () => {
     for (const role of ["host", "screen", "guest"]) {
-      const res = await exports.default.fetch(`https://x/ws/screen:abc/${role}?token=x`, { headers: { Upgrade: "websocket" } });
-      expect(res.status).toBe(404);
+      expect(await connectExpectingClose(`/ws/screen:abc/${role}?token=x`)).toEqual({
+        status: 101,
+        code: WS_CLOSE_SESSION_NOT_FOUND,
+      });
     }
   });
 
-  it("WebSocket to uncreated session is 404", async () => {
+  it("WebSocket to uncreated session upgrades then closes with 4404", async () => {
     const id = newSessionId();
     const token = await hostTokenFor(env.ADMIN_API_SECRET, id);
-    const host = await exports.default.fetch(`https://x/ws/${id}/host?token=${token}`, { headers: { Upgrade: "websocket" } });
-    expect(host.status).toBe(404);
-    const guest = await exports.default.fetch(`https://x/ws/${id}/guest`, { headers: { Upgrade: "websocket" } });
-    expect(guest.status).toBe(404);
+    expect(await connectExpectingClose(`/ws/${id}/host?token=${token}`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_SESSION_NOT_FOUND,
+    });
+    expect(await connectExpectingClose(`/ws/${id}/guest`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_SESSION_NOT_FOUND,
+    });
     const screenToken = await screenTokenFor(env.ADMIN_API_SECRET, id);
-    const screen = await exports.default.fetch(`https://x/ws/${id}/screen?token=${screenToken}`, { headers: { Upgrade: "websocket" } });
-    expect(screen.status).toBe(404);
+    expect(await connectExpectingClose(`/ws/${id}/screen?token=${screenToken}`)).toEqual({
+      status: 101,
+      code: WS_CLOSE_SESSION_NOT_FOUND,
+    });
   });
 
   it("hostTokenFor is deterministic hex of 64 chars", async () => {
