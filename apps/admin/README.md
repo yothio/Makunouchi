@@ -198,11 +198,12 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
    gcloud iam workload-identity-pools providers describe <PROVIDER_ID> --project <PROJECT_ID> --location global --workload-identity-pool <POOL_ID> --format "value(name)"
    ```
 
-8. GitHub の repository secrets を 8 つ登録する（Settings → Secrets and variables → Actions → Repository secrets）。ワークフローには GCP の値を書かず、すべてここから読む（リポジトリを public にしても値が出ない）。名前と中身:
+8. GitHub の repository secrets を 9 つ登録する（Settings → Secrets and variables → Actions → Repository secrets）。ワークフローには GCP の値を書かず、すべてここから読む（リポジトリを public にしても値が出ない）。名前と中身:
 
    | secret 名 | 中身 |
    | --- | --- |
    | `GCP_PROJECT_ID` | GCP プロジェクト ID（`<PROJECT_ID>`） |
+   | `GCP_PROJECT_NUMBER` | GCP プロジェクト番号（`<PROJECT_NUMBER>`。手順 1 の値） |
    | `GCP_REGION` | リージョン（`<REGION>`） |
    | `GCP_ARTIFACT_REGISTRY_HOST` | Artifact Registry のホスト（`<REGION>-docker.pkg.dev`） |
    | `GCP_ARTIFACT_IMAGE` | タグなしのイメージのパス（`<REGION>-docker.pkg.dev/<PROJECT_ID>/<AR_REPOSITORY>/admin`） |
@@ -215,6 +216,10 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
 
    ```
    gh secret set GCP_PROJECT_ID --repo <OWNER>/<REPO>
+   ```
+
+   ```
+   gh secret set GCP_PROJECT_NUMBER --repo <OWNER>/<REPO>
    ```
 
    ```
@@ -245,7 +250,7 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
    gh secret set GCP_DEPLOY_SERVICE_ACCOUNT --repo <OWNER>/<REPO>
    ```
 
-   **ログのマスクに注意**: secret の値は Actions のログで `***` に伏せられる。値を含む長い文字列の中でも、その部分は伏せられる。伏せられないのは、値を加工して出力した場合（一部だけ取り出す・URL エンコードや base64 にするなど）と、secret に登録していない値（プロジェクト番号、サービスの URL など）。ワークフローでは secret を加工せずそのまま使い、`echo` などで出力しない。公開リポジトリではログも公開される。そこで、gcloud の `run deploy` / `jobs update` / `jobs execute` には `--quiet --no-user-output-enabled` を付けて出力を止め（成否は終了コードで決まる。エラーは出る）、プロジェクト番号は `GCP_WORKLOAD_IDENTITY_PROVIDER` から取り出して `::add-mask::` で伏せている。実際に何が出るかは、非公開のうちに初回の `workflow_dispatch` で確かめる。
+   **ログのマスクに注意**: secret の値は Actions のログで `***` に伏せられる。値を含む長い文字列の中でも、その部分は伏せられる。伏せられないのは、値を加工して出力した場合（一部だけ取り出す・URL エンコードや base64 にするなど）と、secret に登録していない値（サービスの URL など）。ワークフローでは secret を加工せずそのまま使い、`echo` などで出力しない。公開リポジトリではログも公開される。そこで、gcloud の `run deploy` / `jobs update` / `jobs execute` には `--quiet --no-user-output-enabled` を付けて出力を止め（成否は終了コードで決まる。エラーは出る）、プロジェクト番号は `GCP_PROJECT_NUMBER` として登録しワークフローから参照する。実際に何が出るかは、非公開のうちに初回の `workflow_dispatch` で確かめる。
 
 9. GitHub の environment `production` を作る（Settings → Environments → New environment。または `gh`）:
 
@@ -327,7 +332,7 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
 4. 作成者ローカルの `config/master.key` を読んで `RAILS_MASTER_KEY` を Secret へ。`ADMIN_API_SECRET`（live と共有）を用意
 5. Artifact Registry + Cloud Run サービス（probe = `/up`、サービスの DB は pooled のみ）
 6. イメージ push → Secret／環境変数 → Job で migrate（`DATABASE_URL`=direct）→ 初回だけ seed → 動作確認
-7. 自動デプロイの設定: デプロイ用サービスアカウント・Workload Identity 連携・GitHub の secrets（8 つ）と environment `production`（上の「GitHub Actions による自動デプロイ」）
+7. 自動デプロイの設定: デプロイ用サービスアカウント・Workload Identity 連携・GitHub の secrets（9 つ）と environment `production`（上の「GitHub Actions による自動デプロイ」）
 8. Task 6 マージ後にリハーサル開催回で実 PUT と幹事ログイン
 
 ## 注意

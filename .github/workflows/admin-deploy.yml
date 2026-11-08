@@ -28,22 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # secrets に登録していない値（プロジェクト番号）をログに出さないよう、先に伏せる。
-      # 番号は GCP_WORKLOAD_IDENTITY_PROVIDER（projects/<番号>/locations/...）から取り出す
+      # secrets に登録していない値はログで伏せられない。プロジェクト番号は GCP_PROJECT_NUMBER を参照する
       - name: プロジェクト番号をログで伏せる
         env:
-          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
         run: |
-          number="${WORKLOAD_IDENTITY_PROVIDER#projects/}"
-          number="${number%%/*}"
-          echo "::add-mask::$number"
-          # 取り出した値が数字だけでなければ、値を出さずに止める
-          case "$number" in
-            ""|*[!0-9]*)
-              echo "::error::GCP_WORKLOAD_IDENTITY_PROVIDER からプロジェクト番号を取り出せなかった（形式は projects/<番号>/locations/...）"
-              exit 1
-              ;;
-          esac
+          if [ -z "$GCP_PROJECT_NUMBER" ]; then
+            echo "::error::GCP_PROJECT_NUMBER が未設定"
+            exit 1
+          fi
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
