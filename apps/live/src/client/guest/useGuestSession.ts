@@ -8,7 +8,6 @@ export const useGuestSession = (sessionId: string) => {
   const [view, setView] = useState<GuestView | null>(null);
   const [needJoin, setNeedJoin] = useState(false);
   const [joinError, setJoinError] = useState<JoinError | null>(null);
-  // Optimistic highlight only; cleared whenever a server guest_view arrives.
   const [pending, setPending] = useState<PendingAnswer | null>(null);
 
   const { send, connected } = useLiveSocket(

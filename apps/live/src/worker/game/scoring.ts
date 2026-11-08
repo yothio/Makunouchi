@@ -1,6 +1,6 @@
 import type { GameState, Player } from "./types";
 
-/** How many questions (from the first) have had their answer revealed; these are the ones that are scored. */
+// revealed までの問題だけ得点に入る（結果フェーズは全問）。
 export const revealedCount = (s: GameState): number => {
   const phase = s.phase;
   if (phase.type === "lobby") return 0;
@@ -8,7 +8,6 @@ export const revealedCount = (s: GameState): number => {
   return phase.status === "revealed" ? phase.index + 1 : phase.index;
 };
 
-/** Only questions whose answer has been revealed (or are already past) are scored. */
 export const scoreOf = (s: GameState, player: Player): number => {
   const scoredUpTo = revealedCount(s);
   let total = 0;

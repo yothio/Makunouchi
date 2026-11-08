@@ -1,6 +1,5 @@
 FactoryBot.define do
-  # 開催回は QuizSession.prepare で作るのが本来の経路。ここでは prepare と同じ変換（snapshot_of）を
-  # 未保存の問題に通してスナップショットを作り、幹事の認証情報は直接組み立てる。
+  # factory は prepare を通さず snapshot と幹事資格を直組み（高速・細かい状態用）。
   factory :quiz_session do
     transient do
       credentials { HostCredentials.generate }

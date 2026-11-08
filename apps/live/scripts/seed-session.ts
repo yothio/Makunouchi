@@ -1,9 +1,8 @@
-// Usage: ADMIN_API_SECRET=... pnpm --filter live seed <baseUrl> [quiz.json]
 import { readFileSync } from "node:fs";
 import { hostTokenFor, screenTokenFor } from "../src/worker/auth.ts";
 import { normalizeBase, requireSecret } from "./env.ts";
 
-/** Password that matches the fixed-vector hash in fixtures/sample-quiz.json (Task 4 / Task 6). */
+/** fixtures/sample-quiz.json の固定ベクタハッシュに対応する平文。 */
 const SAMPLE_HOST_PASSWORD = "correct horse";
 
 const secret = requireSecret();

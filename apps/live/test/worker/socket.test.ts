@@ -44,7 +44,6 @@ describe("role forwarding", () => {
     const deadline = Date.now() + 3000;
     while (frames.length === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
     expect(JSON.parse(frames[0]).type).toBe("need_join");
-    // a guest cannot advance the game even though it sent a host header
     ws.send(JSON.stringify({ type: "advance", from: "lobby" }));
     await new Promise((r) => setTimeout(r, 200));
     expect(host.messages.filter((m) => m.type === "host_view")).toHaveLength(1);
@@ -85,7 +84,6 @@ describe("SessionRoom heartbeat", () => {
     const deadline = Date.now() + 3000;
     while (!frames.includes("pong") && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
     expect(frames).toContain("pong");
-    // still serves normal messages afterwards
     ws.send(JSON.stringify({ type: "join", nickname: "Hana" }));
     while (!frames.some((f) => f.includes('"joined"')) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
     expect(frames.some((f) => f.includes('"joined"'))).toBe(true);
@@ -157,7 +155,7 @@ describe("SessionRoom sockets", () => {
     const { guest } = await joinGuest(id, "Taro");
     guest.send("{nope");
     guest.send({ type: "bogus" });
-    guest.send({ type: "join", nickname: "Again" }); // already joined: ignored
+    guest.send({ type: "join", nickname: "Again" });
     await new Promise((r) => setTimeout(r, 100));
     expect(guest.ws.readyState).toBe(WebSocket.OPEN);
     expect((await rankingOf(id)).body.players).toHaveLength(1);
@@ -329,7 +327,6 @@ describe("SessionRoom screen", () => {
 });
 
 describe("SessionRoom answer history", () => {
-  /** Drives the host through `from` keys and waits for the last resulting phase. */
   const advanceTo = async (host: Awaited<ReturnType<typeof setup>>["host"], steps: [from: string, to: string][]) => {
     for (const [from, to] of steps) {
       host.send({ type: "advance", from });

@@ -86,7 +86,6 @@ describe("safeEqualDigest", () => {
 });
 
 describe("verifyPbkdf2", () => {
-  // Rails HostCredentials / Python hashlib と同じ固定ベクタ。
   const VECTOR =
     "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=";
 

@@ -149,7 +149,6 @@ export class SessionRoom extends DurableObject<Env> {
     try {
       ws.close(code === 1005 ? 1000 : code, reason);
     } catch {
-      // already closed
     }
   }
 
@@ -157,7 +156,6 @@ export class SessionRoom extends DurableObject<Env> {
     try {
       ws.close(1011, "error");
     } catch {
-      // already closed
     }
   }
 
@@ -170,11 +168,9 @@ export class SessionRoom extends DurableObject<Env> {
     try {
       ws.send(JSON.stringify(msg));
     } catch {
-      // socket gone
     }
   }
 
-  /** Commit a successful transition and deliver its events; returns false when rejected. */
   private apply(result: Transition<string>): boolean {
     if (!result.ok) return false;
     this.commit(result.state);
@@ -243,7 +239,6 @@ export class SessionRoom extends DurableObject<Env> {
       try {
         this.send(ws, { type: "guest_view", view: guestView(s, att.playerId) });
       } catch {
-        // skip this socket
       }
     }
   }

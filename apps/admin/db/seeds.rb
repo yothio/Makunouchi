@@ -1,5 +1,3 @@
-# 何度流しても同じ結果になるようにする（冪等）。
-#
 # 最初のシステム管理者を ADMIN_EMAIL / ADMIN_PASSWORD から 1 人作る。
 # システム管理者が既にいれば何もしない（パスワードも変えない）。
 if User.system_admin.exists?

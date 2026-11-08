@@ -1,6 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
 
-// 選んだ画像のプレビューと、direct upload（R2 への直接 PUT）の進捗表示。
 export default class extends Controller {
   static targets = ["input", "preview", "status"]
 

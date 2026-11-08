@@ -11,7 +11,6 @@ const roomFor = (env: Env, sessionId: string) => {
   return env.SESSION_ROOM.getByName(sessionId, { locationHint: "apac-ne" });
 };
 
-/** The token a host or screen connection must present for this session. */
 const tokenFor = (role: Exclude<Role, "guest">, secret: string, sessionId: string): Promise<string> => {
   return role === "host" ? hostTokenFor(secret, sessionId) : screenTokenFor(secret, sessionId);
 };
@@ -20,7 +19,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 
-/** Fail closed: refuse to authenticate anything while ADMIN_API_SECRET is missing or too short. */
+// ADMIN_API_SECRET 未設定時は 500（認証を一切通さない）
 const requireAdminSecret = createMiddleware<{ Bindings: Env }>(async (c, next) => {
   if (!isUsableSecret(c.env.ADMIN_API_SECRET)) {
     console.error("ADMIN_API_SECRET is missing or shorter than the minimum length; refusing request");
@@ -83,7 +82,6 @@ app.get("/api/sessions/:sessionId/ranking", async (c) => {
 app.get(
   "/ws/:sessionId/:role",
   async (c, next) => {
-    // host and screen are authenticated with tokens derived from ADMIN_API_SECRET.
     const role = c.req.param("role");
     if (role === "host" || role === "screen") return requireAdminSecret(c, next);
     await next();
@@ -96,7 +94,6 @@ app.get(
       const expected = await tokenFor(role, c.env.ADMIN_API_SECRET, sessionId);
       if (!safeEqual(c.req.query("token") ?? "", expected)) return c.json({ error: "unauthorized" }, 401);
     }
-    // SessionRoom.fetch returns 404 itself when the session was never initialised.
     // The role is decided here; the DO only reads this header (overwriting any client-supplied value).
     const forwarded = new Request(c.req.raw);
     forwarded.headers.set(ROLE_HEADER, role);

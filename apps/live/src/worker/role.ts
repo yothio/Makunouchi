@@ -1,7 +1,6 @@
-/** Internal Worker → Durable Object header carrying the already-authenticated socket role (a `Role`: "host" | "screen" | "guest"). */
 export const ROLE_HEADER = "X-Makunouchi-Role";
 
-/** Who a WebSocket belongs to: the operator (host), the projector (screen) or a participant (guest). */
+/** host=幹事操作, screen=投影, guest=参加者 */
 export type Role = "host" | "screen" | "guest";
 
 export const isRole = (value: unknown): value is Role => {

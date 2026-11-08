@@ -65,7 +65,6 @@ export const hostView = (s: GameState): HostView => {
   }
 };
 
-/** The projector's view: the host view minus everything that is for the operator only. */
 export const screenView = (s: GameState): ScreenView => {
   const { title, playerCount, screen } = hostView(s);
   switch (screen.kind) {

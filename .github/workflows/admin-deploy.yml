@@ -17,9 +17,6 @@ concurrency:
   group: admin-deploy
   cancel-in-progress: false
 
-# GCP の値はリポジトリが public になっても出さないよう、すべて repository secrets から渡す
-# （一覧は apps/admin/README.md）
-# secrets は必要なステップの env にだけ置く（checkout などの公開アクションには渡さない）
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -63,7 +60,6 @@ jobs:
         run: docker push "$IMAGE:$GITHUB_SHA"
 
       # gcloud の出力（サービス URL・リビジョン名など）をログに出さない（--quiet --no-user-output-enabled。エラーは出る）
-      # 環境変数・Secret・args は Job に設定済みのものを使う。ここではイメージだけ差し替える
       - name: migrate Job のイメージを更新
         env:
           GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
@@ -73,7 +69,6 @@ jobs:
         run: gcloud run jobs update "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA" --quiet --no-user-output-enabled
 
       # 進捗の出力は止まるが、--wait は Job が失敗すると非ゼロの終了コードで終わる。
-      # ステップの成否は終了コードで決まるので、失敗したら次の手順に進まずデプロイしない
       - name: migrate Job を実行して完了を待つ
         env:
           GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
@@ -81,7 +76,6 @@ jobs:
           MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
         run: gcloud run jobs execute "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --wait --quiet --no-user-output-enabled
 
-      # 環境変数・Secret はサービスに設定済みのものを使う。ここではイメージだけ差し替える
       - name: サービスをデプロイ
         env:
           GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}

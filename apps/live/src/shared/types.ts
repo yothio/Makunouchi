@@ -76,7 +76,6 @@ export type ScreenView =
   | { kind: "results_wait"; title: string }
   | { kind: "rank_reveal"; rank: number | null; nickname: string | null };
 
-/** One question whose answer has been revealed, with the viewer's own choice (null = no answer). */
 export type HistoryEntry = { index: number; choice: Choice | null; correct: boolean };
 
 /**

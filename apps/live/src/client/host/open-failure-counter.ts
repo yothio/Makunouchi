@@ -11,7 +11,7 @@ export const recordNeverOpened = (state: OpenFailureCounter): OpenFailureCounter
   neverOpened: state.neverOpened + 1,
 });
 
-/** An open success resets the counter; the token itself is never cleared automatically. */
+// 接続成功でカウントだけリセット。トークンは自動では消さない。
 export const recordOpened = (_state: OpenFailureCounter): OpenFailureCounter => ({ neverOpened: 0 });
 
 export const shouldOfferRelogin = (state: OpenFailureCounter): boolean => {

@@ -84,8 +84,7 @@ describe("AdvanceGate", () => {
   });
 
   test("regression: cooldown is cleared by its timer, not by comparing clocks", () => {
-    // Old design re-read Date.now() on a re-render after the timer fired; with a clock reading
-    // earlier than phaseChangedAt+1000 it still saw cooling=true and never re-rendered.
+    // 再レンダー時に Date.now を読み直すと cooling が解除されないバグの回帰
     const { gate, changes } = make();
     gate.phaseChanged("k1");
     const realNow = Date.now;
@@ -97,7 +96,6 @@ describe("AdvanceGate", () => {
     } finally {
       Date.now = realNow;
     }
-    // subscribers were notified when the cooldown ended, so a UI would re-render
     expect(changes).toHaveBeenCalled();
   });
 
@@ -128,7 +126,7 @@ describe("AdvanceGate", () => {
     gate.tryAdvance();
     gate.setConnected(false);
     expect(gate.getSnapshot().locked).toBe(false);
-    expect(gate.tryAdvance()).toBe(false); // disconnected
+    expect(gate.tryAdvance()).toBe(false);
     gate.setConnected(true);
     expect(gate.tryAdvance()).toBe(true);
     vi.advanceTimersByTime(ADVANCE_LOCK_MS);

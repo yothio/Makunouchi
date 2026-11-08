@@ -1,7 +1,6 @@
 import type { HistoryEntry } from "../../shared/types";
 import { formatHistoryEntry } from "./history";
 
-/** The participant's own answers so far (only questions whose answer has been revealed). */
 export const AnswerHistory = ({ history }: { history: HistoryEntry[] }) => {
   if (history.length === 0) return null;
   return (

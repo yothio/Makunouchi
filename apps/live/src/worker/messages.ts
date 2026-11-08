@@ -17,7 +17,6 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("results_action"), from: z.string(), action: resultsActionSchema }),
 ]) satisfies z.ZodType<ClientMessage>;
 
-/** Parse a raw WebSocket frame; anything malformed or unknown yields null. */
 export const parseClientMessage = (raw: string): ClientMessage | null => {
   let data: unknown;
   try {

@@ -40,7 +40,6 @@ jobs:
           --health-retries 5
     env:
       RAILS_ENV: test
-      # database.yml は TEST_DATABASE_URL が無ければ admin_test に PG* の環境変数でつなぐ。
       PGHOST: localhost
       PGPORT: "5432"
       PGUSER: postgres

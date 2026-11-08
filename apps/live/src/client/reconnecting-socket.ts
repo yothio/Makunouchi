@@ -10,7 +10,6 @@ const SILENT_ON_RETURN = 10_000;
 const CONNECT_TIMEOUT = 5000;
 
 export type ReconnectingSocketOptions = {
-  /** Called on every connection attempt so the URL can change between attempts. */
   getUrl: () => string;
   onMessage: (msg: ServerMessage) => void;
   onStatus: (connected: boolean) => void;
@@ -24,9 +23,7 @@ export type ReconnectingSocketOptions = {
 
 export type ReconnectingSocket = {
   send(msg: ClientMessage): void;
-  /** Reconnect immediately if disconnected, stuck connecting, or open but silent (e.g. tab became visible). */
   reconnectNow(): void;
-  /** Drop the current connection (even if it looks open) and reconnect immediately. */
   forceReconnect(): void;
   close(): void;
 };
@@ -42,7 +39,6 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
   let delay = MIN_DELAY;
   let closed = false;
   let neverOpenedFailures = 0;
-  /** Whether the current `ws` has fired onopen. */
   let currentOpened = false;
 
   const clearConnTimers = () => {
@@ -52,7 +48,6 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
     connectTimer = staleTimer = pingTimer = null;
   };
 
-  /** Tear down `sock` without waiting for its (possibly never-arriving) close event. */
   const drop = (sock: WebSocket, reconnectAfter: number | null) => {
     if (ws !== sock) return;
     const opened = currentOpened;
@@ -63,7 +58,6 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
     try {
       sock.close();
     } catch {
-      // already dead
     }
     opts.onStatus(false);
     if (!opened && !closed) {
@@ -104,7 +98,6 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
         try {
           sock.send("ping");
         } catch {
-          // the stale timer will recycle the socket
         }
       }, PING_INTERVAL);
       opts.onStatus(true);
@@ -118,7 +111,6 @@ export const createReconnectingSocket = (opts: ReconnectingSocketOptions): Recon
       try {
         opts.onMessage(JSON.parse(data) as ServerMessage);
       } catch {
-        // ignore malformed frames
       }
     };
     sock.onclose = () => drop(sock, delay);

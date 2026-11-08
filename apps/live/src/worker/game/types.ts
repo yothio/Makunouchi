@@ -4,7 +4,6 @@ export type Player = {
   id: string;
   token: string;
   nickname: string;
-  /** keyed by question index */
   answers: Record<number, Choice>;
 };
 

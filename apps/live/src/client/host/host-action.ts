@@ -1,6 +1,5 @@
 import type { ClientMessage, HostView, PhaseKey, ResultsAction } from "../../shared/types";
 
-/** Label of the single progress button, or null when no button should be shown. */
 export const hostActionLabel = (view: HostView): string | null => {
   const s = view.screen;
   switch (s.kind) {
@@ -65,7 +64,6 @@ export class AdvanceGate {
     this.onLockExpired = handler;
   }
 
-  /** Call for every host_view; only a changed phaseKey has an effect. */
   phaseChanged(phaseKey: string): void {
     if (phaseKey === this.phaseKey) return;
     this.phaseKey = phaseKey;
@@ -90,7 +88,6 @@ export class AdvanceGate {
     }
   }
 
-  /** Returns true (and locks) if an advance may be sent now. */
   tryAdvance(): boolean {
     if (!this.connected || this.snapshot.cooling || this.snapshot.locked) return false;
     this.lockTimer = setTimeout(() => {
@@ -102,7 +99,6 @@ export class AdvanceGate {
     return true;
   }
 
-  /** Stops timers (unmount). */
   dispose(): void {
     this.clearLockTimer();
     this.clearCooldownTimer();

@@ -1,7 +1,6 @@
-# 幹事の ID/パスワードの生成と、live に送るハッシュ。
-# ハッシュ形式: pbkdf2-sha256$<反復>$<salt b64>$<hash b64>
+# live Worker と同じ PBKDF2: pbkdf2-sha256$<反復>$<salt b64>$<hash b64>
 # （PBKDF2-HMAC-SHA256、導出鍵 32 バイト、salt 16 バイト、標準 Base64・パディングあり）。
-# 反復 100000 は Workers の WebCrypto の PBKDF2 の上限。Task 6 の Worker と同じ固定ベクタで固定する。
+# 反復 100000 は Workers の WebCrypto の PBKDF2 の上限。
 module HostCredentials
   ITERATIONS = 100_000
   KEY_BYTES = 32

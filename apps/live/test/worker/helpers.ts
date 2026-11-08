@@ -104,7 +104,6 @@ export const findLast = <T>(items: T[], pred: (item: T) => boolean): T | undefin
   return undefined;
 };
 
-/** Advance from lobby through every question into the results list. */
 export const driveToResults = async (host: Client, _sessionId: string, startFrom = "lobby"): Promise<void> => {
   const n = quiz.questions.length;
   const steps: [string, string][] = [["lobby", "q:0:open"]];

@@ -79,7 +79,7 @@ describe("submitAnswer", () => {
   test("前の問題 index への回答は無視", () => {
     let s = walk(withPlayer(), 1);
     s = ok(submitAnswer(s, "p1", 0, 1));
-    s = walk(s, 3); // q:1:open
+    s = walk(s, 3);
     expect(phaseKey(s.phase)).toBe("q:1:open");
     expect(submitAnswer(s, "p1", 0, 2)).toEqual({ ok: false, reason: "wrong_question" });
     expect(s.players[0].answers[0]).toBe(1);
@@ -131,7 +131,7 @@ describe("joinPlayer", () => {
     expect(joinPlayer(s, "😀".repeat(21), { id: "a", token: "b" }).ok).toBe(false);
   });
   test("スタート後の参加は可、参加前の問題は 0 点", () => {
-    let s = walk(createGameState(quiz), 3); // q:0:revealed
+    let s = walk(createGameState(quiz), 3);
     const r = joinPlayer(s, "late", { id: "p9", token: "t9" });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -150,32 +150,32 @@ describe("joinPlayer", () => {
 describe("scoreOf", () => {
   test("点数は正解数。closed の問題を数えず、revealed になって初めて加点", () => {
     let s = walk(withPlayer(), 1);
-    s = ok(submitAnswer(s, "p1", 0, 1)); // correct
-    s = walk(s, 1); // closed
+    s = ok(submitAnswer(s, "p1", 0, 1));
+    s = walk(s, 1);
     expect(scoreOf(s, s.players[0])).toBe(0);
-    s = walk(s, 1); // revealed
+    s = walk(s, 1);
     expect(scoreOf(s, s.players[0])).toBe(1);
-    s = walk(s, 1); // q1 open
-    s = ok(submitAnswer(s, "p1", 1, 2)); // correct
+    s = walk(s, 1);
+    s = ok(submitAnswer(s, "p1", 1, 2));
     expect(scoreOf(s, s.players[0])).toBe(1);
-    s = walk(s, 2); // q1 revealed
+    s = walk(s, 2);
     expect(scoreOf(s, s.players[0])).toBe(2);
   });
   test("不正解・未回答は加点なし、results では全問採点", () => {
     let s = walk(withPlayer(), 1);
-    s = ok(submitAnswer(s, "p1", 0, 0)); // wrong
+    s = ok(submitAnswer(s, "p1", 0, 0));
     s = walk(s, 3);
-    s = ok(submitAnswer(s, "p1", 1, 2)); // correct
-    s = walk(s, 3); // closed → revealed → results
+    s = ok(submitAnswer(s, "p1", 1, 2));
+    s = walk(s, 3);
     expect(s.phase.type).toBe("results");
     expect(scoreOf(s, s.players[0])).toBe(1);
   });
   test("参加前の問題と未回答の問題は 0 点のまま", () => {
-    let s = walk(createGameState(quiz), 4); // q:1:open, nobody joined yet
+    let s = walk(createGameState(quiz), 4);
     const joined = joinPlayer(s, "late", { id: "late", token: "tlate" });
     if (!joined.ok) throw new Error("join failed");
-    s = ok(submitAnswer(joined.state, "late", 1, 2)); // correct, but q0 was missed
-    s = walk(s, 2); // q1 revealed
+    s = ok(submitAnswer(joined.state, "late", 1, 2));
+    s = walk(s, 2);
     expect(scoreOf(s, s.players[0])).toBe(1);
   });
 });

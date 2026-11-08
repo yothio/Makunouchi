@@ -21,14 +21,12 @@ export const localTokenStore: TokenStore = {
     try {
       localStorage.setItem(k, v);
     } catch {
-      // ignore
     }
   },
   remove(k) {
     try {
       localStorage.removeItem(k);
     } catch {
-      // ignore
     }
   },
 };

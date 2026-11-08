@@ -1,6 +1,4 @@
 module Organizer
-  # 開催回の作成と詳細。作った時点の問題一式がスナップショットになり、あとから差し替えない（update は無い）。
-  # 作成後に live へ PUT し、pending の再送は register。
   class QuizSessionsController < ApplicationController
     def new
       @quiz_session = QuizSession.new

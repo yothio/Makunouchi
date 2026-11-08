@@ -1,11 +1,8 @@
-/** Consecutive failed host-login attempts before a lockout window starts. */
 export const HOST_LOGIN_MAX_FAILURES = 10;
-/** Lock duration after the Nth failed attempt (ms). */
 export const HOST_LOGIN_LOCK_MS = 60_000;
 
 export type HostAttempts = {
   failures: number;
-  /** Epoch ms when the lock ends; null when not locked. */
   lockedUntil: number | null;
 };
 

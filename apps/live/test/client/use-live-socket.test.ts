@@ -80,7 +80,6 @@ describe("createReconnectingSocket", () => {
     for (let i = 0; i < 7; i++) {
       const before = FakeWebSocket.instances.length;
       last().drop();
-      // find the delay: step 100ms until a new socket appears
       let waited = 0;
       while (FakeWebSocket.instances.length === before) {
         vi.advanceTimersByTime(100);
@@ -126,7 +125,7 @@ describe("createReconnectingSocket", () => {
     expect(FakeWebSocket.instances).toHaveLength(2);
     last().open();
     vi.advanceTimersByTime(9000);
-    expect(FakeWebSocket.instances).toHaveLength(2); // 古いタイマーは取り消される
+    expect(FakeWebSocket.instances).toHaveLength(2);
   });
 
   test("メッセージ受信と送信、close 後は再接続しない", () => {
