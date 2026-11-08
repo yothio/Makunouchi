@@ -23,10 +23,10 @@ class Question < ApplicationRecord
     CHOICE_COLUMNS.map { |column| self[column] }
   end
 
-  # live に渡す画像キー。派生画像が無ければ原画（欠けないことを優先）。
+  # live に渡す画像キー。現原画と対応する派生だけ使い、それ以外は原画（欠けないことを優先）。
   def live_image_key
     return unless image.attached?
-    return delivery_image.blob.key if delivery_image.attached?
+    return delivery_image.blob.key if delivery_ready_for?(image.blob)
 
     image.blob.key
   end

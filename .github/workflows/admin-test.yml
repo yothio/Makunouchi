@@ -56,6 +56,9 @@ jobs:
         with:
           ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
 
+      - name: libvips を入れる
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips42
 
       # system spec は rack_test（ブラウザ不要）なので、ヘッドレスブラウザの準備は要らない。
       # defaults.run.working-directory は uses に効かないので、ここで指定する

@@ -17,6 +17,10 @@ class GenerateDeliveryImageJob < ApplicationJob
         .call
     end
 
+    question.reload
+    return unless question.image.attached?
+    return unless question.image.blob_id == source.id
+
     File.open(processed.path, "rb") do |io|
       question.delivery_image.attach(
         io: io,
@@ -25,6 +29,8 @@ class GenerateDeliveryImageJob < ApplicationJob
         metadata: { "source_blob_id" => source.id }
       )
     end
+  # 変換失敗は握りつぶして原画フォールバックを残す。
+  # LoadError（libvips 欠落）は StandardError の外なので再送出せず、ジョブ失敗として残す。
   rescue StandardError => error
     Rails.logger.error("[GenerateDeliveryImageJob] question_id=#{question_id} #{error.class}: #{error.message}")
   ensure

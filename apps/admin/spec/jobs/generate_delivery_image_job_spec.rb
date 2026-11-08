@@ -44,4 +44,36 @@ RSpec.describe GenerateDeliveryImageJob, type: :job do
     expect(question.image).to be_attached
     expect(question.delivery_image).not_to be_attached
   end
+
+  it "変換中に原画が差し替わったら delivery_image を付けない" do
+    question = create(:question)
+    question.image.attach(
+      io: file_fixture("sample.png").open,
+      filename: "sample.png",
+      content_type: "image/png"
+    )
+    question.save!
+    clear_enqueued_jobs
+    old_blob = question.image.blob
+
+    allow_any_instance_of(ImageProcessing::Builder).to receive(:call).and_wrap_original do |original, *args, **kwargs|
+      tempfile = original.call(*args, **kwargs)
+      if question.image.blob_id == old_blob.id
+        question.image.attach(
+          io: file_fixture("sample2.png").open,
+          filename: "sample2.png",
+          content_type: "image/png"
+        )
+        clear_enqueued_jobs
+      end
+      tempfile
+    end
+
+    GenerateDeliveryImageJob.perform_now(question.id)
+
+    question.reload
+    expect(question.image.blob_id).not_to eq old_blob.id
+    expect(question.delivery_image).not_to be_attached
+    expect(question.live_image_key).to eq question.image.blob.key
+  end
 end
