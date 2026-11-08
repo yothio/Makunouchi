@@ -30,6 +30,7 @@
 | `LIVE_BASE_URL` | live 連携必須 | Rails → Worker の API ベース（例: `https://makunouchi-live.<account>.workers.dev`） |
 | `LIVE_PUBLIC_URL` | 本番で画面を使うなら必須 | 開催回詳細の参列者・幹事 URL の元。未設定だと URL が空（先頭が欠けたパス）になり、画面からコピーできない |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 初回 seed | システム管理者 1 人。`ADMIN_PASSWORD` は **12 文字以上**。既に管理者がいれば seed は何もしない |
+| `ADMIN_CANONICAL_HOST` | 任意（本番で独自ドメインを使うなら設定） | 管理画面の独自ドメインのホスト名だけ（`https://` やパスは付けない）。設定すると、Host が `*.run.app` のリクエストは `/up` 以外を独自ドメインへ 301（GET / HEAD）または 403（それ以外）にする。未設定なら何もしない。値が不正なら起動で落ちる。「Cloud Run の既定ドメインと独自ドメイン」の節を参照 |
 | `PORT` | Cloud Run が渡す | 待ち受け。無いときの既定は本番 8080、開発・テスト 3000 |
 | `RAILS_LOG_LEVEL` | 任意 | 既定 `info` |
 | `RAILS_MAX_THREADS` | 任意 | Puma スレッド（既定 3） |
@@ -81,6 +82,7 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
    - **Startup probe / Liveness probe**: HTTP `GET /up`（`force_ssl` は `/up` をリダイレクト除外済み）
    - 環境変数・Secret: 上表の本番必須項目。**`DATABASE_URL` は pooled だけ**（`DATABASE_URL_DIRECT` はサービスに常設しない）
    - 同時リクエスト数の既定（80）と Puma スレッド 3・DB `max_connections` 5 の前提を変えるときは三つを合わせて見直す
+   - 独自ドメインを使うときは `ADMIN_CANONICAL_HOST` も設定する（次の節）
 4. **デプロイごとに migrate を 1 回**（Cloud Run **Jobs**）。main への push で動く GitHub Actions（`.github/workflows/admin-deploy.yml`、後述）が自動で流す。Job の設計:
    - Job 名: `<MIGRATE_JOB>`。サービスと **同じコンテナイメージ**を使う（CI が git の SHA タグに差し替える）
    - 環境変数・Secret はサービスと同一にし、Job だけ `DATABASE_URL` を **direct**（`DATABASE_URL_DIRECT` の値）にする。CI は環境変数・Secret を上書きしない
@@ -111,6 +113,32 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD`（12 文字以上）を渡して `bin/rails db:seed`
    - 既にシステム管理者がいれば何もしない（冪等）
 6. ブラウザでログインし、問題作成・開催回作成（live は stub または結合後の実 PUT）を確認
+
+### Cloud Run の既定ドメインと独自ドメイン
+
+利用者（システム管理者・主催者）のアクセスは独自ドメインだけにし、Cloud Run の既定ドメイン（`https://<SERVICE_NAME>-<...>.run.app`）はヘルスチェックと監視専用にする。`--no-default-url` や ingress の制限は、監視が既定ドメインを使えなくなるので使わず、アプリ側（`lib/canonical_host_redirect.rb`）で制限する。
+
+- 環境変数 `ADMIN_CANONICAL_HOST` に独自ドメインのホスト名を入れる。Host が `*.run.app` のリクエストのうち、`/up` 以外が対象になる。GET / HEAD は独自ドメインの同じパス・クエリへ 301、それ以外のメソッドは 403。
+- `/up` はどのホストでも通す。Cloud Run の probe は Host が `*.run.app` でも独自ドメインでもない（`localhost` や IP の）ことがあり、`*.run.app` 以外のホストはこの仕組みでは触らない。
+- リダイレクト先は環境変数の値だけから作る。リクエストの Host や `X-Forwarded-Host` は使わない。
+- 監視（稼働時間チェックなど）は既定ドメインの `https://<RUN_APP_HOST>/up` を使う。
+- セッション cookie は Host ごとに別なので、ログインは独自ドメイン側で行う。
+
+設定（**`--update-env-vars`** を使う。`--set-env-vars` は他の環境変数を全部消してしまうので使わない）:
+
+```
+gcloud run services update <SERVICE_NAME> --region <REGION> --project <PROJECT_ID> --update-env-vars ADMIN_CANONICAL_HOST=<ADMIN_HOST>
+```
+
+確かめ方（`<RUN_APP_HOST>` は既定ドメインのホスト名、`<ADMIN_HOST>` は独自ドメイン）:
+
+```
+curl -sI https://<RUN_APP_HOST>/            # 301、location: https://<ADMIN_HOST>/
+curl -sI https://<RUN_APP_HOST>/up          # 200
+curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/ が 302 なら location がログイン画面）
+```
+
+戻すときは `gcloud run services update ... --remove-env-vars ADMIN_CANONICAL_HOST`。
 
 ### GitHub Actions による自動デプロイ
 
@@ -283,7 +311,7 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
 - **バケット**を作り、オブジェクト読み取りを公開する（カスタムドメインで https）。
 - **公開 URL** はカスタムドメイン（https）を `R2_PUBLIC_BASE_URL` に設定する（`r2.dev` は本番向けでない）。live の `imageUrl` は https 必須。
 - **CORS**（direct upload 用）:
-  - `AllowedOrigins`: 管理画面の本番オリジンのみ（開発用別バケットなら `http://localhost:3000`）
+  - `AllowedOrigins`: 管理画面の本番オリジン（独自ドメイン `https://<ADMIN_HOST>`）のみ。`ADMIN_CANONICAL_HOST` を設定すると利用者は独自ドメインでしかアップロードしないので、`*.run.app` は入れない（開発用別バケットなら `http://localhost:3000`）
   - `AllowedMethods`: `PUT`
   - `AllowedHeaders`: `Content-Type` / `Content-MD5` / `Content-Disposition`（Rails 8.1 の `headers_for_direct_upload` を実機で確かめてから確定）
   - `MaxAgeSeconds` を付ける
