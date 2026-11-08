@@ -73,6 +73,12 @@ describe("sessions API", () => {
     expect(res.status).toBe(401);
   });
 
+  it("ranking without Bearer is 401 even when the session id is invalid", async () => {
+    const res = await exports.default.fetch("https://x/api/sessions/screen:abc/ranking");
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+  });
+
   it("ranking of a fresh session", async () => {
     const id = newSessionId();
     await createSession(id);
