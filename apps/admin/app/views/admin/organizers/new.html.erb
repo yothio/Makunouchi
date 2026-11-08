@@ -1,34 +1,32 @@
 <% content_for :title, "主催者の作成" %>
-<main>
-  <h1>主催者の作成</h1>
+<main id="main" class="page page--narrow">
+  <h1 class="page-title">主催者の作成</h1>
 
-  <% if notice %>
-    <p class="notice" role="status"><%= notice %></p>
-  <% end %>
+  <div class="card">
+    <%= form_with model: @user, url: admin_organizers_path, class: "form" do |form| %>
+      <% if @user.errors.any? %>
+        <ul class="form-errors error" role="alert">
+          <% @user.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      <% end %>
 
-  <%= form_with model: @user, url: admin_organizers_path do |form| %>
-    <% if @user.errors.any? %>
-      <ul class="error" role="alert">
-        <% @user.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
+      <div class="field">
+        <%= form.label :email, "メールアドレス" %>
+        <%= form.email_field :email, required: true, autocomplete: "off" %>
+      </div>
+      <div class="field">
+        <%= form.label :password, "パスワード" %>
+        <%= form.password_field :password, required: true, autocomplete: "new-password" %>
+      </div>
+      <div class="field">
+        <%= form.label :password_confirmation, "パスワード（確認）" %>
+        <%= form.password_field :password_confirmation, required: true, autocomplete: "new-password" %>
+      </div>
+      <div class="form-actions">
+        <%= form.submit "作成する", class: "btn btn--primary" %>
+      </div>
     <% end %>
-
-    <p>
-      <%= form.label :email, "メールアドレス" %><br>
-      <%= form.email_field :email, required: true, autocomplete: "off" %>
-    </p>
-    <p>
-      <%= form.label :password, "パスワード" %><br>
-      <%= form.password_field :password, required: true, autocomplete: "new-password" %>
-    </p>
-    <p>
-      <%= form.label :password_confirmation, "パスワード（確認）" %><br>
-      <%= form.password_field :password_confirmation, required: true, autocomplete: "new-password" %>
-    </p>
-    <p><%= form.submit "作成する" %></p>
-  <% end %>
-
-  <%= button_to "ログアウト", session_path, method: :delete %>
+  </div>
 </main>

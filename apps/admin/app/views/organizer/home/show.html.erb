@@ -1,19 +1,30 @@
 <% content_for :title, "管理画面" %>
-<main>
-  <h1>管理画面</h1>
-  <p><%= current_user.email %> でログイン中です。</p>
+<main id="main" class="page">
+  <h1 class="page-title">管理画面</h1>
+  <p class="page-lead"><%= current_user.email %> でログイン中です。</p>
 
-  <p class="question-count">質問解答の数: <%= @question_count %> 問</p>
-  <p><%= link_to "質問解答の一覧へ", organizer_questions_path %></p>
+  <section class="card">
+    <div class="card__head">
+      <h2 class="section-title">質問解答</h2>
+      <%= link_to "質問解答の一覧へ", organizer_questions_path, class: "btn btn--secondary btn--small" %>
+    </div>
+    <p class="question-count">質問解答の数: <span class="figure"><%= @question_count %></span> 問</p>
+  </section>
 
-  <h2>開催回</h2>
-  <p class="quiz-session-count">開催回の数: <%= @quiz_sessions.size %> 件</p>
-  <ul>
-    <% @quiz_sessions.each do |quiz_session| %>
-      <li class="quiz-session"><%= link_to quiz_session.title, organizer_quiz_session_path(quiz_session) %></li>
+  <section class="card">
+    <div class="card__head">
+      <h2 class="section-title">開催回</h2>
+      <%= link_to "開催回を作成", new_organizer_quiz_session_path, class: "btn btn--primary btn--small" %>
+    </div>
+    <p class="quiz-session-count">開催回の数: <span class="figure"><%= @quiz_sessions.size %></span> 件</p>
+    <% if @quiz_sessions.any? %>
+      <ul class="link-list">
+        <% @quiz_sessions.each do |quiz_session| %>
+          <li class="quiz-session"><%= link_to quiz_session.title, organizer_quiz_session_path(quiz_session) %></li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="empty">まだ開催回がありません。「開催回を作成」から作ってください。</p>
     <% end %>
-  </ul>
-  <p><%= link_to "開催回を作成", new_organizer_quiz_session_path %></p>
-
-  <%= button_to "ログアウト", session_path, method: :delete %>
+  </section>
 </main>

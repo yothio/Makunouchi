@@ -1,48 +1,66 @@
 <% content_for :title, @quiz_session.title %>
-<main>
-  <h1><%= @quiz_session.title %></h1>
-  <p class="status">状態: <%= t("quiz_session.status.#{@quiz_session.status}") %></p>
+<main id="main" class="page">
+  <div class="page-head">
+    <h1 class="page-title"><%= @quiz_session.title %></h1>
+    <p class="status">状態: <span class="badge badge--<%= @quiz_session.status %>"><%= t("quiz_session.status.#{@quiz_session.status}") %></span></p>
+  </div>
 
-  <h2>幹事のログイン</h2>
-  <p>幹事には口頭で伝えてください。</p>
-  <dl>
-    <dt>ID</dt>
-    <dd class="host-login-id"><%= @quiz_session.host_login_id %></dd>
-    <dt>パスワード</dt>
-    <dd class="host-password"><%= @quiz_session.host_password %></dd>
-  </dl>
+  <section class="card">
+    <h2 class="section-title">幹事のログイン</h2>
+    <p class="hint">幹事には口頭で伝えてください。</p>
+    <dl class="credentials">
+      <div class="credentials__row">
+        <dt>ID</dt>
+        <dd class="host-login-id value-mono"><%= @quiz_session.host_login_id %></dd>
+      </div>
+      <div class="credentials__row">
+        <dt>パスワード</dt>
+        <dd class="host-password value-mono"><%= @quiz_session.host_password %></dd>
+      </div>
+    </dl>
+  </section>
 
-  <h2>URL</h2>
-  <dl>
-    <dt>参列者</dt>
-    <dd class="guest-url"><%= @quiz_session.guest_url %></dd>
-    <dt>幹事</dt>
-    <dd class="host-url"><%= @quiz_session.host_url %></dd>
-    <dt>投影画面（プロジェクター用の別の PC で開く）</dt>
-    <% if @quiz_session.screen_url %>
-      <dd class="screen-url"><%= @quiz_session.screen_url %></dd>
-    <% else %>
-      <dd class="screen-url-missing">投影画面の URL を作れません（live への接続設定が不足しています）。管理者に設定を確認してもらってください。</dd>
-    <% end %>
-  </dl>
-
-  <h2>作成時の質問解答（<%= @quiz_session.quiz_snapshot.size %> 問）</h2>
-  <ol>
-    <% @quiz_session.quiz_snapshot.each do |question| %>
-      <li class="snapshot-question">
-        <p><%= question["title"] %></p>
-        <ul>
-          <% question["choices"].each_with_index do |choice, index| %>
-            <li><%= %w[A B C D][index] %>. <%= choice %><%= "（正解）" if index == question["correctIndex"] %></li>
-          <% end %>
-        </ul>
-      </li>
-    <% end %>
-  </ol>
+  <section class="card">
+    <h2 class="section-title">URL</h2>
+    <dl class="credentials">
+      <div class="credentials__row">
+        <dt>参列者</dt>
+        <dd class="guest-url value-mono value-mono--url"><%= @quiz_session.guest_url %></dd>
+      </div>
+      <div class="credentials__row">
+        <dt>幹事</dt>
+        <dd class="host-url value-mono value-mono--url"><%= @quiz_session.host_url %></dd>
+      </div>
+      <div class="credentials__row">
+        <dt>投影画面（プロジェクター用の別の PC で開く）</dt>
+        <% if @quiz_session.screen_url %>
+          <dd class="screen-url value-mono value-mono--url"><%= @quiz_session.screen_url %></dd>
+        <% else %>
+          <dd class="screen-url-missing notice-inline">投影画面の URL を作れません（live への接続設定が不足しています）。管理者に設定を確認してもらってください。</dd>
+        <% end %>
+      </div>
+    </dl>
+  </section>
 
   <% if @quiz_session.pending? %>
-    <%= button_to "もう一度送る", register_organizer_quiz_session_path(@quiz_session), method: :post, form: { class: "register-again" } %>
+    <%= button_to "もう一度送る", register_organizer_quiz_session_path(@quiz_session), method: :post, class: "btn btn--primary", form: { class: "register-again" } %>
   <% end %>
 
-  <p><%= link_to "トップへ戻る", root_path %></p>
+  <section class="card">
+    <h2 class="section-title">作成時の質問解答（<%= @quiz_session.quiz_snapshot.size %> 問）</h2>
+    <ol class="snapshot">
+      <% @quiz_session.quiz_snapshot.each do |question| %>
+        <li class="snapshot-question">
+          <p class="snapshot-question__title"><%= question["title"] %></p>
+          <ul class="snapshot-question__choices">
+            <% question["choices"].each_with_index do |choice, index| %>
+              <li class="<%= "is-correct" if index == question["correctIndex"] %>"><%= %w[A B C D][index] %>. <%= choice %><%= "（正解）" if index == question["correctIndex"] %></li>
+            <% end %>
+          </ul>
+        </li>
+      <% end %>
+    </ol>
+  </section>
+
+  <p class="back-link"><%= link_to "トップへ戻る", root_path %></p>
 </main>

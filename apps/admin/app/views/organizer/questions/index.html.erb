@@ -1,23 +1,27 @@
 <% content_for :title, "質問解答の一覧" %>
-<main>
-  <h1>質問解答の一覧</h1>
+<main id="main" class="page">
+  <div class="page-head">
+    <h1 class="page-title">質問解答の一覧</h1>
+    <%= link_to "新規作成", new_organizer_question_path, class: "btn btn--primary" %>
+  </div>
 
-  <% if notice %>
-    <p class="notice" role="status"><%= notice %></p>
+  <% if @questions.any? %>
+    <ol class="questions">
+      <% @questions.each do |question| %>
+        <li class="question">
+          <div class="question__body">
+            <%= link_to question.title, edit_organizer_question_path(question), class: "question__title" %>
+            <span class="question__answer">（正解: <%= %w[A B C D][question.correct_index] %>）</span>
+          </div>
+          <%= button_to "削除", organizer_question_path(question), method: :delete,
+                class: "btn btn--danger btn--small",
+                form: { data: { turbo_confirm: "この問題を削除しますか？" } } %>
+        </li>
+      <% end %>
+    </ol>
+  <% else %>
+    <p class="empty card">まだ質問解答がありません。「新規作成」から追加してください。</p>
   <% end %>
 
-  <p><%= link_to "新規作成", new_organizer_question_path %></p>
-
-  <ol class="questions">
-    <% @questions.each do |question| %>
-      <li class="question">
-        <%= link_to question.title, edit_organizer_question_path(question) %>
-        （正解: <%= %w[A B C D][question.correct_index] %>）
-        <%= button_to "削除", organizer_question_path(question), method: :delete,
-              form: { data: { turbo_confirm: "この問題を削除しますか？" } } %>
-      </li>
-    <% end %>
-  </ol>
-
-  <p><%= link_to "トップへ戻る", root_path %></p>
+  <p class="back-link"><%= link_to "トップへ戻る", root_path %></p>
 </main>
