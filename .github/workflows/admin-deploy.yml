@@ -1,23 +1,24 @@
 name: admin-deploy
 
-# release.yml（workflow_call）と手で push した app-v* タグ、ロールバック用の workflow_dispatch。
+# release.yml（workflow_call）と手で push した app-YYYYMMDD-HHMM タグ、ロールバック用の workflow_dispatch。
 # GITHUB_TOKEN で打ったタグの push は他ワークフローを起こさないので、release 経路と push 経路が二重に動かない。
 on:
   push:
     tags:
-      - "app-v*"
+      - "app-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]"
   workflow_call:
     inputs:
       tag:
-        description: "デプロイするタグ（app-vX.Y.Z）"
+        description: "デプロイするタグ（app-YYYYMMDD-HHMM）"
         required: true
         type: string
   workflow_dispatch:
     inputs:
       tag:
-        description: "再デプロイするタグ（app-vX.Y.Z）"
+        description: "再デプロイするタグ（app-YYYYMMDD-HHMM）"
         required: true
         type: string
+
 
 permissions:
   contents: read
@@ -45,13 +46,14 @@ jobs:
             TAG="$REF_NAME"
           fi
           case "$TAG" in
-            app-v[0-9]*.[0-9]*.[0-9]*)
+            app-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9])
               ;;
             *)
-              echo "::error::タグ $TAG は app-vX.Y.Z 形式ではない"
+              echo "::error::タグ $TAG は app-YYYYMMDD-HHMM 形式ではない"
               exit 1
               ;;
           esac
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

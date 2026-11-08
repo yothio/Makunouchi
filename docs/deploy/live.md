@@ -175,19 +175,20 @@ gcloud run services update <SERVICE_NAME> --project <PROJECT_ID> --region <REGIO
 
 ## 6. GitHub Actions でのデプロイ
 
-live の本番デプロイは release タグ `live-vX.Y.Z` をきっかけにします。`main` への push では動きません。
+live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-20261109-1530`）をきっかけにします。日時は日本時間でタグを作る時刻です。`main` への push では動きません。
 
 流れは次のとおりです。
 
-1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`、上げる桁、確認入力に Worker 名 `makunouchi-live`）
-2. 直前の `live-v*` から次のバージョンを計算する（タグが無ければ `live-v0.1.0`）
+1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`、確認入力に Worker 名 `makunouchi-live`）
+2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
 3. そのコミットで `test` が success であることを確かめる
 4. `main` の先頭にタグを打ち、GitHub Release を作る
 5. 同じ実行から `live-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
 
 `live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、テスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
 
-手で `live-v*` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。確認の文字列入力は release 側（とロールバック用の `workflow_dispatch`）にあります。
+手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。確認の文字列入力は release 側（とロールバック用の `workflow_dispatch`）にあります。
+
 
 ### 6.1 初回の設定
 
@@ -214,7 +215,7 @@ live の本番デプロイは release タグ `live-vX.Y.Z` をきっかけにし
    画面から: Settings → Environments → `production` → Deployment branches and tags で「Selected branches and tags」を選ぶ。
 
    - ブランチ: `main`（release.yml からの `workflow_call` は呼び出し元の ref が `main` のまま）
-   - タグ: `app-v*` と `live-v*`（手でタグを push したときのデプロイ用）
+   - タグ: `app-*` と `live-*`（手でタグを push したときのデプロイ用）
 
    コマンドから（既存設定が変わることがあるので、先に画面で現状を見る）:
 
@@ -227,32 +228,33 @@ live の本番デプロイは release タグ `live-vX.Y.Z` をきっかけにし
    ```
 
    ```
-   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=app-v* -f type=tag
+   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=app-* -f type=tag
    ```
 
    ```
-   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=live-v* -f type=tag
+   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=live-* -f type=tag
    ```
 
-4. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-v*` と `live-v*` の作成・更新・削除を、リリース担当だけに限る。この文書では設定手順だけ示し、代行では作らない。
+4. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。この文書では設定手順だけ示し、代行では作らない。
 
 ### 6.2 起動のしかた
 
 通常のリリース（タグ作成からデプロイまで）。`confirm` に Worker 名を入れる。`main` 以外から起動したとき、確認が一致しないときは、タグを打つ前に止まります。
 
 ```
-gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live -f bump=patch -f confirm=makunouchi-live
+gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live -f confirm=makunouchi-live
 ```
 
-画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`、上げる桁を選び、`confirm` に `makunouchi-live` を入れる。
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`、`confirm` に `makunouchi-live` を入れる。
 
-ロールバック（既存の `live-v*` を再デプロイ）:
+ロールバック（既存の `live-YYYYMMDD-HHMM` を再デプロイ）:
 
 ```
-gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-vX.Y.Z -f confirm=makunouchi-live
+gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-20261109-1530 -f confirm=makunouchi-live
 ```
 
-`live-v` 以外のタグは受け付けない。
+`live-YYYYMMDD-HHMM` 以外のタグは受け付けない。
+
 
 **確かめること / 注意**
 

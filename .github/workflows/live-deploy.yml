@@ -1,28 +1,29 @@
 name: live-deploy
 
-# release.yml（workflow_call）と手で push した live-v* タグ、ロールバック用の workflow_dispatch。
+# release.yml（workflow_call）と手で push した live-YYYYMMDD-HHMM タグ、ロールバック用の workflow_dispatch。
 # main への push では動かない。進行中にデプロイすると全員の WebSocket が切れる。
 # GITHUB_TOKEN で打ったタグの push は他ワークフローを起こさないので、release 経路と push 経路が二重に動かない。
 on:
   push:
     tags:
-      - "live-v*"
+      - "live-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]"
   workflow_call:
     inputs:
       tag:
-        description: "デプロイするタグ（live-vX.Y.Z）"
+        description: "デプロイするタグ（live-YYYYMMDD-HHMM）"
         required: true
         type: string
   workflow_dispatch:
     inputs:
       tag:
-        description: "再デプロイするタグ（live-vX.Y.Z）"
+        description: "再デプロイするタグ（live-YYYYMMDD-HHMM）"
         required: true
         type: string
       confirm:
         description: "確認のため Worker 名 makunouchi-live を入力（本番の進行中は起動しない）"
         required: true
         type: string
+
 
 permissions:
   contents: read
@@ -51,10 +52,10 @@ jobs:
             TAG="$REF_NAME"
           fi
           case "$TAG" in
-            live-v[0-9]*.[0-9]*.[0-9]*)
+            live-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9])
               ;;
             *)
-              echo "::error::タグ $TAG は live-vX.Y.Z 形式ではない"
+              echo "::error::タグ $TAG は live-YYYYMMDD-HHMM 形式ではない"
               exit 1
               ;;
           esac

@@ -90,12 +90,12 @@
 
 ## 4. GitHub Actions によるデプロイ
 
-admin の本番デプロイは release タグ `app-vX.Y.Z` をきっかけにします。`main` への push では動きません。
+admin の本番デプロイは release タグ `app-YYYYMMDD-HHMM`（例: `app-20261109-1530`）をきっかけにします。日時は日本時間でタグを作る時刻です。`main` への push では動きません。
 
 流れは次のとおりです。
 
-1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `app`、上げる桁 `patch` / `minor` / `major`）
-2. 直前の `app-v*` から次のバージョンを計算する（タグが無ければ `app-v0.1.0`）
+1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `app`）
+2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
 3. そのコミットで `test` / `admin-test` / `admin-lint` が success であることを確かめる
 4. `main` の先頭にタグを打ち、GitHub Release を作る
 5. 同じ実行から `admin-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
@@ -107,7 +107,8 @@ admin の本番デプロイは release タグ `app-vX.Y.Z` をきっかけにし
 3. `<MIGRATE_JOB>` のイメージをその SHA に更新し、実行して完了を待つ
 4. `<SERVICE_NAME>` を同じイメージでデプロイ
 
-手で `app-v*` タグを push した場合も `admin-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。
+手で `app-YYYYMMDD-HHMM` タグを push した場合も `admin-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。
+
 
 **運用ルール**: **main は PR 経由でのみ更新**し（直接 push しない）、`admin-test.yml` と `admin-lint` と `test` を required check にして、通ったものだけをマージしてください。リリース前にも同じチェックの success をワークフローが確かめます。
 
@@ -253,10 +254,11 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 
    - **Deployment branches and tags** を「Selected branches and tags」にする
      - ブランチ: `main`（release.yml からの `workflow_call` は呼び出し元の ref が `main` のままなので、これが必須）
-     - タグ: `app-v*` と `live-v*`（手でタグを push したときのデプロイ用。付けないとタグ起点の実行が environment で止まる）
+     - タグ: `app-*` と `live-*`（手でタグを push したときのデプロイ用。付けないとタグ起点の実行が environment で止まる）
    - 承認待ちにしたいときは **Required reviewers** を設定する（承認待ちの間は `concurrency` で後続も待つ。プライベート無料プランでは使えないことがある）
 
-10. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-v*` と `live-v*` の作成・更新・削除を、リリース担当だけに限る。誰でもタグを押せないようにする。この文書では設定手順だけ示し、代行では作らない。
+10. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。誰でもタグを押せないようにする。この文書では設定手順だけ示し、代行では作らない。
+
 
 11. **初回のデプロイ**は `release.yml` でタグを切るか、既存タグを `admin-deploy.yml` の `workflow_dispatch` に渡して行う（下の「起動のしかた」）。権限不足は初回に出やすい（`gcloud run deploy` と `jobs update` は内部で操作の完了を待つため、`run.operations.get` などが足りるかが実機でしか分からない）。
 
@@ -268,7 +270,7 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 
 注意:
 
-- プロバイダの条件が `main` 限定なので、release / `workflow_dispatch`（`--ref main`）以外の ref では認証で失敗する（意図どおり）。手で `app-v*` を push した経路は `assertion.ref` がタグになるため、現状の WIF 条件では認証できない。手 push を使うならプロバイダ条件に `app-v*` / `live-v*` のタグ ref を足す（通常のリリースは `workflow_call` なので不要）
+- プロバイダの条件が `main` 限定なので、release / `workflow_dispatch`（`--ref main`）以外の ref では認証で失敗する（意図どおり）。手で `app-YYYYMMDD-HHMM` を push した経路は `assertion.ref` がタグになるため、現状の WIF 条件では認証できない。手 push を使うならプロバイダ条件に `app-*` / `live-*` のタグ ref を足す（通常のリリースは `workflow_call` なので不要）
 - デプロイ用サービスアカウントは Secret Manager を読まない。Secret の参照はサービスと Job の実行用アカウント（`<RUN_SERVICE_ACCOUNT_NAME>`）が行う
 - 本番の進行中に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回作成に使うテーブルを触りうるので、当日はリリースしない
 
@@ -277,18 +279,19 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 通常のリリース（タグ作成からデプロイまで）:
 
 ```
-gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=app -f bump=patch
+gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=app
 ```
 
-画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `app`、上げる桁を選ぶ。
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `app`。
 
-ロールバック（既存の `app-v*` を再デプロイ）:
+ロールバック（既存の `app-YYYYMMDD-HHMM` を再デプロイ）:
 
 ```
-gh workflow run admin-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=app-vX.Y.Z
+gh workflow run admin-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=app-20261109-1530
 ```
 
-`app-v` 以外のタグは受け付けない。
+`app-YYYYMMDD-HHMM` 以外のタグは受け付けない。
+
 
 ### 4.3 ロールバック
 

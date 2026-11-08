@@ -12,14 +12,6 @@ on:
         options:
           - app
           - live
-      bump:
-        description: "上げる桁（タグが無いときは常に 0.1.0）"
-        required: true
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
       confirm:
         description: "live のときだけ Worker 名 makunouchi-live を入力（app のときは空でよい）"
         required: false
@@ -63,43 +55,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 次のバージョンを計算する
+      - name: タグ名を決める
         id: version
         env:
           TARGET: ${{ inputs.target }}
-          BUMP: ${{ inputs.bump }}
+          TZ: Asia/Tokyo
         run: |
-          PREFIX="${TARGET}-v"
-          LATEST="$(git tag -l "${PREFIX}*" | sed "s/^${PREFIX}//" | sort -V | tail -n 1)"
-          if [ -z "$LATEST" ]; then
-            NEXT="0.1.0"
-          else
-            IFS=. read -r MAJOR MINOR PATCH <<EOF
-          $LATEST
-          EOF
-            case "$BUMP" in
-              major)
-                NEXT="$((MAJOR + 1)).0.0"
-                ;;
-              minor)
-                NEXT="${MAJOR}.$((MINOR + 1)).0"
-                ;;
-              patch)
-                NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
-                ;;
-              *)
-                echo "::error::未知の bump: $BUMP"
-                exit 1
-                ;;
-            esac
-          fi
-          TAG="${PREFIX}${NEXT}"
+          TAG="${TARGET}-$(date +%Y%m%d-%H%M)"
           if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::タグ $TAG は既にある"
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "次のタグ: $TAG（直前: ${LATEST:-なし}）"
+          echo "次のタグ: $TAG"
 
       - name: 必須チェックが成功しているか確かめる
         env:
@@ -137,18 +105,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          PREFIX="${TARGET}-"
+          PREV_TAG="$(git tag -l "${PREFIX}[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]" | sort | tail -n 1)"
+
           git tag "$TAG" "$GITHUB_SHA"
           git push origin "refs/tags/$TAG"
-
-          PREFIX="${TARGET}-v"
-          PREV="$(git tag -l "${PREFIX}*" | sed "s/^${PREFIX}//" | sort -V | tail -n 2 | head -n 1)"
-          PREV_TAG=""
-          if [ -n "$PREV" ]; then
-            CANDIDATE="${PREFIX}${PREV}"
-            if [ "$CANDIDATE" != "$TAG" ]; then
-              PREV_TAG="$CANDIDATE"
-            fi
-          fi
 
           if [ -n "$PREV_TAG" ]; then
             gh release create "$TAG" --generate-notes --notes-start-tag "$PREV_TAG" --title "$TAG" --target "$GITHUB_SHA"
