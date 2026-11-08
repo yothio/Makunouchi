@@ -1,6 +1,6 @@
-require "test_helper"
+require "rails_helper"
 
-class QuizPayloadBuilderTest < ActiveSupport::TestCase
+RSpec.describe QuizPayloadBuilder do
   def organizer_with(count)
     user = users(:other_organizer)
     user.questions.destroy_all
@@ -10,26 +10,26 @@ class QuizPayloadBuilderTest < ActiveSupport::TestCase
     user
   end
 
-  test "points と topN は無く、host.passwordHash があり平文パスワードはどこにも入らない" do
+  it "points と topN は無く、host.passwordHash があり平文パスワードはどこにも入らない" do
     session = QuizSession.prepare(user: organizer_with(5), title: "本番").tap(&:save!)
 
     payload = QuizPayloadBuilder.call(session)
 
-    assert_equal "本番", payload[:title]
-    assert_equal 5, payload[:questions].size
-    assert_not payload.key?(:points)
-    assert_not payload.key?(:topN)
-    assert_not payload.key?("points")
-    assert_not payload.key?("topN")
-    assert_equal session.host_login_id, payload.dig(:host, :loginId)
-    assert_equal session.host_password_hash, payload.dig(:host, :passwordHash)
-    assert_nil payload.dig(:host, :password)
-    assert_nil payload.dig(:host, :host_password)
+    expect(payload[:title]).to eq "本番"
+    expect(payload[:questions].size).to eq 5
+    expect(payload.key?(:points)).to be false
+    expect(payload.key?(:topN)).to be false
+    expect(payload.key?("points")).to be false
+    expect(payload.key?("topN")).to be false
+    expect(payload.dig(:host, :loginId)).to eq session.host_login_id
+    expect(payload.dig(:host, :passwordHash)).to eq session.host_password_hash
+    expect(payload.dig(:host, :password)).to be_nil
+    expect(payload.dig(:host, :host_password)).to be_nil
     dumped = JSON.generate(payload)
-    assert_no_match(/#{Regexp.escape(session.host_password)}/, dumped)
+    expect(dumped).not_to match(/#{Regexp.escape(session.host_password)}/)
   end
 
-  test "画像ありなら imageUrl は R2_PUBLIC_BASE_URL と imageKey から https で組む" do
+  it "画像ありなら imageUrl は R2_PUBLIC_BASE_URL と imageKey から https で組む" do
     user = organizer_with(5)
     question = user.questions.first
     question.image.attach(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
@@ -40,20 +40,20 @@ class QuizPayloadBuilderTest < ActiveSupport::TestCase
 
     payload = QuizPayloadBuilder.call(session)
 
-    assert_equal "https://cdn.example.com/quiz/#{question.image.blob.key}", payload[:questions].first[:imageUrl]
+    expect(payload[:questions].first[:imageUrl]).to eq "https://cdn.example.com/quiz/#{question.image.blob.key}"
   ensure
     ENV["R2_PUBLIC_BASE_URL"] = original
   end
 
-  test "画像なしなら imageUrl は null" do
+  it "画像なしなら imageUrl は null" do
     session = QuizSession.prepare(user: organizer_with(5), title: "本番").tap(&:save!)
 
     payload = QuizPayloadBuilder.call(session)
 
-    assert_nil payload[:questions].first[:imageUrl]
+    expect(payload[:questions].first[:imageUrl]).to be_nil
   end
 
-  test "本番で画像 URL が https にならないときは例外" do
+  it "本番で画像 URL が https にならないときは例外" do
     user = organizer_with(5)
     question = user.questions.first
     question.image.attach(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
@@ -62,9 +62,9 @@ class QuizPayloadBuilderTest < ActiveSupport::TestCase
     original = ENV["R2_PUBLIC_BASE_URL"]
     ENV["R2_PUBLIC_BASE_URL"] = "http://insecure.example.com"
 
-    assert_raises(QuizPayloadBuilder::InsecureImageUrl) do
+    expect {
       QuizPayloadBuilder.call(session, strict_https: true)
-    end
+    }.to raise_error(QuizPayloadBuilder::InsecureImageUrl)
   ensure
     ENV["R2_PUBLIC_BASE_URL"] = original
   end
