@@ -22,6 +22,12 @@ Rails.application.configure do
 
   config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
+  # 利用者は独自ドメインだけで使う。未設定なら run.app も通常どおり応答する。force_ssl より前に置き、http の run.app も独自ドメインの https へ直接飛ばす。
+  if ENV["ADMIN_CANONICAL_HOST"].present?
+    require_relative "../../lib/canonical_host_redirect"
+    config.middleware.insert_before 0, CanonicalHostRedirect, ENV["ADMIN_CANONICAL_HOST"]
+  end
+
   config.log_tags = [ :request_id ]
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
 

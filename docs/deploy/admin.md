@@ -13,10 +13,10 @@
 **目的**: 本番に必要なクラウド資源と秘密を一度そろえる。
 
 1. Neon（pooled / direct の 2 URL）
-2. R2 バケット・https 公開・CORS・API トークン（「R2 の設定」節）
+2. R2 バケット・https 公開・CORS・API トークン（「R2 の設定」節。AllowedOrigins は独自ドメイン）
 3. **ローカル開発**で `bin/rails db:encryption:init` → 表示された 3 値を Secret へ（production イメージ上では回さない）
 4. 作成者ローカルの `apps/admin/config/master.key` を読んで `RAILS_MASTER_KEY` を Secret へ。`ADMIN_API_SECRET`（live と共有、32 文字以上）を用意
-5. Artifact Registry + Cloud Run サービス（probe = `/up`、サービスの `DATABASE_URL` は pooled のみ）
+5. Artifact Registry + Cloud Run サービス（probe = `/up`、サービスの `DATABASE_URL` は pooled のみ）。独自ドメインを使うなら `ADMIN_CANONICAL_HOST` も設定する
 6. イメージ push → Secret／環境変数 → Job で migrate（`DATABASE_URL` を direct に差し替え）→ 初回だけ seed → 動作確認
 7. 自動デプロイの設定（「GitHub Actions」節）: デプロイ用サービスアカウント・Workload Identity・GitHub secrets・environment `production`
 8. live 側のデプロイと `LIVE_BASE_URL` / `LIVE_PUBLIC_URL` の設定が終わってから、リハーサル開催回で実 PUT と幹事ログイン（[live.md](live.md)）
@@ -39,6 +39,7 @@
    - Startup / Liveness probe: HTTP `GET /up`（`force_ssl` は `/up` をリダイレクト除外済み）
    - 環境変数・Secret: README の本番必須項目。**`DATABASE_URL` は pooled だけ**（`DATABASE_URL_DIRECT` はサービスに常設しない）
    - 同時リクエスト数の既定（80）と Puma スレッド 3・DB `max_connections` 5 の前提を変えるときは三つを合わせて見直す
+   - 独自ドメインを使うときは `ADMIN_CANONICAL_HOST` も設定する（次の節）
 4. **デプロイごとに migrate を 1 回**（Cloud Run **Jobs**）。CI（後述）が自動で流す。Job の設計:
    - Job 名: `<MIGRATE_JOB>`。サービスと **同じコンテナイメージ**（CI が git の SHA タグに差し替える）
    - 環境変数・Secret はサービスと同一にし、Job だけ `DATABASE_URL` を **direct**（`DATABASE_URL_DIRECT` の値）にする。CI は環境変数・Secret を上書きしない
@@ -70,14 +71,48 @@
 
 ---
 
-## 3. R2 の設定
+## 3. Cloud Run の既定ドメインと独自ドメイン
+
+**目的**: 利用者（システム管理者・主催者）のアクセスは独自ドメインだけにし、Cloud Run の既定ドメイン（`https://<SERVICE_NAME>-<...>.run.app`）はヘルスチェックと監視専用にする。
+
+`--no-default-url` や ingress の制限は、監視が既定ドメインを使えなくなるので使わず、アプリ側（`lib/canonical_host_redirect.rb`）で制限します。
+
+- 環境変数 `ADMIN_CANONICAL_HOST` に独自ドメインのホスト名を入れる。Host が `*.run.app` のリクエストのうち、`/up` 以外が対象になる。GET / HEAD は独自ドメインの同じパス・クエリへ 302、それ以外のメソッドは 403
+- `/up` はどのホストでも通す。Cloud Run の probe は Host が `*.run.app` でも独自ドメインでもない（`localhost` や IP の）ことがあり、`*.run.app` 以外のホストはこの仕組みでは触らない
+- リダイレクト先は環境変数の値だけから作る。リクエストの Host や `X-Forwarded-Host` は使わない
+- 監視（稼働時間チェックなど）は既定ドメインの `https://<RUN_APP_HOST>/up` を使う
+- セッション cookie は Host ごとに別なので、ログインは独自ドメイン側で行う
+
+設定には `--update-env-vars` を使います。`--set-env-vars` は他の環境変数を全部消してしまうので使いません。
+
+```
+gcloud run services update <SERVICE_NAME> --region <REGION> --project <PROJECT_ID> --update-env-vars ADMIN_CANONICAL_HOST=<ADMIN_HOST>
+```
+
+戻すときは次を使います。
+
+```
+gcloud run services update <SERVICE_NAME> --region <REGION> --project <PROJECT_ID> --remove-env-vars ADMIN_CANONICAL_HOST
+```
+
+**確かめること**（`<RUN_APP_HOST>` は既定ドメインのホスト名、`<ADMIN_HOST>` は独自ドメイン）:
+
+```
+curl -sI https://<RUN_APP_HOST>/            # 302、location: https://<ADMIN_HOST>/
+curl -sI https://<RUN_APP_HOST>/up          # 200
+curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/ が 302 なら location がログイン画面）
+```
+
+---
+
+## 4. R2 の設定
 
 **目的**: 管理画面からの画像 direct upload と、公開 https URL を使えるようにする。
 
 - **バケット**を作り、オブジェクト読み取りを公開する（カスタムドメインで https）
 - **公開 URL** はカスタムドメイン（https）を `R2_PUBLIC_BASE_URL` に設定する（`r2.dev` は本番向けでない）。live の `imageUrl` は https 必須
 - **CORS**（direct upload 用）:
-  - `AllowedOrigins`: 管理画面の本番オリジンのみ（開発用別バケットなら `http://localhost:3000`）
+  - `AllowedOrigins`: 管理画面の本番オリジン（独自ドメイン `https://<ADMIN_HOST>`）のみ。`ADMIN_CANONICAL_HOST` を設定すると利用者は独自ドメインでしかアップロードしないので、`*.run.app` は入れない（開発用別バケットなら `http://localhost:3000`）
   - `AllowedMethods`: `PUT`
   - `AllowedHeaders`: `Content-Type` / `Content-MD5` / `Content-Disposition`（Rails 8.1 の `headers_for_direct_upload` を実機で確かめてから確定）
   - `MaxAgeSeconds` を付ける
@@ -88,7 +123,7 @@
 
 ---
 
-## 4. GitHub Actions による自動デプロイ
+## 5. GitHub Actions による自動デプロイ
 
 `.github/workflows/admin-deploy.yml` が、main への push（`apps/admin/**` かこのワークフロー自身の変更）と手動実行（`workflow_dispatch`）で次を順に流します。どこかで失敗したら以降は動きません（migrate が失敗したらサービスはデプロイされません）。
 
@@ -100,7 +135,7 @@
 
 CI が変えるのはイメージだけです。環境変数・Secret・Job の args・probe は、サービスと Job に設定済みのものがそのまま使われます。認証は Workload Identity 連携（鍵ファイルは作らない）。同時に 2 つは動かず（`concurrency`）、実行中のデプロイは取り消しません。
 
-### 4.1 デプロイ用サービスアカウントと Workload Identity
+### 5.1 デプロイ用サービスアカウントと Workload Identity
 
 **目的**: GitHub Actions が鍵なしで Artifact Registry と Cloud Run を更新できるようにする。
 
@@ -255,7 +290,7 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 - デプロイ用サービスアカウントは Secret Manager を読まない。Secret の参照はサービスと Job の実行用アカウント（`<RUN_SERVICE_ACCOUNT_NAME>`）が行う
 - 本番の進行中に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回作成に使うテーブルを触りうるので、当日は main へ push しない
 
-### 4.2 起動のしかた（2 回目以降）
+### 5.2 起動のしかた（2 回目以降）
 
 - `main` へ `apps/admin/**`（またはワークフローファイル）の変更をマージすると自動で走る
 - 手動:
@@ -264,13 +299,13 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
   gh workflow run admin-deploy.yml --repo <OWNER>/<REPO> --ref main
   ```
 
-### 4.3 ロールバック
+### 5.3 ロールバック
 
 イメージタグ（git SHA）を前の成功分に戻してサービスをデプロイし直します。スキーマを戻す必要がある破壊的 migration がある場合は、別途 migration の方針（expand/contract）に従います。進行中のゲスト通信は live 側なので切れませんが、admin で作業中なら控えます。
 
 ---
 
-## 5. 本番前チェックリスト
+## 6. 本番前チェックリスト
 
 - [ ] `PORT` を尊重して待ち受けている（Cloud Run が渡す）
 - [ ] `config.assume_ssl = true` と `force_ssl`（`/up` は除外）
@@ -281,7 +316,8 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 - [ ] Active Record Encryption の 3 鍵を（ローカルで生成し）Secret に入れ、バックアップした
 - [ ] `RAILS_MASTER_KEY` を作成者ローカルの `master.key` から Secret に入れた
 - [ ] R2 の 4 変数 + `R2_PUBLIC_BASE_URL`（https）
-- [ ] R2 CORS が管理画面オリジンのみ
+- [ ] R2 CORS が独自ドメイン（`https://<ADMIN_HOST>`）のみ（`*.run.app` は入れない）
+- [ ] 独自ドメインを使うなら `ADMIN_CANONICAL_HOST` を設定し、監視は既定ドメインの `/up` を使う
 - [ ] `ADMIN_API_SECRET` が live と一致（32 文字以上）
 - [ ] `LIVE_BASE_URL` / `LIVE_PUBLIC_URL` が正しい
 - [ ] Active Job `:async` のジョブ欠落を許容していることを理解している
