@@ -8,11 +8,10 @@
   --color-text: #1d2521;
   --color-text-muted: #55605a;
   --color-border: #d6dcd7;
-  --color-border-strong: #aab3ad;
+  --color-border-strong: #7a867f;
   --color-accent: #2d6a55;
   --color-accent-hover: #235544;
   --color-accent-text: #ffffff;
-  --color-accent-soft: #e1eee8;
   --color-danger: #b3261e;
   --color-danger-hover: #8f1d17;
   --color-danger-soft: #fbe9e7;
@@ -25,7 +24,6 @@
   --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Noto Sans JP", "Meiryo", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
 
-  --text-xs: 0.8125rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
@@ -41,7 +39,6 @@
   --space-7: 3rem;
 
   --radius: 6px;
-  --radius-pill: 1rem;
   --shadow-card: 0 1px 2px rgb(20 30 25 / 6%);
   --content-width: 56rem;
   --content-width-narrow: 30rem;
@@ -55,11 +52,10 @@
     --color-text: #e7ece8;
     --color-text-muted: #a0aba4;
     --color-border: #313a35;
-    --color-border-strong: #56635b;
+    --color-border-strong: #6f7d75;
     --color-accent: #86cdb0;
     --color-accent-hover: #a2dcc4;
     --color-accent-text: #0e1b15;
-    --color-accent-soft: #223a2f;
     --color-danger: #f0877f;
     --color-danger-hover: #f6a8a2;
     --color-danger-soft: #3d2220;
@@ -80,6 +76,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-padding-bottom: 5rem;
 }
 
 body {
@@ -89,6 +86,7 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 h1,
@@ -247,5 +245,29 @@ a:hover {
 
   .site-header__email {
     display: none;
+  }
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-sunken: #f1f1f1;
+    --color-text: #000000;
+    --color-text-muted: #444444;
+    --color-border: #999999;
+  }
+
+  .site-header,
+  .skip-link,
+  .btn,
+  .back-link {
+    display: none;
+  }
+
+  .card {
+    break-inside: avoid;
+    box-shadow: none;
   }
 }

@@ -58,7 +58,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
 
     css = Rails.root.glob("app/assets/stylesheets/*.css").map(&:read).join
     expect(css).to match(/\.form-actions--sticky\s*\{[^}]*position:\s*sticky/)
-    expect(css).to match(/\.choices\s*\{[^}]*grid-template-columns/)
+    expect(css).to match(/\.choices\s*\{[^}]*grid-template-columns:\s*repeat\(2/)
     expect(css).to match(/\.field_with_errors\s*\{[^}]*display:\s*contents/)
   end
 

@@ -32,10 +32,12 @@
         <% end %>
       </div>
     </header>
-    <div class="flashes">
-      <% if notice.present? %><p class="flash flash--notice notice" role="status"><%= notice %></p><% end %>
-      <% if alert.present? %><p class="flash flash--alert alert" role="alert"><%= alert %></p><% end %>
-    </div>
+    <% if notice.present? || alert.present? %>
+      <div class="flashes">
+        <% if notice.present? %><p class="flash flash--notice notice" role="status"><%= notice %></p><% end %>
+        <% if alert.present? %><p class="flash flash--alert alert" role="alert"><%= alert %></p><% end %>
+      </div>
+    <% end %>
     <%= yield %>
   </body>
 
