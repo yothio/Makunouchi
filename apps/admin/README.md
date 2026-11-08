@@ -42,9 +42,11 @@
 
 ```
 bin/setup --skip-server   # bundle install と db:prepare
-PARALLEL_WORKERS=1 bin/rails test
+bundle exec rspec         # テスト全部（system spec は rack_test なのでブラウザ不要）
 bin/rails server          # http://localhost:3000
 ```
+
+テストは RSpec（`spec/`）。1 ファイルだけ流すなら `bundle exec rspec spec/models/user_spec.rb`。`spec/config/` は設定ファイルを読むだけで Rails も DB も起動しないので、Postgres が無くても `bundle exec rspec spec/config` で流せる。fixtures は `spec/fixtures/`。
 
 初回だけシステム管理者を作る例（パスワードは 12 文字以上）:
 
