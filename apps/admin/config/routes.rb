@@ -12,7 +12,11 @@ Rails.application.routes.draw do
   namespace :organizer do
     resources :questions, except: :show
     # 開催回は作って見るだけ。スナップショットを差し替える update は作らない。
-    resources :quiz_sessions, only: %i[new create show]
+    # pending の再送は register（同一 public_id・同一ハッシュ）。
+    resources :quiz_sessions, only: %i[new create show] do
+      member { post :register }
+    end
+
   end
 
   root "organizer/home#show"
