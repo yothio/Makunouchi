@@ -12,11 +12,6 @@ on:
         options:
           - app
           - live
-      confirm:
-        description: "live のときだけ Worker 名 makunouchi-live を入力（app のときは空でよい）"
-        required: false
-        type: string
-        default: ""
 
 # contents: タグと Release。actions: 必須チェック確認の API。id-token: 呼び出し先の admin-deploy が Workload Identity に使う
 permissions:
@@ -42,19 +37,10 @@ jobs:
             exit 1
           fi
 
-      - name: live の確認入力を確かめる
-        env:
-          TARGET: ${{ inputs.target }}
-          CONFIRM: ${{ inputs.confirm }}
-        run: |
-          if [ "$TARGET" = "live" ] && [ "$CONFIRM" != "makunouchi-live" ]; then
-            echo "::error::確認用の入力が Worker 名と一致しない"
-            exit 1
-          fi
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
 
       - name: タグ名を決める
         id: tag

@@ -19,11 +19,6 @@ on:
         description: "再デプロイするタグ（live-YYYYMMDD-HHMM）"
         required: true
         type: string
-      confirm:
-        description: "確認のため Worker 名 makunouchi-live を入力（本番の進行中は起動しない）"
-        required: true
-        type: string
-
 
 permissions:
   contents: read
@@ -39,13 +34,11 @@ jobs:
     timeout-minutes: 15
     environment: production
     steps:
-      - name: 起動条件を確認
+      - name: タグ名を決める
         id: target
         env:
           INPUT_TAG: ${{ inputs.tag }}
           REF_NAME: ${{ github.ref_name }}
-          CONFIRM: ${{ inputs.confirm }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           TAG="$INPUT_TAG"
           if [ -z "$TAG" ]; then
@@ -59,11 +52,8 @@ jobs:
               exit 1
               ;;
           esac
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRM" != "makunouchi-live" ]; then
-            echo "::error::確認用の入力が Worker 名と一致しない"
-            exit 1
-          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

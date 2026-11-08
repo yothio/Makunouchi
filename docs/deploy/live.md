@@ -179,7 +179,7 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
 
 流れは次のとおりです。
 
-1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`、確認入力に Worker 名 `makunouchi-live`）
+1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`）
 2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
 3. そのコミットで `test` が success であることを確かめる
 4. `main` の先頭にタグを打ち、GitHub Release を作る
@@ -187,9 +187,7 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
 
 `live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、テスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
 
-手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。この手 push 経路では Worker 名の確認入力を通しません（`confirm` は release とロールバック用の `workflow_dispatch` だけ）。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限する前提です。
-
-
+手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限してください。
 
 ### 6.1 初回の設定
 
@@ -240,18 +238,18 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
 
 ### 6.2 起動のしかた
 
-通常のリリース（タグ作成からデプロイまで）。`confirm` に Worker 名を入れる。`main` 以外から起動したとき、確認が一致しないときは、タグを打つ前に止まります。
+通常のリリース（タグ作成からデプロイまで）。`main` 以外から起動したときは、タグを打つ前に止まります。
 
 ```
-gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live -f confirm=makunouchi-live
+gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live
 ```
 
-画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`、`confirm` に `makunouchi-live` を入れる。
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`。
 
 ロールバック（既存の `live-YYYYMMDD-HHMM` を再デプロイ）:
 
 ```
-gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-20261109-1530 -f confirm=makunouchi-live
+gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-20261109-1530
 ```
 
 `live-YYYYMMDD-HHMM` 以外のタグは受け付けない。
