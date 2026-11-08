@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe QuizPayloadBuilder do
+  include ActiveJob::TestHelper
+
   def organizer_with(count)
     create(:user).tap { |user| create_list(:question, count, user: user) }
   end
@@ -36,6 +38,43 @@ RSpec.describe QuizPayloadBuilder do
     payload = QuizPayloadBuilder.call(session)
 
     expect(payload[:questions].first[:imageUrl]).to eq "https://cdn.example.com/quiz/#{question.image.blob.key}"
+  ensure
+    ENV["R2_PUBLIC_BASE_URL"] = original
+  end
+
+  it "派生画像が無いときは原画の URL を使う" do
+    user = organizer_with(5)
+    question = user.questions.first
+    question.image.attach(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
+    question.save!
+    expect(question.delivery_image).not_to be_attached
+
+    session = QuizSession.prepare(user: user, title: "本番").tap(&:save!)
+    original = ENV["R2_PUBLIC_BASE_URL"]
+    ENV["R2_PUBLIC_BASE_URL"] = "https://cdn.example.com/quiz"
+
+    payload = QuizPayloadBuilder.call(session)
+
+    expect(payload[:questions].first[:imageUrl]).to eq "https://cdn.example.com/quiz/#{question.image.blob.key}"
+  ensure
+    ENV["R2_PUBLIC_BASE_URL"] = original
+  end
+
+  it "派生画像があるときはその URL を使う" do
+    user = organizer_with(5)
+    question = user.questions.first
+    question.image.attach(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
+    question.save!
+    perform_enqueued_jobs only: GenerateDeliveryImageJob
+    question.reload
+
+    session = QuizSession.prepare(user: user, title: "本番").tap(&:save!)
+    original = ENV["R2_PUBLIC_BASE_URL"]
+    ENV["R2_PUBLIC_BASE_URL"] = "https://cdn.example.com/quiz"
+
+    payload = QuizPayloadBuilder.call(session)
+
+    expect(payload[:questions].first[:imageUrl]).to eq "https://cdn.example.com/quiz/#{question.delivery_image.blob.key}"
   ensure
     ENV["R2_PUBLIC_BASE_URL"] = original
   end

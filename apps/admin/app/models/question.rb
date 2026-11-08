@@ -1,6 +1,7 @@
 class Question < ApplicationRecord
   IMAGE_CONTENT_TYPES = %w[image/png image/jpeg image/webp image/gif].freeze
   IMAGE_MAX_BYTES = 5.megabytes
+  DELIVERY_MAX_EDGE = 1280
   CHOICE_COLUMNS = %i[choice_a choice_b choice_c choice_d].freeze
 
   belongs_to :user
@@ -8,6 +9,7 @@ class Question < ApplicationRecord
   # 差し替え・削除のときも古い blob（R2 のオブジェクト）は消さない。
   # 開催回に取り込んだスナップショットが画像の URL を持つため。
   has_one_attached :image, dependent: false
+  has_one_attached :delivery_image, dependent: false
 
   normalizes :title, *CHOICE_COLUMNS, with: ->(value) { value.strip }
 
@@ -19,6 +21,27 @@ class Question < ApplicationRecord
 
   def choices
     CHOICE_COLUMNS.map { |column| self[column] }
+  end
+
+  # live に渡す画像キー。派生画像が無ければ原画（欠けないことを優先）。
+  def live_image_key
+    return unless image.attached?
+    return delivery_image.blob.key if delivery_image.attached?
+
+    image.blob.key
+  end
+
+  def delivery_ready_for?(source_blob)
+    delivery_image.attached? &&
+      delivery_image.blob.metadata["source_blob_id"].to_s == source_blob.id.to_s
+  end
+
+  def enqueue_delivery_image_generation
+    return unless image.attached?
+    return if delivery_ready_for?(image.blob)
+
+    delivery_image.detach if delivery_image.attached?
+    GenerateDeliveryImageJob.perform_later(id)
   end
 
   private
