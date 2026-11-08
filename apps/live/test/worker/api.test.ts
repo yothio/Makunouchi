@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
+import { SessionRoom } from "../../src/worker/session-room";
 import { authHeaders, connectHost, createSession, driveToResults, newSessionId, quiz } from "./helpers";
 
 const put = (id: string, body: unknown, headers: Record<string, string> = authHeaders) =>
@@ -56,6 +57,15 @@ describe("sessions API", () => {
   it("ranking of an uncreated session is 404", async () => {
     const res = await exports.default.fetch(`https://x/api/sessions/${newSessionId()}/ranking`, { headers: authHeaders });
     expect(res.status).toBe(404);
+  });
+
+  it("ranking with an invalid session id is 404 without waking the Durable Object", async () => {
+    const spy = vi.spyOn(SessionRoom.prototype, "ranking");
+    const res = await exports.default.fetch("https://x/api/sessions/screen:abc/ranking", { headers: authHeaders });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it("ranking requires auth", async () => {
