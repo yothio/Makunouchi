@@ -1,6 +1,15 @@
 require "rails_helper"
 
 RSpec.describe Organizer::QuestionsController, type: :request do
+  let(:organizer) { create(:user) }
+  let(:other_organizer) { create(:user) }
+  let(:system_admin) { create(:user, :system_admin) }
+  let!(:first_question) do
+    create(:question, user: organizer, title: "新郎の好きな食べ物は？",
+                      choice_a: "カレー", choice_b: "ラーメン", choice_c: "寿司", choice_d: "ハンバーグ", correct_index: 2)
+  end
+  let!(:second_question) { create(:question, user: organizer, title: "二人の出会いは？") }
+  let!(:others_question) { create(:question, user: other_organizer, title: "他の主催者の問題") }
   let(:valid) { { title: "新しい問題", choice_a: "A", choice_b: "B", choice_c: "C", choice_d: "D", correct_index: "1" } }
 
   it "未ログインはログインへ" do
@@ -12,7 +21,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "一覧は自分の問題だけを作成順に出す" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get organizer_questions_path
 
@@ -23,7 +32,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "新規作成: 入力フォームがあり、保存すると自分の問題になる" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get new_organizer_question_path
     expect(response).to have_http_status(:success)
@@ -34,13 +43,13 @@ RSpec.describe Organizer::QuestionsController, type: :request do
 
     expect {
       post organizer_questions_path, params: { question: valid }
-    }.to change { users(:organizer).questions.count }.by(1)
+    }.to change { organizer.questions.count }.by(1)
     expect(response).to redirect_to(organizer_questions_path)
-    expect(users(:organizer).questions.order(:id).last.correct_index).to eq 1
+    expect(organizer.questions.order(:id).last.correct_index).to eq 1
   end
 
   it "保存ボタンは画面下に固定され、選択肢は 2 列に並ぶ（1280x800 で見切れない）" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get new_organizer_question_path
 
@@ -54,15 +63,15 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "user_id は params から受けず、必ずログイン中のユーザーになる" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
-    post organizer_questions_path, params: { question: valid.merge(user_id: users(:other_organizer).id) }
+    post organizer_questions_path, params: { question: valid.merge(user_id: other_organizer.id) }
 
-    expect(Question.order(:id).last.user).to eq users(:organizer)
+    expect(Question.order(:id).last.user).to eq organizer
   end
 
   it "不正な入力は 422 で作らない" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     expect {
       post organizer_questions_path, params: { question: valid.merge(choice_d: "", correct_index: "4") }
@@ -72,7 +81,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "検証エラーは日本語で出す（正解未選択・同じ文言の選択肢）" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     post organizer_questions_path, params: { question: valid.merge(correct_index: "", choice_b: "A") }
 
@@ -86,8 +95,8 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "編集と更新ができる。画像を送らなければ今の画像を残す" do
-    sign_in_as users(:organizer)
-    question = questions(:first)
+    sign_in_as organizer
+    question = first_question
     question.image.attach(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
     question.save!
 
@@ -102,7 +111,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "direct upload の signed_id で画像を付けられる" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
     blob = ActiveStorage::Blob.create_and_upload!(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
 
     post organizer_questions_path, params: { question: valid.merge(image: blob.signed_id) }
@@ -111,17 +120,17 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "削除できる" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     expect {
-      delete organizer_question_path(questions(:first))
+      delete organizer_question_path(first_question)
     }.to change(Question, :count).by(-1)
     expect(response).to redirect_to(organizer_questions_path)
   end
 
   it "他の主催者の問題は 404（見る・編集・更新・削除）" do
-    sign_in_as users(:organizer)
-    other = questions(:others)
+    sign_in_as organizer
+    other = others_question
 
     get edit_organizer_question_path(other)
     expect(response).to have_http_status(:not_found)
@@ -135,7 +144,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "システム管理者が入ると、自分の（空の）問題セットを見る" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     get organizer_questions_path
 
@@ -144,7 +153,7 @@ RSpec.describe Organizer::QuestionsController, type: :request do
   end
 
   it "画面で importmap と Active Storage の JS が解決できる" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get new_organizer_question_path
 

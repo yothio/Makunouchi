@@ -50,6 +50,9 @@ group :development, :test do
 
   # RSpec for Rails
   gem "rspec-rails"
+
+  # テストデータは fixtures でなく factory で作る
+  gem "factory_bot_rails"
 end
 
 group :development do

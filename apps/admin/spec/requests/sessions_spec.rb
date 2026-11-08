@@ -1,6 +1,9 @@
 require "rails_helper"
 
 RSpec.describe SessionsController, type: :request do
+  let(:organizer) { create(:user) }
+  let(:system_admin) { create(:user, :system_admin) }
+
   it "ログイン画面は未ログインで見られる" do
     get new_session_path
 
@@ -15,7 +18,7 @@ RSpec.describe SessionsController, type: :request do
   end
 
   it "主催者のログイン成功は管理画面トップへ" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     expect(response).to redirect_to(root_path)
     follow_redirect!
@@ -23,13 +26,13 @@ RSpec.describe SessionsController, type: :request do
   end
 
   it "システム管理者のログイン成功は主催者作成画面へ" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     expect(response).to redirect_to(new_admin_organizer_path)
   end
 
   it "パスワード違いと存在しないメールは同じ失敗で、ログインしない" do
-    post session_path, params: { email: users(:organizer).email, password: "wrong" }
+    post session_path, params: { email: organizer.email, password: "wrong" }
     expect(response).to have_http_status(:unprocessable_content)
     message = css_select(".error").text
 
@@ -43,7 +46,7 @@ RSpec.describe SessionsController, type: :request do
   end
 
   it "ログアウトするとセッションが消える" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
     delete session_path
 
     expect(response).to redirect_to(new_session_path)
@@ -52,7 +55,7 @@ RSpec.describe SessionsController, type: :request do
   end
 
   it "ログアウト後に控えておいた古い cookie を再送しても入れない" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
     old_cookie = cookies[Rails.application.config.session_options[:key]]
     get root_path
     expect(response).to have_http_status(:success)
@@ -65,23 +68,23 @@ RSpec.describe SessionsController, type: :request do
   end
 
   it "ログアウト後に入り直せば、新しいセッションは使える" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
     delete session_path
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get root_path
     expect(response).to have_http_status(:success)
   end
 
   it "ログイン時刻の無い古い形式のセッションは受け付けない" do
-    user = users(:organizer)
+    user = organizer
 
     expect(Authentication.user_from({ user_id: user.id })).to be_nil
     expect(Authentication.user_from({ user_id: user.id, login_at: nil })).to be_nil
   end
 
   it "sessions_valid_after より前のログインは無効、それ以降は有効" do
-    user = users(:organizer)
+    user = organizer
     cutoff = Time.current
     user.update_column(:sessions_valid_after, cutoff)
     micros = ->(time) { (time.to_r * 1_000_000).to_i }
@@ -96,7 +99,7 @@ RSpec.describe SessionsController, type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    post session_path, params: { email: users(:organizer).email, password: SignInHelper::PASSWORD }
+    post session_path, params: { email: organizer.email, password: SignInHelper::PASSWORD }
     expect(response).to have_http_status(:too_many_requests)
     assert_select ".error"
   end

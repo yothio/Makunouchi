@@ -9,6 +9,7 @@ RSpec.describe User, type: :model do
   end
 
   it "email は必須で、大文字小文字と前後の空白を無視して一意" do
+    create(:user, email: "organizer@example.com")
     expect(User.new(email: "", password: "password12345", role: "organizer")).not_to be_valid
 
     user = User.new(email: "  Organizer@Example.com ", password: "password12345", role: "organizer")
@@ -17,8 +18,8 @@ RSpec.describe User, type: :model do
   end
 
   it "role は system_admin か organizer だけ" do
-    expect(users(:system_admin)).to be_system_admin
-    expect(users(:organizer)).to be_organizer
+    expect(create(:user, :system_admin)).to be_system_admin
+    expect(create(:user)).to be_organizer
     expect(User.new(email: "x@example.com", password: "password12345", role: "guest")).not_to be_valid
     expect(User.new(email: "x@example.com", password: "password12345", role: nil)).not_to be_valid
   end
@@ -34,7 +35,7 @@ RSpec.describe User, type: :model do
   end
 
   it "パスワードを触らない更新は最小長の検証に引っかからない" do
-    user = users(:organizer)
+    user = create(:user)
     user.update!(email: "renamed@example.com")
 
     expect(user.reload.email).to eq "renamed@example.com"
@@ -47,7 +48,7 @@ RSpec.describe User, type: :model do
   end
 
   it "パスワードは平文で保存されず、authenticate_by で照合できる" do
-    user = users(:organizer)
+    user = create(:user)
 
     expect(user.password_digest).not_to eq "password12345"
     expect(User.authenticate_by(email: user.email, password: "password12345")).to eq user

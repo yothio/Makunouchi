@@ -2,12 +2,7 @@ require "rails_helper"
 
 RSpec.describe QuizPayloadBuilder do
   def organizer_with(count)
-    user = users(:other_organizer)
-    user.questions.destroy_all
-    count.times do |i|
-      user.questions.create!(title: "問題#{i}", choice_a: "a", choice_b: "b", choice_c: "c", choice_d: "d", correct_index: i % 4)
-    end
-    user
+    create(:user).tap { |user| create_list(:question, count, user: user) }
   end
 
   it "points と topN は無く、host.passwordHash があり平文パスワードはどこにも入らない" do
