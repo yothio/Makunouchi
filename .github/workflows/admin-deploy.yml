@@ -1,0 +1,91 @@
+name: admin-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# 同時に 2 つ動かさない。実行中のデプロイは取り消さず、後から来たものを待たせる
+concurrency:
+  group: admin-deploy
+  cancel-in-progress: false
+
+# GCP の値はリポジトリが public になっても出さないよう、すべて repository secrets から渡す
+# （一覧は apps/admin/README.md）
+# secrets は必要なステップの env にだけ置く（checkout などの公開アクションには渡さない）
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # secrets に登録していない値はログで伏せられない。プロジェクト番号は GCP_PROJECT_NUMBER を参照する
+      - name: プロジェクト番号をログで伏せる
+        env:
+          GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+        run: |
+          if [ -z "$GCP_PROJECT_NUMBER" ]; then
+            echo "::error::GCP_PROJECT_NUMBER が未設定"
+            exit 1
+          fi
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Artifact Registry へ docker を認証
+        env:
+          REGISTRY: ${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}
+        run: gcloud auth configure-docker "$REGISTRY" --quiet
+
+      - name: イメージをビルドして push（タグは git の SHA）
+        working-directory: apps/admin
+        env:
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+        run: docker build --platform linux/amd64 -t "$IMAGE:$GITHUB_SHA" .
+
+      - name: イメージを push
+        env:
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+        run: docker push "$IMAGE:$GITHUB_SHA"
+
+      # gcloud の出力（サービス URL・リビジョン名など）をログに出さない（--quiet --no-user-output-enabled。エラーは出る）
+      # 環境変数・Secret・args は Job に設定済みのものを使う。ここではイメージだけ差し替える
+      - name: migrate Job のイメージを更新
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+          MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
+        run: gcloud run jobs update "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA" --quiet --no-user-output-enabled
+
+      # 進捗の出力は止まるが、--wait は Job が失敗すると非ゼロの終了コードで終わる。
+      # ステップの成否は終了コードで決まるので、失敗したら次の手順に進まずデプロイしない
+      - name: migrate Job を実行して完了を待つ
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
+        run: gcloud run jobs execute "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --wait --quiet --no-user-output-enabled
+
+      # 環境変数・Secret はサービスに設定済みのものを使う。ここではイメージだけ差し替える
+      - name: サービスをデプロイ
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+          SERVICE: ${{ secrets.GCP_CLOUD_RUN_SERVICE }}
+        run: gcloud run deploy "$SERVICE" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA" --quiet --no-user-output-enabled
