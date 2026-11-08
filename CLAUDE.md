@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 結婚式の余興で使う 4 択クイズシステム（pnpm モノレポ）。**要件の正は `docs/requirements/`**（企画書・行動シナリオ・UI作成・手書きスケッチ。入口は `README.md`）。設計はそれに合わせて改訂した `docs/superpowers/specs/2026-10-25-wedding-quiz-design.md` にあり、食い違ったときは `docs/requirements/` を優先する。設計書の「未決事項」の節に、資料と現在の実装が食い違っている点をまとめてある。実装計画は `docs/superpowers/plans/` にある。
 
-- `apps/live`: 当日の進行を受け持つ Cloudflare Workers + Durable Object + React。現在あるのはこれだけ。
-- `apps/admin`: Rails 8 の管理画面（式・問題の CRUD、開催回の作成と幹事 ID/PASS の発行。結果の取り込み・保存はしない）。設計上の予定で、まだ存在しない。
+- `apps/live`: 当日の進行を受け持つ Cloudflare Workers + Durable Object + React。
+- `apps/admin`: Rails 8 の管理画面（問題の CRUD、開催回の作成と幹事 ID/PASS の発行。結果の取り込み・保存はしない。`ranking` は呼ばない）。Cloud Run + Neon + R2。手順は `apps/admin/README.md`。
 
 **最優先の品質は「本番中にアクセス集中で進行が止まらないこと」**（1 開催回あたり最大 120 人程度、負荷試験は 150 接続）。当日はゲストのアクセスが Rails に届かない構成にしている。
 

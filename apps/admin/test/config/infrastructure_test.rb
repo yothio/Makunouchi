@@ -151,6 +151,20 @@ class InfrastructureTest < Minitest::Test
     assert_match(/DATABASE_URL_DIRECT/, read("README.md"))
   end
 
+  test "README に Cloud Run 向けの必須項目が書いてある" do
+    readme = read("README.md")
+
+    %w[
+      ADMIN_API_SECRET LIVE_BASE_URL LIVE_PUBLIC_URL R2_PUBLIC_BASE_URL
+      ADMIN_EMAIL ADMIN_PASSWORD assume_ssl /up
+    ].each do |needle|
+      assert_match(Regexp.new(Regexp.escape(needle)), readme, "#{needle} が README に無い")
+    end
+    assert_match(/Startup|Liveness|probe/i, readme)
+    assert_match(/db:seed/, readme)
+    assert_match(/:async/, readme)
+  end
+
   test "master.key とシークレットを追跡しない" do
     assert_match(%r{^/config/\*\.key$}, read(".gitignore"))
   end
