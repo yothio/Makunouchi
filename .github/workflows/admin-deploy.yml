@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 # GCP の値はリポジトリが public になっても出さないよう、すべて repository secrets から渡す
-# （一覧は apps/admin/README.md）。ワークフローには値を書かない。
+# （一覧は apps/admin/README.md）
 # secrets は必要なステップの env にだけ置く（checkout などの公開アクションには渡さない）
 jobs:
   deploy:
@@ -68,8 +68,7 @@ jobs:
           IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
         run: docker push "$IMAGE:$GITHUB_SHA"
 
-      # gcloud の出力（サービス URL・リビジョン名など）をログに出さないよう、
-      # 以下の 3 つには --quiet --no-user-output-enabled を付ける（エラーは出る）。
+      # gcloud の出力（サービス URL・リビジョン名など）をログに出さない（--quiet --no-user-output-enabled。エラーは出る）
       # 環境変数・Secret・args は Job に設定済みのものを使う。ここではイメージだけ差し替える
       - name: migrate Job のイメージを更新
         env:
