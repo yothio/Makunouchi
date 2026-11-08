@@ -8,3 +8,42 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+/* 問題フォーム: 1280x800 でも「保存」が見切れないよう、選択肢を 2 列に並べ、保存ボタンは画面下に固定する。 */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.5rem;
+}
+
+.choices > .choice {
+  margin: 0.5rem 0;
+}
+
+.choices input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 検証エラー時に Rails が入力欄を包む div で、ラベルや選択肢の並びが崩れないようにする。 */
+.field_with_errors {
+  display: contents;
+}
+
+.field_with_errors input[type="text"] {
+  outline: 2px solid #c0392b;
+}
+
+.preview {
+  max-height: 160px;
+  object-fit: contain;
+}
+
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 1rem 0 0;
+  padding: 0.75rem 0;
+  background: #fff;
+  border-top: 1px solid #ddd;
+}

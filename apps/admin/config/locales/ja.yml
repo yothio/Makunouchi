@@ -17,10 +17,42 @@ ja:
       too_short: "は%{count}文字以上で入力してください"
       too_long: "は%{count}文字以内で入力してください"
       password_too_long: "は長すぎます"
+      in: "は%{count}の範囲で入力してください"
+      not_a_number: "は数値で入力してください"
+      not_an_integer: "は整数で入力してください"
+      greater_than_or_equal_to: "は%{count}以上にしてください"
+      less_than_or_equal_to: "は%{count}以下にしてください"
   activerecord:
     models:
       user: "ユーザー"
+      question: "問題"
+    errors:
+      models:
+        question:
+          attributes:
+            correct_index:
+              not_a_number: "を選んでください"
+              not_an_integer: "を選んでください"
+              in: "は A〜D から選んでください"
+              greater_than_or_equal_to: "は A〜D から選んでください"
+              less_than_or_equal_to: "は A〜D から選んでください"
+            image:
+              invalid: "は png / jpeg / webp / gif のいずれかにしてください"
+              too_long: "は%{count} MB 以下にしてください"
+            choice_a: &duplicate_choice
+              duplicate_choice: "は他の選択肢と同じ文言です。違う文言にしてください"
+            choice_b: *duplicate_choice
+            choice_c: *duplicate_choice
+            choice_d: *duplicate_choice
     attributes:
+      question:
+        title: "質問のタイトル"
+        image: "画像"
+        choice_a: "選択肢 A"
+        choice_b: "選択肢 B"
+        choice_c: "選択肢 C"
+        choice_d: "選択肢 D"
+        correct_index: "正解"
       user:
         email: "メールアドレス"
         password: "パスワード"

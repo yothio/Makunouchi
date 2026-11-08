@@ -3,6 +3,7 @@ require "test_helper"
 class SeedsTest < ActiveSupport::TestCase
   setup do
     @original = ENV.to_h.slice("ADMIN_EMAIL", "ADMIN_PASSWORD")
+    Question.delete_all
     User.delete_all
   end
 

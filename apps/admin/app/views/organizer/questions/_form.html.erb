@@ -1,0 +1,46 @@
+<%= form_with model: question, url: url, data: { controller: "image-preview" } do |form| %>
+  <% if question.errors.any? %>
+    <ul class="error" role="alert">
+      <% question.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <p>
+    <%= form.label :title, "質問のタイトル" %><br>
+    <%= form.text_field :title, required: true, maxlength: 200, size: 60 %>
+  </p>
+
+  <p>
+    <%= form.label :image, "画像（任意。png / jpeg / webp / gif、5 MB 以下）" %><br>
+    <% if question.image.attached? && question.image.persisted? %>
+      <%= image_tag url_for(question.image), class: "preview", alt: "設定済みの画像", data: { image_preview_target: "preview" }, width: 240 %>
+    <% else %>
+      <img class="preview" alt="" width="240" hidden data-image-preview-target="preview">
+    <% end %><br>
+    <%= form.file_field :image, direct_upload: true, accept: Question::IMAGE_CONTENT_TYPES.join(","),
+          data: { image_preview_target: "input", action: "change->image-preview#show direct-upload:progress->image-preview#progress direct-upload:error->image-preview#failed" } %>
+    <span data-image-preview-target="status" role="status"></span>
+  </p>
+
+  <div class="choices">
+    <% %w[a b c d].each do |letter| %>
+      <%# p だと、検証エラーで入力欄を包む div（field_with_errors）が入ったときにブラウザが p を閉じて並びが崩れるので div にする %>
+      <div class="choice">
+        <%= form.label "choice_#{letter}", "選択肢 #{letter.upcase}" %><br>
+        <%= form.text_field "choice_#{letter}", required: true, maxlength: 50, size: 40 %>
+      </div>
+    <% end %>
+  </div>
+
+  <fieldset>
+    <legend>正解の選択肢</legend>
+    <% %w[A B C D].each_with_index do |label, index| %>
+      <%= form.radio_button :correct_index, index, required: true %>
+      <%= form.label "correct_index_#{index}", label %>
+    <% end %>
+  </fieldset>
+
+  <p class="form-actions"><%= form.submit "保存" %></p>
+<% end %>
