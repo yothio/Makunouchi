@@ -148,18 +148,22 @@ RSpec.describe "インフラ設定" do
     expect(read("README.md")).to match(/DATABASE_URL_DIRECT/)
   end
 
-  it "README に Cloud Run 向けの必須項目が書いてある" do
+  it "README とデプロイ文書に Cloud Run 向けの必須項目が書いてある" do
     readme = read("README.md")
+    deploy = root.join("../../docs/deploy/admin.md").read
 
     %w[
       ADMIN_API_SECRET LIVE_BASE_URL LIVE_PUBLIC_URL R2_PUBLIC_BASE_URL
-      ADMIN_EMAIL ADMIN_PASSWORD assume_ssl /up
+      ADMIN_EMAIL ADMIN_PASSWORD /up
     ].each do |needle|
       expect(readme).to match(Regexp.new(Regexp.escape(needle))), "#{needle} が README に無い"
     end
-    expect(readme).to match(/Startup|Liveness|probe/i)
     expect(readme).to match(/db:seed/)
     expect(readme).to match(/:async/)
+    expect(readme).to match(%r{docs/deploy/admin\.md})
+
+    expect(deploy).to match(/assume_ssl/), "assume_ssl が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/Startup|Liveness|probe/i)
   end
 
   it "master.key とシークレットを追跡しない" do

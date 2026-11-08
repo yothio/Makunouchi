@@ -4,30 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-結婚式の余興で使う 4 択クイズシステム（pnpm モノレポ）。**要件の正は `docs/requirements/`**（企画書・行動シナリオ・UI作成・手書きスケッチ。入口は `README.md`）。設計はそれに合わせて改訂した `docs/superpowers/specs/2026-10-25-wedding-quiz-design.md` にあり、食い違ったときは `docs/requirements/` を優先する。設計書の「未決事項」の節に、資料と現在の実装が食い違っている点をまとめてある。実装計画は `docs/superpowers/plans/` にある。
+結婚式の余興で使う 4 択クイズシステム（pnpm モノレポ）。アプリの説明・ローカル開発の入口・デプロイ文書へのリンクはルートの [README.md](README.md) を正とする。
 
-- `apps/live`: 当日の進行を受け持つ Cloudflare Workers + Durable Object + React。
-- `apps/admin`: Rails 8 の管理画面（問題の CRUD、開催回の作成と幹事 ID/PASS の発行。結果の取り込み・保存はしない。`ranking` は呼ばない）。Cloud Run + Neon + R2。手順は `apps/admin/README.md`。テストは RSpec（`apps/admin` で `bundle exec rspec`、PostgreSQL が要る。テストデータは fixtures でなく `spec/factories/` の factory_bot で作る。CI は `.github/workflows/admin-test.yml`）。
+**要件の正は `docs/requirements/`**（企画書・行動シナリオ・UI作成・手書きスケッチ。入口は `docs/requirements/README.md`）。設計はそれに合わせて改訂した `docs/superpowers/specs/2026-10-25-wedding-quiz-design.md` にあり、食い違ったときは `docs/requirements/` を優先する。設計書の「未決事項」の節に、資料と現在の実装が食い違っている点をまとめてある。実装計画は `docs/superpowers/plans/` にある。
+
+- `apps/live`: 当日の進行（Cloudflare Workers + Durable Object + React）。詳細は [apps/live/README.md](apps/live/README.md)、デプロイは [docs/deploy/live.md](docs/deploy/live.md)。
+- `apps/admin`: Rails 8.1 の管理画面（問題の CRUD、開催回の作成と幹事 ID/PASS の発行。結果の取り込み・保存はしない。`ranking` は呼ばない）。詳細は [apps/admin/README.md](apps/admin/README.md)、デプロイは [docs/deploy/admin.md](docs/deploy/admin.md)。テストは RSpec（`apps/admin` で `bundle exec rspec`、PostgreSQL が要る。テストデータは fixtures でなく `spec/factories/` の factory_bot で作る。CI は `.github/workflows/admin-test.yml`）。
 
 **最優先の品質は「本番中にアクセス集中で進行が止まらないこと」**（1 開催回あたり最大 120 人程度、負荷試験は 150 接続）。当日はゲストのアクセスが Rails に届かない構成にしている。
 
 ## コマンド
 
-ルートから `pnpm --filter live <script>`、または `apps/live` で `pnpm <script>`。
-
-- `dev`: Vite + `@cloudflare/vite-plugin` でローカル起動（http://localhost:5173）。事前に `cp apps/live/.dev.vars.sample apps/live/.dev.vars`。`.dev.vars` は起動時にしか読まれない。
-- `test`: Node 環境（`vitest.config.ts`: `test/{game,client}`）と Workers 環境（`vitest.workers.config.ts`: `test/worker`、`@cloudflare/vitest-plugin`）を順に実行する。
-- `typecheck`: `tsc --noEmit`（本体と `scripts/` の 2 つの tsconfig）。
-- `lint` / `lint:fix`: oxlint（`.oxlintrc.json`）。
-- `build` / `deploy`（`vite build && wrangler deploy`）。
-- `seed <baseUrl> [quiz.json]`: `fixtures/sample-quiz.json` で開催回を作り、ゲスト URL・幹事画面 URL・投影画面 URL を表示する。`ADMIN_API_SECRET` 環境変数が必要。
-- `loadtest <baseUrl> <sessionId> --clients 150`: ロビー状態の新しい開催回に対して実行する（開催回は戻せないので毎回 `seed` し直す）。
+ルートから `pnpm --filter live <script>`、または `apps/live` で `pnpm <script>`。スクリプト一覧と説明は [apps/live/README.md](apps/live/README.md) を見る。`deploy` は pnpm 組み込みと名前が重なるので `pnpm --filter live run deploy` と `run` を付ける。
 
 単一テストの実行（`apps/live` で）:
 
 ```
-pnpm exec vitest run test/game/state.test.ts                                   # Node 環境
-pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts  # Workers 環境
+pnpm exec vitest run test/game/state.test.ts
+pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts
 ```
 
 `test/worker/load.test.ts` は 150 ゲスト + 1 ホストを同一プロセスでつなぎ、advance ごとに全員へ 2000 ms 以内に `guest_view` が届くことを確認する。
@@ -65,4 +59,4 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 - `pnpm-workspace.yaml` の `minimumReleaseAge: 10080` により、公開から 7 日未満のパッケージバージョンはインストールできない。
 - **本番の進行中は絶対にデプロイしない**（全員の WebSocket が切れる）。
 - `ADMIN_API_SECRET` は Rails 側と同じ値にする（本番は 32 文字以上、`wrangler secret put ADMIN_API_SECRET`）。
-- デプロイ手順と本番前チェックリストは `apps/live/README.md` にある。
+- デプロイ手順と本番前チェックリストは `docs/deploy/`（live / admin）にある。
