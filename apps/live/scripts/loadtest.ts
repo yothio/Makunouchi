@@ -51,7 +51,9 @@ console.log(`connected: 1 host + 1 screen + ${clients} guests`);
 const result = await driveQuiz({ host, screen, guests, log: console.log });
 console.log("");
 for (const a of result.advances) {
-  console.log(`${a.from.padEnd(12)} -> ${a.to.padEnd(12)} max ${String(Math.round(a.maxMs)).padStart(5)} ms  missing ${a.missing}`);
+  console.log(
+    `${a.from.padEnd(12)} -> ${a.to.padEnd(12)} guests ${String(Math.round(a.maxMs)).padStart(5)} ms missing ${a.missing}  screen ${String(Math.round(a.screenMs)).padStart(5)} ms missing ${a.screenMissing}`,
+  );
 }
 for (const p of result.podium) {
   console.log(

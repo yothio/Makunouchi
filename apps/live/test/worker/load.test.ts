@@ -48,6 +48,7 @@ describe("load: 150 guests", () => {
     console.log(`worst ${result.worstMs.toFixed(0)} ms, missing ${result.totalMissing}`);
 
     expect(result.advances.length).toBe(sample.questions.length * 3 + 1);
+    expect(result.advances.every((a) => a.screenMissing === 0 && a.screenMs <= 2000)).toBe(true);
     expect(result.podium.length).toBe(12);
     expect(result.totalMissing).toBe(0);
     expect(result.worstMs).toBeLessThanOrEqual(2000);
