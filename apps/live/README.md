@@ -94,4 +94,4 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 初回デプロイ、secret、GitHub Actions（Draft Release を公開すると動く `live-deploy.yml`。タグは `live-YYYYMMDD-HHMM`）、ロールバック、本番前チェックリストは [docs/deploy/live.md](../../docs/deploy/live.md) にまとめています。
 
 
-本番の進行中は絶対にデプロイしないでください。全員の WebSocket が切れます。
+本番の進行中は Draft を公開しないでください。全員の WebSocket が切れます。

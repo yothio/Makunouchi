@@ -39,19 +39,10 @@ jobs:
       - name: タグ名を決める
         id: tag
         env:
-          GH_TOKEN: ${{ github.token }}
           TARGET: ${{ inputs.target }}
           TZ: Asia/Tokyo
         run: |
           TAG="${TARGET}-$(date +%Y%m%d-%H%M)"
-          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "::error::タグ $TAG は既にある"
-            exit 1
-          fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::Release $TAG は既にある"
-            exit 1
-          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "次のタグ: $TAG"
 
@@ -71,9 +62,23 @@ jobs:
                 DELETED=1
                 ;;
             esac
-          done < <(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName')
+          done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" --jq '.[] | select(.draft) | .tag_name')
           if [ "$DELETED" -eq 0 ]; then
             echo "消す Draft はない"
+          fi
+
+      - name: 同名のタグか公開済み Release があれば止める
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::タグ $TAG は既にある"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG は既にある"
+            exit 1
           fi
 
       - name: Draft Release を作る
