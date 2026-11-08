@@ -46,6 +46,28 @@ class Organizer::QuizSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", root_path
   end
 
+  test "詳細に投影画面の URL（screen トークン付き）が出る。秘密そのものは出さない" do
+    user = users(:organizer)
+    add_questions(user, 5)
+    sign_in_as user
+    original = ENV["ADMIN_API_SECRET"]
+    ENV["ADMIN_API_SECRET"] = "t" * 32
+
+    post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
+    created = user.quiz_sessions.order(:id).last
+    follow_redirect!
+
+    assert_select ".screen-url", text: /\/screen\/#{created.public_id}\?token=#{ScreenToken.screen("t" * 32, created.public_id)}\z/
+    assert_no_match(/#{"t" * 32}/, response.body)
+
+    ENV.delete("ADMIN_API_SECRET")
+    get organizer_quiz_session_path(created)
+    assert_select ".screen-url", 0
+    assert_select ".screen-url-missing"
+  ensure
+    ENV["ADMIN_API_SECRET"] = original
+  end
+
   test "問題が 4 問や 16 問では作れず、理由を伝える" do
     user = users(:organizer)
     sign_in_as user

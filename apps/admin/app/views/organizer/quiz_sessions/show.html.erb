@@ -18,6 +18,12 @@
     <dd class="guest-url"><%= @quiz_session.guest_url %></dd>
     <dt>幹事</dt>
     <dd class="host-url"><%= @quiz_session.host_url %></dd>
+    <dt>投影画面（プロジェクター用の別の PC で開く）</dt>
+    <% if @quiz_session.screen_url %>
+      <dd class="screen-url"><%= @quiz_session.screen_url %></dd>
+    <% else %>
+      <dd class="screen-url-missing">投影画面の URL を作れません（live への接続設定が不足しています）。管理者に設定を確認してもらってください。</dd>
+    <% end %>
   </dl>
 
   <h2>作成時の質問解答（<%= @quiz_session.quiz_snapshot.size %> 問）</h2>

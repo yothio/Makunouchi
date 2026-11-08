@@ -120,4 +120,22 @@ class QuizSessionTest < ActiveSupport::TestCase
   ensure
     ENV["LIVE_PUBLIC_URL"] = original
   end
+
+  test "投影画面の URL は screen トークン付き。ADMIN_API_SECRET が無ければ nil" do
+    session = QuizSession.prepare(user: organizer_with(5), title: "本番")
+    original_url = ENV["LIVE_PUBLIC_URL"]
+    original_secret = ENV["ADMIN_API_SECRET"]
+    ENV["LIVE_PUBLIC_URL"] = "https://live.example.com/"
+    ENV["ADMIN_API_SECRET"] = "s" * 32
+
+    token = ScreenToken.screen("s" * 32, session.public_id)
+    assert_equal "https://live.example.com/screen/#{session.public_id}?token=#{token}", session.screen_url
+    assert_no_match(/#{"s" * 32}/, session.screen_url)
+
+    ENV.delete("ADMIN_API_SECRET")
+    assert_nil session.screen_url
+  ensure
+    ENV["LIVE_PUBLIC_URL"] = original_url
+    ENV["ADMIN_API_SECRET"] = original_secret
+  end
 end

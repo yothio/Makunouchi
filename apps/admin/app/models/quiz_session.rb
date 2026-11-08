@@ -48,6 +48,15 @@ class QuizSession < ApplicationRecord
 
   def host_url = "#{live_public_url}/host/#{public_id}"
 
+  # 投影画面の URL（決定 2A）。トークンは HMAC-SHA256(ADMIN_API_SECRET, "screen:" + public_id)。
+  # ADMIN_API_SECRET が未設定なら nil（トークンを作れないので URL を出さない）。
+  def screen_url
+    secret = ENV["ADMIN_API_SECRET"].to_s
+    return if secret.empty?
+
+    "#{live_public_url}/screen/#{public_id}?token=#{ScreenToken.screen(secret, public_id)}"
+  end
+
   private
 
   def live_public_url
