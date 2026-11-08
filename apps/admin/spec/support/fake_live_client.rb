@@ -1,4 +1,3 @@
-# live への登録を差し替えるテスト用のクライアント。呼び出しを記録し、決めた結果（または Proc の戻り値）を返す。
 class FakeLiveClient
   attr_reader :calls
 

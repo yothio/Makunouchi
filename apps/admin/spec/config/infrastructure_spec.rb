@@ -2,16 +2,13 @@ require "pathname"
 require "erb"
 require "yaml"
 
-# Task 1: 雛形を Neon / Cloud Run / R2 向けに直した結果を、設定ファイルの内容で固定する。
-# Rails も DB も起動しない（ファイルを読むだけ）ので、Postgres が無くても流せる。
-# そのため rails_helper は読み込まず、spec_helper だけで動く形を保つ。
-# 実際の Neon / R2 には繋がない（そちらは実機確認）。
+# 設定ファイルの内容だけを検証する。Rails / DB を起動しないので rails_helper ではなく spec_helper だけを使う。
 RSpec.describe "インフラ設定" do
   def root = Pathname.new(File.expand_path("../..", __dir__))
 
   def read(path) = root.join(path).read
 
-  # storage.yml の ERB が参照する Rails を、環境ごとに差し替えて描画する（本物の Rails は使わない）。
+  # storage.yml の ERB が参照する Rails を差し替えて描画する（本物の Rails は使わない）。
   def yaml(path, env_name: "test", env_vars: {})
     app_root = root
     fake_env = Struct.new(:name) do

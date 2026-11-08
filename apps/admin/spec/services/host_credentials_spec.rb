@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe HostCredentials do
   # Python の hashlib.pbkdf2_hmac('sha256', b'correct horse', bytes(range(16)), 100000, 32) で独立に求めた値。
-  # Task 6 の Worker（WebCrypto PBKDF2）も同じベクタで照合を固定する。
+  # apps/live の WebCrypto PBKDF2 も同じベクタで照合する。
   let(:salt) { (0..15).to_a.pack("C*") }
   let(:vector) { "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=" }
 
