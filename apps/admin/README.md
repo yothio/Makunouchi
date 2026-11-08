@@ -54,7 +54,6 @@ bin/rubocop
 - `bin/rails server`: <http://localhost:3000>
 - `bin/rubocop`: 直せるものは `bin/rubocop -a`。CI は `admin-lint`
 - テストは RSpec（`spec/`）。1 ファイルだけなら `bundle exec rspec spec/models/user_spec.rb`
-- `spec/config/` は設定ファイルを読むだけで Rails も DB も起動しないので、Postgres が無くても `bundle exec rspec spec/config` で流せる
 - テストデータは fixtures でなく factory_bot（`spec/factories/`）。`create(:user)`、`create(:user, :system_admin)` のように trait で状態を選ぶ。`spec/factories_spec.rb` が factory を検証する。添付ファイルの素材だけ `spec/fixtures/files/` に置く
 
 初回だけシステム管理者を作る例です（パスワードは 12 文字以上）。
