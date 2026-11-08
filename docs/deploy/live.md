@@ -186,6 +186,7 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
 
 `live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、そのタグでテスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
 
+タグと GitHub Release はデプロイ側の CI より先に作られます。デプロイ前のテスト・型検査・lint が落ちてもタグと Release は残ります。直したら新しいタグでもう一度 `release` を回してください（同名タグは作れません）。
 
 手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限してください。
 
@@ -252,8 +253,7 @@ gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live
 gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-20261109-1530
 ```
 
-`live-YYYYMMDD-HHMM` 以外のタグは受け付けない。
-
+`live-YYYYMMDD-HHMM` 以外のタグは受け付けない。再デプロイでも通常リリースと同じく、デプロイ前にテスト・型検査・lint が走ります。
 
 **確かめること / 注意**
 
@@ -264,7 +264,7 @@ gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-202
 
 ### 6.3 ロールバック
 
-前の成功タグを `live-deploy.yml` の `workflow_dispatch` に渡して再デプロイできます。手元の wrangler で戻す場合は次のとおりです。どちらも進行中は実行しません。
+前の成功タグを `live-deploy.yml` の `workflow_dispatch` に渡して再デプロイできます。再デプロイでも通常リリースと同じく、デプロイ前にテスト・型検査・lint が走ります。手元の wrangler で戻す場合は次のとおりです。どちらも進行中は実行しません。
 
 ```
 cd apps/live

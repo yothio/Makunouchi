@@ -154,7 +154,7 @@ RSpec.describe "インフラ設定" do
 
     %w[
       ADMIN_API_SECRET LIVE_BASE_URL LIVE_PUBLIC_URL R2_PUBLIC_BASE_URL
-      ADMIN_EMAIL ADMIN_PASSWORD /up
+      ADMIN_EMAIL ADMIN_PASSWORD ADMIN_CANONICAL_HOST /up
     ].each do |needle|
       expect(readme).to match(Regexp.new(Regexp.escape(needle))), "#{needle} が README に無い"
     end
@@ -167,6 +167,12 @@ RSpec.describe "インフラ設定" do
     expect(deploy).to match(/app-YYYYMMDD-HHMM|app-\*/), "release タグの説明が docs/deploy/admin.md に無い"
     expect(deploy).to match(/release\.yml/), "release.yml の手順が docs/deploy/admin.md に無い"
     expect(deploy).to match(/workflow_call/), "workflow_call の説明が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/ADMIN_CANONICAL_HOST/), "ADMIN_CANONICAL_HOST が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/--update-env-vars/), "--update-env-vars が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/--set-env-vars.*使いません/m), "--set-env-vars を使わない注意が docs/deploy/admin.md に無い"
+    expect(deploy).to match(%r{<RUN_APP_HOST>/up}), "監視用の run.app /up が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/curl -sI/), "curl での確かめ方が docs/deploy/admin.md に無い"
+    expect(deploy).to match(%r{https://<ADMIN_HOST>}), "R2 CORS 向けの独自ドメインが docs/deploy/admin.md に無い"
   end
 
   it "master.key とシークレットを追跡しない" do
