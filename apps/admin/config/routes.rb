@@ -16,7 +16,6 @@ Rails.application.routes.draw do
     resources :quiz_sessions, only: %i[new create show] do
       member { post :register }
     end
-
   end
 
   root "organizer/home#show"
