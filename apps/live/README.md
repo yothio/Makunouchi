@@ -41,13 +41,22 @@ Cloudflare Workers + Durable Object (SessionRoom) + React。1 開催回の参加
 
 ## デプロイ
 
+Node は 22 以上（`wrangler` の要件。CI は 24）。リポジトリに `.nvmrc` や `engines` の指定はない。
+
+先にデプロイし、そのあとで秘密値を登録する。秘密値が未登録の間の Worker は、開催回の作成や幹事・投影画面の接続を 500 で断る（fail closed）。
+
 ```
-cd apps/live
-pnpm exec wrangler secret put ADMIN_API_SECRET   # 本番の秘密値を入力（32 文字以上。例: openssl rand -hex 32 で生成）
-pnpm --filter live deploy
+pnpm --filter live run deploy
 ```
 
-`deploy` は `vite build` のあと `wrangler deploy` を実行する。デプロイ先は `https://makunouchi-live.<account>.workers.dev`（`wrangler.jsonc` の `name`）。
+```
+cd apps/live
+pnpm exec wrangler secret put ADMIN_API_SECRET --name makunouchi-live
+```
+
+- `deploy` は `vite build` のあと `wrangler deploy` を実行する。`run` を省いた `pnpm deploy` は pnpm 組み込みのコマンドになり失敗するので、`run` を付ける。
+- `secret put` は本番の秘密値を対話入力する（32 文字以上。例: `openssl rand -hex 32` で生成）。入力の末尾の空白・改行は wrangler が除く。`--name` を間違えると別名の Worker ができるので必ず付ける。`secret put` も新しいバージョンを即デプロイするので、進行中は実行しない。
+- デプロイ先は `https://makunouchi-live.<サブドメイン>.workers.dev`（`wrangler.jsonc` の `name`）。
 
 `ADMIN_API_SECRET` は Rails 側（`apps/admin`）と同じ値にする。Rails は `Authorization: Bearer <ADMIN_API_SECRET>` で API を呼び、開催回作成時に幹事の ID とパスワードのハッシュ（`host`）を送る。投影画面 URL は `screenToken = HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId)`（hex）。幹事 HMAC トークンはログイン成功時に Worker が返し、Rails は計算も表示もしない（緊急時のトークン URL は `seed` など Worker 側で出す）。開催回 ID は英数字・`_`・`-` のみ（100 文字まで）。
 
@@ -55,15 +64,64 @@ pnpm --filter live deploy
 
 **結果発表を「自由な順番で選ぶ形」に変えた変更をデプロイしたあとは、デプロイ前に作った開催回（特に結果発表に入ったもの）は使わず、作り直す。** 旧実装（固定の発表順・表彰台）で保存された状態は、新しい結果フェーズのキーや画面と合わず、`r:undefined:hidden` のような不正な段階になることがある。
 
+## GitHub Actions でのデプロイ
+
+`.github/workflows/live-deploy.yml` が、テスト・型検査・lint のあとに `pnpm --filter live run deploy` を実行する。`main` への push では動かず、手動起動（`workflow_dispatch`）だけで動く。`ADMIN_API_SECRET` は CI から触らない。`wrangler deploy` は Worker に登録済みの secret を消さない（公式: 「Secrets are never deleted by a deployment」）ので、初回に手で登録した値が保たれる。
+
+### 初回の設定
+
+1. Cloudflare ダッシュボードの Account API tokens で、トークンを作る。
+   - 権限のテンプレートは「Edit Cloudflare Workers」（公式の GitHub Actions の手順が使うもの）。
+   - 対象のアカウントは、デプロイ先の 1 つに限定する。
+   - 追加の権限は付けない。トークンの値は作成時に一度だけ表示される。
+2. GitHub に repository secrets を登録する。値は対話入力で渡し、コマンドに書かない。
+
+   ```
+   gh secret set CLOUDFLARE_API_TOKEN --repo yothio/Makunouchi
+   ```
+
+   ```
+   gh secret set CLOUDFLARE_ACCOUNT_ID --repo yothio/Makunouchi
+   ```
+
+   アカウント ID はダッシュボードのアカウントのメニューか `wrangler whoami` で確かめる。
+3. ワークフローは `environment: production` で動く。リポジトリの Settings → Environments に `production` があることを確かめる（admin のデプロイと共用）。
+
+### 起動のしかた
+
+入力 `confirm` に Worker 名 `makunouchi-live` を入れる。一致しないとき、`main` 以外のブランチから起動したときは、デプロイの前に止まる。
+
+```
+gh workflow run live-deploy.yml --repo yothio/Makunouchi --ref main -f confirm=makunouchi-live
+```
+
+画面からは、GitHub の Actions タブで `live-deploy` を選び、Run workflow でブランチ `main` を選んで `confirm` に `makunouchi-live` を入れる。
+
+- **本番の進行中は起動しない**（全員の WebSocket が切れる）。当日の前後は、起動する前に進行が終わっていることを確かめる。
+- ログには `workers.dev` の URL を出さないよう、`wrangler deploy` の標準出力は捨てている（`WRANGLER_LOG=error` も指定）。アカウント ID は `::add-mask::` で伏せる。成否は終了コードで決まり、エラーは標準エラー出力に出る。デプロイ後の URL はダッシュボードの Workers & Pages で見る。
+- `WRANGLER_SEND_METRICS=false` で wrangler の利用データ送信を止めている。
+
+### ロールバック
+
+手元から戻す。進行中は実行しない。
+
+```
+cd apps/live
+pnpm exec wrangler versions list
+pnpm exec wrangler rollback <バージョン ID> --message "<理由>"
+```
+
+Durable Object の構成（`migrations` など）が変わったバージョン間は戻せない。
+
 ## 本番での seed と負荷試験
 
 秘密値は環境変数 `ADMIN_API_SECRET` で渡す（未設定ならスクリプトは明確なメッセージで終了する）。
 
 ```
 export ADMIN_API_SECRET=<本番の値>
-pnpm --filter live seed https://makunouchi-live.<account>.workers.dev
+pnpm --filter live seed https://makunouchi-live.<サブドメイン>.workers.dev
 # 表示された sessionId を使う
-pnpm --filter live loadtest https://makunouchi-live.<account>.workers.dev <sessionId> --clients 150
+pnpm --filter live loadtest https://makunouchi-live.<サブドメイン>.workers.dev <sessionId> --clients 150
 ```
 
 - 負荷試験は、ロビー状態の新しい開催回に対して実行する。開催回は 1 回進めると戻せないので、試験のたびに `seed` で作り直す。
