@@ -1,0 +1,173 @@
+name: release
+
+# タグ作成は GITHUB_TOKEN で行う。このトークンが起こす push は他ワークフローを起動しないため、
+# デプロイは workflow_call で直接呼ぶ（PAT / GitHub App は使わない）。
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "デプロイ対象（app = apps/admin、live = apps/live）"
+        required: true
+        type: choice
+        options:
+          - app
+          - live
+      bump:
+        description: "上げる桁（タグが無いときは常に 0.1.0）"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      confirm:
+        description: "live のときだけ Worker 名 makunouchi-live を入力（app のときは空でよい）"
+        required: false
+        type: string
+        default: ""
+
+# contents: タグと Release。id-token: 呼び出し先の admin-deploy が Workload Identity に使う
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.event.inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: main 以外なら止める
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::main 以外のブランチからはリリースしない"
+            exit 1
+          fi
+
+      - name: live の確認入力を確かめる
+        env:
+          TARGET: ${{ inputs.target }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$TARGET" = "live" ] && [ "$CONFIRM" != "makunouchi-live" ]; then
+            echo "::error::確認用の入力が Worker 名と一致しない"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: 次のバージョンを計算する
+        id: version
+        env:
+          TARGET: ${{ inputs.target }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          PREFIX="${TARGET}-v"
+          LATEST="$(git tag -l "${PREFIX}*" | sed "s/^${PREFIX}//" | sort -V | tail -n 1)"
+          if [ -z "$LATEST" ]; then
+            NEXT="0.1.0"
+          else
+            IFS=. read -r MAJOR MINOR PATCH <<EOF
+          $LATEST
+          EOF
+            case "$BUMP" in
+              major)
+                NEXT="$((MAJOR + 1)).0.0"
+                ;;
+              minor)
+                NEXT="${MAJOR}.$((MINOR + 1)).0"
+                ;;
+              patch)
+                NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
+                ;;
+              *)
+                echo "::error::未知の bump: $BUMP"
+                exit 1
+                ;;
+            esac
+          fi
+          TAG="${PREFIX}${NEXT}"
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::タグ $TAG は既にある"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "次のタグ: $TAG（直前: ${LATEST:-なし}）"
+
+      - name: 必須チェックが成功しているか確かめる
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          TARGET: ${{ inputs.target }}
+          REPO: ${{ github.repository }}
+        run: |
+          check_workflow() {
+            NAME="$1"
+            CONCLUSION="$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&status=completed&per_page=100" \
+              --jq ".workflow_runs[] | select(.name == \"$NAME\") | .conclusion" | head -n 1)"
+            if [ -z "$CONCLUSION" ]; then
+              echo "::error::コミット $SHA にワークフロー $NAME の完了記録が無い"
+              exit 1
+            fi
+            if [ "$CONCLUSION" != "success" ]; then
+              echo "::error::ワークフロー $NAME が success ではない（$CONCLUSION）"
+              exit 1
+            fi
+            echo "$NAME: $CONCLUSION"
+          }
+
+          check_workflow "test"
+          if [ "$TARGET" = "app" ]; then
+            check_workflow "admin-test"
+            check_workflow "admin-lint"
+          fi
+
+      - name: タグを打ち GitHub Release を作る
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+
+          PREFIX="${TARGET}-v"
+          PREV="$(git tag -l "${PREFIX}*" | sed "s/^${PREFIX}//" | sort -V | tail -n 2 | head -n 1)"
+          PREV_TAG=""
+          if [ -n "$PREV" ]; then
+            CANDIDATE="${PREFIX}${PREV}"
+            if [ "$CANDIDATE" != "$TAG" ]; then
+              PREV_TAG="$CANDIDATE"
+            fi
+          fi
+
+          if [ -n "$PREV_TAG" ]; then
+            gh release create "$TAG" --generate-notes --notes-start-tag "$PREV_TAG" --title "$TAG" --target "$GITHUB_SHA"
+          else
+            gh release create "$TAG" --generate-notes --title "$TAG" --target "$GITHUB_SHA"
+          fi
+
+  deploy-app:
+    needs: prepare
+    if: inputs.target == 'app'
+    uses: ./.github/workflows/admin-deploy.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+    secrets: inherit
+
+  deploy-live:
+    needs: prepare
+    if: inputs.target == 'live'
+    uses: ./.github/workflows/live-deploy.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+    secrets: inherit

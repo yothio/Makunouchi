@@ -60,7 +60,10 @@ docs/deploy/        初回デプロイと CI デプロイの手順
 - admin（Cloud Run / Neon / R2 / Workload Identity）: [docs/deploy/admin.md](docs/deploy/admin.md)
 - live（Cloudflare Workers / secret / GitHub Actions）: [docs/deploy/live.md](docs/deploy/live.md)
 
+本番への反映は `release` ワークフローでタグ（`app-vX.Y.Z` / `live-vX.Y.Z`）を切ってからデプロイします。`main` への push だけではデプロイしません。詳細は上記の各文書の GitHub Actions の節を見てください。
+
 本番のクイズ進行中は live をデプロイしないでください。全員の WebSocket が切れます。
+
 
 ## セキュリティ
 

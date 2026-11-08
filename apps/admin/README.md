@@ -100,7 +100,7 @@ DATABASE_URL="<direct の URL>" bin/rails db:migrate
 
 ## デプロイ
 
-初回設定、Cloud Run、R2 CORS、Workload Identity、`admin-deploy.yml`、本番前チェックリストは [docs/deploy/admin.md](../../docs/deploy/admin.md) にまとめています。
+初回設定、Cloud Run、R2 CORS、Workload Identity、release タグ（`app-v*`）経由のデプロイ、本番前チェックリストは [docs/deploy/admin.md](../../docs/deploy/admin.md) にまとめています。
 
 ## 注意
 

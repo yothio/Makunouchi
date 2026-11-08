@@ -164,6 +164,9 @@ RSpec.describe "インフラ設定" do
 
     expect(deploy).to match(/assume_ssl/), "assume_ssl が docs/deploy/admin.md に無い"
     expect(deploy).to match(/Startup|Liveness|probe/i)
+    expect(deploy).to match(/app-vX\.Y\.Z|app-v\*/), "release タグの説明が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/release\.yml/), "release.yml の手順が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/workflow_call/), "workflow_call の説明が docs/deploy/admin.md に無い"
   end
 
   it "master.key とシークレットを追跡しない" do
