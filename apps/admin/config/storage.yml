@@ -6,7 +6,22 @@ local:
   service: Disk
   root: <%= Rails.root.join("storage") %>
 
-# Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
+# Cloudflare R2（S3 互換）。鍵・バケット名・エンドポイントは環境変数で渡す。
+# 本番は 4 つとも必須（欠けたら ENV.fetch が KeyError で起動を止める。ダミーに黙って落ちない）。
+# 開発・テストは R2 を使わないので、無くても読み込める。
+<% r2 = ->(name) { Rails.env.production? ? ENV.fetch(name) : ENV[name] } %>
+# aws-sdk-s3 1.178 以降の既定のチェックサム（CRC 系）は R2 で失敗することがあるため when_required にする。
+r2:
+  service: S3
+  access_key_id: <%= r2.("R2_ACCESS_KEY_ID") %>
+  secret_access_key: <%= r2.("R2_SECRET_ACCESS_KEY") %>
+  region: auto
+  bucket: <%= r2.("R2_BUCKET") %>
+  endpoint: <%= r2.("R2_ENDPOINT") %>
+  force_path_style: true
+  request_checksum_calculation: when_required
+  response_checksum_validation: when_required
+
 # amazon:
 #   service: S3
 #   access_key_id: <%= Rails.application.credentials.dig(:aws, :access_key_id) %>
