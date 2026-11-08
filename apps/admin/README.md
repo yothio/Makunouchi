@@ -85,6 +85,20 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
    - Job 名: `makunouchi-admin-migrate`。サービスと **同じコンテナイメージ**を使う（CI が git の SHA タグに差し替える）
    - 環境変数・Secret はサービスと同一にし、Job だけ `DATABASE_URL` を **direct**（`DATABASE_URL_DIRECT` の値）にする。CI は環境変数・Secret を上書きしない
    - args: `./bin/rails,db:migrate`
+   - 実行用サービスアカウントはサービスと **同じ** `makunouchi-admin-run`（別のアカウントにするなら、そちらにも下記の `iam.serviceAccountUser` が要る）
+   - **自動再実行はしない**: `--max-retries=0`（既定は 3 で、途中まで進んだ migrate が自動で繰り返される）。あわせて `--tasks=1`（既定どおり）と `--task-timeout=10m`（既定どおり。長い migrate を出すときだけ延ばす）を明記する。Job を作るときのフラグ（他のフラグはコンソールで作った Job に合わせる）:
+
+     ```
+     --tasks=1 --max-retries=0 --task-timeout=10m
+     ```
+
+   - **既に作った Job を直す**には（イメージ・環境変数・Secret は変わらない）:
+
+     ```
+     gcloud run jobs update makunouchi-admin-migrate --project yothio-rails-cloud-run --region asia-northeast1 --tasks 1 --max-retries 0 --task-timeout 10m
+     ```
+
+   - **破壊的な migration（列の削除・改名など）は 2 段階で出す**（expand → contract）。migrate が成功したあとにサービスのデプロイが失敗すると、旧コードが新しいスキーマで動く期間ができるため
    - **手で流す場合**（CI が使えないとき・調査用）は、イメージを差し替えて Job を実行する:
 
      ```
@@ -106,16 +120,22 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
 2. `makunouchi-admin-migrate` Job のイメージをその SHA に更新し、実行して完了を待つ
 3. `makunouchi-admin` サービスを同じイメージでデプロイ
 
+**運用ルール（テストが通る前にデプロイが走らないように）**: このワークフローは main への push で即動き、テストを待たない。そこで **main は PR 経由でのみ更新**し（直接 push しない）、管理画面のテスト（`admin-test.yml`、PR #39 で入る）と `admin-lint` を **required check**（Settings → Branches → Branch protection / Rulesets）にして、通ったものだけをマージする。
+
 CI が変えるのはイメージだけ。環境変数・Secret・Job の args・probe は、サービスと Job に設定済みのものがそのまま使われる。認証は Workload Identity 連携（鍵ファイルは作らない・置かない）。同時に 2 つは動かず（`concurrency`）、実行中のデプロイは取り消さない。
 
 #### 初回設定（デプロイ用サービスアカウントと Workload Identity 連携）
 
 GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロジェクト `yothio-rails-cloud-run`（他アプリと共有）に対して行うので、実行前に `gcloud config get-value project` で確かめる。`<...>` は置き換える。
 
-1. プロジェクト番号を取得する（以降の `<PROJECT_NUMBER>`）:
+1. プロジェクト番号（以降の `<PROJECT_NUMBER>`）とリポジトリの数値 ID（以降の `<REPOSITORY_ID>`）を取得する:
 
    ```
    gcloud projects describe yothio-rails-cloud-run --format="value(projectNumber)"
+   ```
+
+   ```
+   gh api repos/yothio/Makunouchi --jq .id
    ```
 
 2. デプロイ用サービスアカウントを作る:
@@ -158,11 +178,13 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
    gcloud iam workload-identity-pools create makunouchi-github --project yothio-rails-cloud-run --location global --display-name "makunouchi GitHub"
    ```
 
-5. プロバイダを作る。`attribute-condition` で **リポジトリ `yothio/Makunouchi` の `main` ブランチ**からだけ使えるようにする（他のリポジトリ・ブランチ・PR からのトークンは、このプロバイダの時点で拒否される）:
+5. プロバイダを作る。`attribute-condition` で **リポジトリ `yothio/Makunouchi`（名前と数値 ID の両方）の `main` ブランチ、かつ environment `production`** のときだけ使えるようにする（他のリポジトリ・ブランチ・PR・environment を書かないワークフローからのトークンは、このプロバイダの時点で拒否される。`repository_id` は、リポジトリを改名・削除したあとに同じ名前を別の人が取った場合の対策）:
 
    ```
-   gcloud iam workload-identity-pools providers create-oidc makunouchi-github-actions --project yothio-rails-cloud-run --location global --workload-identity-pool makunouchi-github --issuer-uri "https://token.actions.githubusercontent.com" --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" --attribute-condition "assertion.repository == 'yothio/Makunouchi' && assertion.ref == 'refs/heads/main'"
+   gcloud iam workload-identity-pools providers create-oidc makunouchi-github-actions --project yothio-rails-cloud-run --location global --workload-identity-pool makunouchi-github --issuer-uri "https://token.actions.githubusercontent.com" --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref,attribute.environment=assertion.environment" --attribute-condition "assertion.repository == 'yothio/Makunouchi' && assertion.repository_id == '<REPOSITORY_ID>' && assertion.ref == 'refs/heads/main' && assertion.environment == 'production'"
    ```
+
+   `environment: production` を使うと、トークンの `sub` は `repo:yothio/Makunouchi:environment:production` の形に変わる。ただし principalSet（手順 6）は `attribute.repository` で束ねていて `google.subject` は使わないので、認証は壊れない。`ref` も `refs/heads/main` のまま。
 
 6. そのリポジトリのトークンに、デプロイ用サービスアカウントを借りる権限を付ける:
 
@@ -183,11 +205,21 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
    gh variable set GCP_DEPLOY_SERVICE_ACCOUNT --repo yothio/Makunouchi --body "makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com"
    ```
 
-9. GitHub の environment `production` を作る（Settings → Environments → New environment。または `gh`）。必要なら Required reviewers を付けると、デプロイ前に承認待ちにできる:
+9. GitHub の environment `production` を作る（Settings → Environments → New environment。または `gh`）:
 
    ```
    gh api --method PUT repos/yothio/Makunouchi/environments/production
    ```
+
+   作っただけでは保護ルールが無い。次も設定する:
+
+   - **Deployment branches and tags** を「Selected branches and tags」にして `main` だけを許可する（WIF の `ref` 条件と二重に守れる）
+   - デプロイ前に承認待ちにしたいときは **Required reviewers** に自分を入れる（承認待ちの間は `concurrency` で後続も待つ）。プライベートリポジトリの無料プランでは使えないことがある
+
+10. **初回は `workflow_dispatch` で手動実行**する（Actions → admin-deploy → Run workflow、ブランチは `main`）。権限不足は初回に出やすい（`gcloud run deploy` と `jobs update` は内部で操作の完了を待つため、`run.operations.get` などが足りるかが実機でしか分からない）。落ちたステップを見れば切り分けられる:
+    - 認証のステップで失敗: プロバイダの条件（リポジトリ・ID・ブランチ・environment）、`workloadIdentityUser` の付与、Variables の値
+    - docker push で失敗: Artifact Registry の `artifactregistry.writer`
+    - `jobs update` / `jobs execute` / `run deploy` で失敗: 出力の `PERMISSION_DENIED` の権限名を見て、該当リソースに足す。`iam.serviceAccountUser` が `makunouchi-admin-run` に付いているかも確かめる
 
 注意:
 
