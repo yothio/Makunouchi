@@ -175,7 +175,20 @@ gcloud run services update <SERVICE_NAME> --project <PROJECT_ID> --region <REGIO
 
 ## 6. GitHub Actions でのデプロイ
 
-`.github/workflows/live-deploy.yml` が、テスト・型検査・lint のあとに `pnpm --filter live run deploy` を実行します。`main` への push では動かず、手動起動（`workflow_dispatch`）だけです。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
+live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-20261109-1530`）をきっかけにします。日時は日本時間でタグを作る時刻です。`main` への push では動きません。
+
+流れは次のとおりです。
+
+1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`）
+2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
+3. `main` の先頭にタグを打ち、GitHub Release を作る
+4. 同じ実行から `live-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
+
+`live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、そのタグでテスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
+
+タグと GitHub Release はデプロイ側の CI より先に作られます。デプロイ前のテスト・型検査・lint が落ちてもタグと Release は残ります。直したら新しいタグでもう一度 `release` を回してください（同名タグは作れません）。
+
+手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限してください。
 
 ### 6.1 初回の設定
 
@@ -184,7 +197,7 @@ gcloud run services update <SERVICE_NAME> --project <PROJECT_ID> --region <REGIO
 1. Cloudflare ダッシュボードの Account API tokens でトークンを作る。
    - 権限のテンプレートは「Edit Cloudflare Workers」（公式の GitHub Actions 手順が使うもの）
    - 対象アカウントはデプロイ先の 1 つに限定する
-   - このリポジトリのデプロイが主に使うのは Workers Scripts の編集。絞りたいときはカスタムトークンで必要な権限だけにする（絞ったら初回の手動起動で通ることを確かめる）。テンプレートに権限は足さない
+   - このリポジトリのデプロイが主に使うのは Workers Scripts の編集。絞りたいときはカスタムトークンで必要な権限だけにする（絞ったら初回のリリースで通ることを確かめる）。テンプレートに権限は足さない
    - トークンの値は作成時に一度だけ表示される
 2. GitHub に repository secrets を登録する。値は対話入力で渡し、コマンドに書かない。
 
@@ -197,9 +210,12 @@ gcloud run services update <SERVICE_NAME> --project <PROJECT_ID> --region <REGIO
    ```
 
    アカウント ID はダッシュボードか `wrangler whoami` で確かめる。
-3. ワークフローは `environment: production` で動く（admin のデプロイと共用）。`production` の Deployment branches を `main` だけに限定する。
+3. ワークフローは `environment: production` で動く（admin のデプロイと共用）。Deployment branches and tags を次のようにする。
 
-   画面から: Settings → Environments → `production` → Deployment branches and tags で「Selected branches and tags」を選び、`main` を追加する。
+   画面から: Settings → Environments → `production` → Deployment branches and tags で「Selected branches and tags」を選ぶ。
+
+   - ブランチ: `main`（release.yml からの `workflow_call` は呼び出し元の ref が `main` のまま）
+   - タグ: `app-*` と `live-*`（手でタグを push したときのデプロイ用）
 
    コマンドから（既存設定が変わることがあるので、先に画面で現状を見る）:
 
@@ -211,17 +227,33 @@ gcloud run services update <SERVICE_NAME> --project <PROJECT_ID> --region <REGIO
    gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=main -f type=branch
    ```
 
-admin のデプロイは `main` への push と手動起動で動くので、この限定の影響を受けません。
+   ```
+   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=app-* -f type=tag
+   ```
+
+   ```
+   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=live-* -f type=tag
+   ```
+
+4. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。この文書では設定手順だけ示し、代行では作らない。
 
 ### 6.2 起動のしかた
 
-入力 `confirm` に Worker 名 `makunouchi-live` を入れます。一致しないとき、`main` 以外から起動したときは、デプロイの前に止まります。
+通常のリリース（タグ作成からデプロイまで）。`main` 以外から起動したときは、タグを打つ前に止まります。
 
 ```
-gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f confirm=makunouchi-live
+gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live
 ```
 
-画面からは Actions タブで `live-deploy` を選び、ブランチ `main`、`confirm` に `makunouchi-live` を入れて Run workflow します。
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`。
+
+ロールバック（既存の `live-YYYYMMDD-HHMM` を再デプロイ）:
+
+```
+gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-20261109-1530
+```
+
+`live-YYYYMMDD-HHMM` 以外のタグは受け付けない。再デプロイでも通常リリースと同じく、デプロイ前にテスト・型検査・lint が走ります。
 
 **確かめること / 注意**
 
@@ -232,7 +264,7 @@ gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f confirm=maku
 
 ### 6.3 ロールバック
 
-手元から戻します。進行中は実行しません。
+前の成功タグを `live-deploy.yml` の `workflow_dispatch` に渡して再デプロイできます。再デプロイでも通常リリースと同じく、デプロイ前にテスト・型検査・lint が走ります。手元の wrangler で戻す場合は次のとおりです。どちらも進行中は実行しません。
 
 ```
 cd apps/live

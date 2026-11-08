@@ -59,4 +59,6 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 - `pnpm-workspace.yaml` の `minimumReleaseAge: 10080` により、公開から 7 日未満のパッケージバージョンはインストールできない。
 - **本番の進行中は絶対にデプロイしない**（全員の WebSocket が切れる）。
 - `ADMIN_API_SECRET` は Rails 側と同じ値にする（本番は 32 文字以上、`wrangler secret put ADMIN_API_SECRET`）。
-- デプロイ手順と本番前チェックリストは `docs/deploy/`（live / admin）にある。
+- 本番デプロイは `release.yml` でタグ（`app-YYYYMMDD-HHMM` / `live-YYYYMMDD-HHMM`）を切ってから動かす。`main` への push ではデプロイしない。手順と本番前チェックリストは `docs/deploy/`（live / admin）にある。
+
+

@@ -164,6 +164,9 @@ RSpec.describe "インフラ設定" do
 
     expect(deploy).to match(/assume_ssl/), "assume_ssl が docs/deploy/admin.md に無い"
     expect(deploy).to match(/Startup|Liveness|probe/i)
+    expect(deploy).to match(/app-YYYYMMDD-HHMM|app-\*/), "release タグの説明が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/release\.yml/), "release.yml の手順が docs/deploy/admin.md に無い"
+    expect(deploy).to match(/workflow_call/), "workflow_call の説明が docs/deploy/admin.md に無い"
     expect(deploy).to match(/ADMIN_CANONICAL_HOST/), "ADMIN_CANONICAL_HOST が docs/deploy/admin.md に無い"
     expect(deploy).to match(/--update-env-vars/), "--update-env-vars が docs/deploy/admin.md に無い"
     expect(deploy).to match(/--set-env-vars.*使いません/m), "--set-env-vars を使わない注意が docs/deploy/admin.md に無い"

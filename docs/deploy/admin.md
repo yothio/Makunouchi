@@ -123,15 +123,30 @@ curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/
 
 ---
 
-## 5. GitHub Actions による自動デプロイ
+## 5. GitHub Actions によるデプロイ
 
-`.github/workflows/admin-deploy.yml` が、main への push（`apps/admin/**` かこのワークフロー自身の変更）と手動実行（`workflow_dispatch`）で次を順に流します。どこかで失敗したら以降は動きません（migrate が失敗したらサービスはデプロイされません）。
+admin の本番デプロイは release タグ `app-YYYYMMDD-HHMM`（例: `app-20261109-1530`）をきっかけにします。日時は日本時間でタグを作る時刻です。`main` への push では動きません。
 
-1. `apps/admin` のイメージを `linux/amd64` でビルドし、タグを git の SHA にして Artifact Registry（`<AR_REPOSITORY>/admin`）へ push
-2. `<MIGRATE_JOB>` のイメージをその SHA に更新し、実行して完了を待つ
-3. `<SERVICE_NAME>` を同じイメージでデプロイ
+流れは次のとおりです。
 
-**運用ルール**: このワークフローは main への push で即動き、テストを待ちません。**main は PR 経由でのみ更新**し（直接 push しない）、`admin-test.yml` と `admin-lint` を required check にして、通ったものだけをマージしてください。
+1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `app`）
+2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
+3. `main` の先頭にタグを打ち、GitHub Release を作る
+4. 同じ実行から `admin-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
+
+`admin-deploy.yml` は次を順に流します。どこかで失敗したら以降は動きません（rspec / rubocop が失敗したらイメージは出さず、migrate が失敗したらサービスはデプロイされません）。
+
+1. タグのコミットが `main` に含まれることを確かめる
+2. そのタグで `admin-test.yml`（rspec）と `admin-lint.yml`（rubocop）を `workflow_call` で流す
+3. `apps/admin` のイメージを `linux/amd64` でビルドし、タグを git の SHA にして Artifact Registry（`<AR_REPOSITORY>/admin`）へ push
+4. `<MIGRATE_JOB>` のイメージをその SHA に更新し、実行して完了を待つ
+5. `<SERVICE_NAME>` を同じイメージでデプロイ
+
+手で `app-YYYYMMDD-HHMM` タグを push した場合も `admin-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。
+
+**運用ルール**: **main は PR 経由でのみ更新**し（直接 push しない）、`admin-test` と `admin-lint` と `test` を required check にして、通ったものだけをマージしてください。デプロイ時にも同じ rspec / rubocop をタグのコミットで流します。
+
+タグと GitHub Release はデプロイ側の CI より先に作られます。デプロイ前の rspec / rubocop が落ちてもタグと Release は残ります。直したら新しいタグでもう一度 `release` を回してください（同名タグは作れません）。
 
 CI が変えるのはイメージだけです。環境変数・Secret・Job の args・probe は、サービスと Job に設定済みのものがそのまま使われます。認証は Workload Identity 連携（鍵ファイルは作らない）。同時に 2 つは動かず（`concurrency`）、実行中のデプロイは取り消しません。
 
@@ -273,10 +288,15 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 
    作っただけでは保護ルールが無い。次も設定する:
 
-   - **Deployment branches and tags** を「Selected branches and tags」にして `main` だけを許可する（WIF の `ref` 条件と二重に守れる）
+   - **Deployment branches and tags** を「Selected branches and tags」にする
+     - ブランチ: `main`（release.yml からの `workflow_call` は呼び出し元の ref が `main` のままなので、これが必須）
+     - タグ: `app-*` と `live-*`（手でタグを push したときのデプロイ用。付けないとタグ起点の実行が environment で止まる）
    - 承認待ちにしたいときは **Required reviewers** を設定する（承認待ちの間は `concurrency` で後続も待つ。プライベート無料プランでは使えないことがある）
 
-10. **初回は `workflow_dispatch` で手動実行**する（Actions → admin-deploy → Run workflow、ブランチは `main`）。権限不足は初回に出やすい（`gcloud run deploy` と `jobs update` は内部で操作の完了を待つため、`run.operations.get` などが足りるかが実機でしか分からない）。
+10. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。誰でもタグを押せないようにする。この文書では設定手順だけ示し、代行では作らない。
+
+
+11. **初回のデプロイ**は `release.yml` でタグを切るか、既存タグを `admin-deploy.yml` の `workflow_dispatch` に渡して行う（下の「起動のしかた」）。権限不足は初回に出やすい（`gcloud run deploy` と `jobs update` は内部で操作の完了を待つため、`run.operations.get` などが足りるかが実機でしか分からない）。
 
 **確かめること（初回の切り分け）**
 
@@ -286,22 +306,31 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
 
 注意:
 
-- プロバイダの条件が `main` 限定なので、main 以外から `workflow_dispatch` しても認証で失敗する（意図どおり）
+- プロバイダの条件が `main` 限定なので、release / `workflow_dispatch`（`--ref main`）以外の ref では認証で失敗する（意図どおり）。手で `app-YYYYMMDD-HHMM` を push した経路は `assertion.ref` がタグになるため、現状の WIF 条件では認証できない。手 push を使うならプロバイダ条件に `app-*` / `live-*` のタグ ref を足す（通常のリリースは `workflow_call` なので不要）
 - デプロイ用サービスアカウントは Secret Manager を読まない。Secret の参照はサービスと Job の実行用アカウント（`<RUN_SERVICE_ACCOUNT_NAME>`）が行う
-- 本番の進行中に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回作成に使うテーブルを触りうるので、当日は main へ push しない
+- 本番の進行中に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回作成に使うテーブルを触りうるので、当日はリリースしない
 
-### 5.2 起動のしかた（2 回目以降）
+### 5.2 起動のしかた
 
-- `main` へ `apps/admin/**`（またはワークフローファイル）の変更をマージすると自動で走る
-- 手動:
+通常のリリース（タグ作成からデプロイまで）:
 
-  ```
-  gh workflow run admin-deploy.yml --repo <OWNER>/<REPO> --ref main
-  ```
+```
+gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=app
+```
+
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `app`。
+
+ロールバック（既存の `app-YYYYMMDD-HHMM` を再デプロイ）:
+
+```
+gh workflow run admin-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=app-20261109-1530
+```
+
+`app-YYYYMMDD-HHMM` 以外のタグは受け付けない。再デプロイでも通常リリースと同じく、デプロイ前に rspec と rubocop が走ります。
 
 ### 5.3 ロールバック
 
-イメージタグ（git SHA）を前の成功分に戻してサービスをデプロイし直します。スキーマを戻す必要がある破壊的 migration がある場合は、別途 migration の方針（expand/contract）に従います。進行中のゲスト通信は live 側なので切れませんが、admin で作業中なら控えます。
+前の成功タグを `admin-deploy.yml` の `workflow_dispatch` に渡して再デプロイします。再デプロイでも通常リリースと同じく、デプロイ前に rspec と rubocop が走ります。イメージタグはタグが指す git SHA です。スキーマを戻す必要がある破壊的 migration がある場合は、別途 migration の方針（expand/contract）に従います。進行中のゲスト通信は live 側なので切れませんが、admin で作業中なら控えます。
 
 ---
 
