@@ -1,0 +1,10 @@
+<% digest = BCrypt::Password.create("password12345", cost: BCrypt::Engine::MIN_COST) %>
+system_admin:
+  email: admin@example.com
+  password_digest: <%= digest %>
+  role: system_admin
+
+organizer:
+  email: organizer@example.com
+  password_digest: <%= digest %>
+  role: organizer

@@ -1,0 +1,6 @@
+<% content_for :title, "管理画面" %>
+<main>
+  <h1>管理画面</h1>
+  <p><%= current_user.email %> でログイン中です。</p>
+  <%= button_to "ログアウト", session_path, method: :delete %>
+</main>

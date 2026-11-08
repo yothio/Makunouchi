@@ -1,0 +1,28 @@
+# UI は日本語。rails-i18n は入れず、使う分だけ書く。
+ja:
+  date:
+    formats:
+      default: "%Y年%m月%d日"
+  time:
+    formats:
+      default: "%Y年%m月%d日 %H:%M"
+  errors:
+    format: "%{attribute}%{message}"
+    messages:
+      blank: "を入力してください"
+      taken: "は既に使われています"
+      invalid: "は正しくありません"
+      inclusion: "は一覧にありません"
+      confirmation: "が「%{attribute}」と一致しません"
+      too_short: "は%{count}文字以上で入力してください"
+      too_long: "は%{count}文字以内で入力してください"
+      password_too_long: "は長すぎます"
+  activerecord:
+    models:
+      user: "ユーザー"
+    attributes:
+      user:
+        email: "メールアドレス"
+        password: "パスワード"
+        password_confirmation: "パスワード（確認）"
+        role: "役割"

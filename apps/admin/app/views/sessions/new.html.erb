@@ -1,0 +1,20 @@
+<% content_for :title, "ログイン" %>
+<main>
+  <h1>ログイン</h1>
+
+  <% if @error %>
+    <p class="error" role="alert"><%= @error %></p>
+  <% end %>
+
+  <%= form_with url: session_path do |form| %>
+    <p>
+      <%= form.label :email, "メールアドレス" %><br>
+      <%= form.email_field :email, required: true, autofocus: true, autocomplete: "username" %>
+    </p>
+    <p>
+      <%= form.label :password, "パスワード" %><br>
+      <%= form.password_field :password, required: true, autocomplete: "current-password" %>
+    </p>
+    <p><%= form.submit "ログイン" %></p>
+  <% end %>
+</main>
