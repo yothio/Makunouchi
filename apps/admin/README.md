@@ -67,7 +67,7 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
 
 ## Cloud Run へのデプロイ
 
-GCP コンソール（または同等の UI）での手作業を前提にする。`gcloud` の長いコマンド例は意図的に省略する（アカウント・リージョン・リポジトリ名が環境ごとに違うため）。初回は下の「ユーザーが手で行う初回設定」を済ませてから。
+サービス・Job・Secret の作成は GCP コンソール（または同等の UI）での手作業を前提にする（`gcloud` の例は、CI 用の設定と手で migrate を流す場合だけ載せる）。初回は下の「ユーザーが手で行う初回設定」を済ませてから。
 
 1. **イメージをビルド**（`apps/admin` で）:
 
@@ -81,16 +81,119 @@ GCP コンソール（または同等の UI）での手作業を前提にする�
    - **Startup probe / Liveness probe**: HTTP `GET /up`（`force_ssl` は `/up` をリダイレクト除外済み）
    - 環境変数・Secret: 上表の本番必須項目。**`DATABASE_URL` は pooled だけ**（`DATABASE_URL_DIRECT` はサービスに常設しない）
    - 同時リクエスト数の既定（80）と Puma スレッド 3・DB `max_connections` 5 の前提を変えるときは三つを合わせて見直す
-4. **デプロイごとに migrate を 1 回**（推奨: Cloud Run **Jobs**）:
-   - サービスと **同じコンテナイメージ**を使う
-   - 環境変数・Secret はサービスと同一にする
-   - そのうえで Job だけ `DATABASE_URL` を **direct**（`DATABASE_URL_DIRECT` の値）に差し替える
-   - コマンド: `bin/rails db:migrate`（起動エントリはサービスと同じでよい）
-   - 手元で流す場合も同じ: イメージまたはローカルから、本番と同じ鍵一式＋`DATABASE_URL=<direct>` で `bin/rails db:migrate`
+4. **デプロイごとに migrate を 1 回**（Cloud Run **Jobs**）。main への push で動く GitHub Actions（`.github/workflows/admin-deploy.yml`、後述）が自動で流す。Job の設計:
+   - Job 名: `makunouchi-admin-migrate`。サービスと **同じコンテナイメージ**を使う（CI が git の SHA タグに差し替える）
+   - 環境変数・Secret はサービスと同一にし、Job だけ `DATABASE_URL` を **direct**（`DATABASE_URL_DIRECT` の値）にする。CI は環境変数・Secret を上書きしない
+   - args: `./bin/rails,db:migrate`
+   - **手で流す場合**（CI が使えないとき・調査用）は、イメージを差し替えて Job を実行する:
+
+     ```
+     gcloud run jobs update makunouchi-admin-migrate --project yothio-rails-cloud-run --region asia-northeast1 --image asia-northeast1-docker.pkg.dev/yothio-rails-cloud-run/makunouchi/admin:<git-sha>
+     gcloud run jobs execute makunouchi-admin-migrate --project yothio-rails-cloud-run --region asia-northeast1 --wait
+     ```
+
+     ローカルから流すなら、本番と同じ鍵一式＋`DATABASE_URL=<direct>` で `bin/rails db:migrate`
 5. **初回だけ seed**（同様に Job または手元）:
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD`（12 文字以上）を渡して `bin/rails db:seed`
    - 既にシステム管理者がいれば何もしない（冪等）
 6. ブラウザでログインし、問題作成・開催回作成（live は stub または結合後の実 PUT）を確認
+
+### GitHub Actions による自動デプロイ
+
+`.github/workflows/admin-deploy.yml` が、main への push（`apps/admin/**` かこのワークフロー自身の変更）と手動実行（workflow_dispatch）で次を順に流す。どこかで失敗したら以降は動かない（migrate が失敗したらサービスはデプロイされない）。
+
+1. `apps/admin` のイメージを `linux/amd64` でビルドし、タグを git の SHA にして Artifact Registry（`makunouchi/admin`）へ push
+2. `makunouchi-admin-migrate` Job のイメージをその SHA に更新し、実行して完了を待つ
+3. `makunouchi-admin` サービスを同じイメージでデプロイ
+
+CI が変えるのはイメージだけ。環境変数・Secret・Job の args・probe は、サービスと Job に設定済みのものがそのまま使われる。認証は Workload Identity 連携（鍵ファイルは作らない・置かない）。同時に 2 つは動かず（`concurrency`）、実行中のデプロイは取り消さない。
+
+#### 初回設定（デプロイ用サービスアカウントと Workload Identity 連携）
+
+GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロジェクト `yothio-rails-cloud-run`（他アプリと共有）に対して行うので、実行前に `gcloud config get-value project` で確かめる。`<...>` は置き換える。
+
+1. プロジェクト番号を取得する（以降の `<PROJECT_NUMBER>`）:
+
+   ```
+   gcloud projects describe yothio-rails-cloud-run --format="value(projectNumber)"
+   ```
+
+2. デプロイ用サービスアカウントを作る:
+
+   ```
+   gcloud iam service-accounts create makunouchi-github-deploy --project yothio-rails-cloud-run --display-name "makunouchi GitHub Actions deploy"
+   ```
+
+3. 権限を付ける（最小限。**プロジェクト全体には何も付けない**。すべてリソース単位で付けられるため、プロジェクト単位の付与は不要な想定）:
+
+   - Artifact Registry の `makunouchi` リポジトリへの書き込み（push）:
+
+     ```
+     gcloud artifacts repositories add-iam-policy-binding makunouchi --project yothio-rails-cloud-run --location asia-northeast1 --member "serviceAccount:makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com" --role roles/artifactregistry.writer
+     ```
+
+   - Cloud Run サービス `makunouchi-admin` の更新（デプロイ）:
+
+     ```
+     gcloud run services add-iam-policy-binding makunouchi-admin --project yothio-rails-cloud-run --region asia-northeast1 --member "serviceAccount:makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com" --role roles/run.developer
+     ```
+
+   - Cloud Run Job `makunouchi-admin-migrate` の更新と実行（実行の完了待ちに実行結果の参照も要るが、`roles/run.developer` に含まれる）:
+
+     ```
+     gcloud run jobs add-iam-policy-binding makunouchi-admin-migrate --project yothio-rails-cloud-run --region asia-northeast1 --member "serviceAccount:makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com" --role roles/run.developer
+     ```
+
+   - 実行用サービスアカウント `makunouchi-admin-run` を使う権限（サービスと Job のリビジョンがこのアカウントで動くため、更新時に必要）。このアカウント 1 つに対してだけ付ける:
+
+     ```
+     gcloud iam service-accounts add-iam-policy-binding makunouchi-admin-run@yothio-rails-cloud-run.iam.gserviceaccount.com --project yothio-rails-cloud-run --member "serviceAccount:makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com" --role roles/iam.serviceAccountUser
+     ```
+
+   実際に流して `PERMISSION_DENIED` が出たら、出た権限名を見て足す（このコマンド群を実環境で通したわけではない）。
+
+4. Workload Identity プールを作る:
+
+   ```
+   gcloud iam workload-identity-pools create makunouchi-github --project yothio-rails-cloud-run --location global --display-name "makunouchi GitHub"
+   ```
+
+5. プロバイダを作る。`attribute-condition` で **リポジトリ `yothio/Makunouchi` の `main` ブランチ**からだけ使えるようにする（他のリポジトリ・ブランチ・PR からのトークンは、このプロバイダの時点で拒否される）:
+
+   ```
+   gcloud iam workload-identity-pools providers create-oidc makunouchi-github-actions --project yothio-rails-cloud-run --location global --workload-identity-pool makunouchi-github --issuer-uri "https://token.actions.githubusercontent.com" --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" --attribute-condition "assertion.repository == 'yothio/Makunouchi' && assertion.ref == 'refs/heads/main'"
+   ```
+
+6. そのリポジトリのトークンに、デプロイ用サービスアカウントを借りる権限を付ける:
+
+   ```
+   gcloud iam service-accounts add-iam-policy-binding makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com --project yothio-rails-cloud-run --role roles/iam.workloadIdentityUser --member "principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/makunouchi-github/attribute.repository/yothio/Makunouchi"
+   ```
+
+7. プロバイダのリソース名を取得する（次の `GCP_WORKLOAD_IDENTITY_PROVIDER` の値。`projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/makunouchi-github/providers/makunouchi-github-actions` の形）:
+
+   ```
+   gcloud iam workload-identity-pools providers describe makunouchi-github-actions --project yothio-rails-cloud-run --location global --workload-identity-pool makunouchi-github --format "value(name)"
+   ```
+
+8. GitHub のリポジトリ Variables を 2 つ登録する（Settings → Secrets and variables → Actions → Variables、または `gh`）。どちらも秘密ではないので Variables でよい:
+
+   ```
+   gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --repo yothio/Makunouchi --body "<手順 7 の値>"
+   gh variable set GCP_DEPLOY_SERVICE_ACCOUNT --repo yothio/Makunouchi --body "makunouchi-github-deploy@yothio-rails-cloud-run.iam.gserviceaccount.com"
+   ```
+
+9. GitHub の environment `production` を作る（Settings → Environments → New environment。または `gh`）。必要なら Required reviewers を付けると、デプロイ前に承認待ちにできる:
+
+   ```
+   gh api --method PUT repos/yothio/Makunouchi/environments/production
+   ```
+
+注意:
+
+- プロバイダの条件が `main` 限定なので、main 以外のブランチから `workflow_dispatch` しても認証で失敗する（意図どおり）。
+- デプロイ用サービスアカウントは Secret Manager を読まない。Secret の参照はサービスと Job の実行用アカウント（`makunouchi-admin-run`）が行う。
+- 本番の進行中（結婚式の当日）に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回の作成に使うテーブルを触りうるので、当日は main へ push しない。
 
 ### Active Job（`:async`）について
 
@@ -128,7 +231,7 @@ GCP コンソール（または同等の UI）での手作業を前提にする�
 - [ ] `config.assume_ssl = true` と `force_ssl`（`/up` は除外）
 - [ ] Startup / Liveness probe が `GET /up`
 - [ ] Cloud Run **サービス**の `DATABASE_URL` は pooled だけ（direct は Job／手元の migrate 時だけ）
-- [ ] デプロイごとに migrate を 1 回だけ流した（起動時には流していない）
+- [ ] デプロイごとに migrate を 1 回だけ流した（CI の migrate Job が成功している。起動時には流していない）
 - [ ] 初回 `db:seed` で管理者を作った（`ADMIN_PASSWORD` 12 文字以上）
 - [ ] Active Record Encryption の 3 鍵を（ローカルで生成し）Secret に入れ、バックアップした
 - [ ] `RAILS_MASTER_KEY` を作成者ローカルの `master.key` から Secret に入れた（リポジトリには無い）
@@ -150,7 +253,8 @@ GCP コンソール（または同等の UI）での手作業を前提にする�
 4. 作成者ローカルの `config/master.key` を読んで `RAILS_MASTER_KEY` を Secret へ。`ADMIN_API_SECRET`（live と共有）を用意
 5. Artifact Registry + Cloud Run サービス（probe = `/up`、サービスの DB は pooled のみ）
 6. イメージ push → Secret／環境変数 → Job で migrate（`DATABASE_URL`=direct）→ 初回だけ seed → 動作確認
-7. Task 6 マージ後にリハーサル開催回で実 PUT と幹事ログイン
+7. 自動デプロイの設定: デプロイ用サービスアカウント・Workload Identity 連携・GitHub の Variables（2 つ）と environment `production`（上の「GitHub Actions による自動デプロイ」）
+8. Task 6 マージ後にリハーサル開催回で実 PUT と幹事ログイン
 
 ## 注意
 

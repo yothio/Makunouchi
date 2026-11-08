@@ -1,0 +1,63 @@
+name: admin-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# 同時に 2 つ動かさない。実行中のデプロイは取り消さず、後から来たものを待たせる
+concurrency:
+  group: admin-deploy
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: yothio-rails-cloud-run
+  GCP_REGION: asia-northeast1
+  REGISTRY: asia-northeast1-docker.pkg.dev
+  IMAGE: asia-northeast1-docker.pkg.dev/yothio-rails-cloud-run/makunouchi/admin
+  SERVICE: makunouchi-admin
+  MIGRATE_JOB: makunouchi-admin-migrate
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Artifact Registry へ docker を認証
+        run: gcloud auth configure-docker "$REGISTRY" --quiet
+
+      - name: イメージをビルドして push（タグは git の SHA）
+        working-directory: apps/admin
+        run: docker build --platform linux/amd64 -t "$IMAGE:$GITHUB_SHA" .
+
+      - name: イメージを push
+        run: docker push "$IMAGE:$GITHUB_SHA"
+
+      # 環境変数・Secret・args は Job に設定済みのものを使う。ここではイメージだけ差し替える
+      - name: migrate Job のイメージを更新
+        run: gcloud run jobs update "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA"
+
+      # --wait は Job が失敗すると非ゼロで終わる。失敗したら次の手順に進まずデプロイしない
+      - name: migrate Job を実行して完了を待つ
+        run: gcloud run jobs execute "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --wait
+
+      # 環境変数・Secret はサービスに設定済みのものを使う。ここではイメージだけ差し替える
+      - name: サービスをデプロイ
+        run: gcloud run deploy "$SERVICE" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA"
