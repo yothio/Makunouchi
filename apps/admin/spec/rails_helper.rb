@@ -45,7 +45,6 @@ RSpec.configure do |config|
   # instead of true.
   config.use_transactional_fixtures = true
 
-  # minitest の `fixtures :all` と同じく、spec/fixtures/*.yml を全 spec で読み込む。
   config.global_fixtures = :all
 
   # spec/services は type を付けずに書くので、fixtures やトランザクションの仕組みだけ個別に入れる。

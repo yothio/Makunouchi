@@ -42,7 +42,7 @@
 
 ```
 bin/setup --skip-server   # bundle install と db:prepare
-bundle exec rspec         # テスト全部（system spec は rack_test なのでブラウザ不要）
+bundle exec rspec
 bin/rails server          # http://localhost:3000
 ```
 

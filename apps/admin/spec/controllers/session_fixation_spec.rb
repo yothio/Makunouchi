@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# reset_session を外すと落ちるように、ログイン前にセッションへ印を入れて、
-# ログイン・ログアウトのあとに消えていることを見る（機能テスト）。
-# リクエストの前にセッションを仕込む必要があるので request spec ではなく controller spec にしている。
+# リクエスト前に session を仕込む必要があるため controller spec にしている。
 RSpec.describe SessionsController, type: :controller do
   it "ログイン成功でログイン前のセッションの中身は引き継がれない" do
     request.session[:marker] = "attacker-controlled"

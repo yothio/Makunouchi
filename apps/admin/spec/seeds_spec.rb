@@ -12,7 +12,6 @@ RSpec.describe "db/seeds" do
     ENV.update(@original)
   end
 
-  # seeds.rb の puts を捕まえて、標準出力に流さない。
   def run_seeds
     original_stdout = $stdout
     original_stderr = $stderr
