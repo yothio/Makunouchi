@@ -34,6 +34,38 @@ class QuestionTest < ActiveSupport::TestCase
     assert_equal "B", question.choice_b
   end
 
+  test "同じ文言の選択肢は無効（前後の空白を除いて比べる）" do
+    question = build(choice_a: "カレー", choice_b: " カレー ")
+
+    assert_not question.valid?
+    assert question.errors.of_kind?(:choice_a, :duplicate_choice)
+    assert question.errors.of_kind?(:choice_b, :duplicate_choice)
+    assert_not question.errors.key?(:choice_c)
+    assert_includes question.errors.full_messages, "選択肢 Aは他の選択肢と同じ文言です。違う文言にしてください"
+  end
+
+  test "空の選択肢どうしは重複とは数えない（空欄の指摘だけ出す）" do
+    question = build(choice_c: "", choice_d: "")
+
+    assert_not question.valid?
+    assert_not question.errors.of_kind?(:choice_c, :duplicate_choice)
+  end
+
+  test "検証エラーのメッセージは日本語" do
+    question = build(title: "", choice_a: "あ" * 51, correct_index: nil)
+    question.image.attach(io: file_fixture("not_image.txt").open, filename: "x.txt", content_type: "text/plain")
+    question.valid?
+
+    messages = question.errors.full_messages
+    assert_includes messages, "質問のタイトルは1文字以上で入力してください"
+    assert_includes messages, "選択肢 Aは50文字以内で入力してください"
+    assert_includes messages, "正解を選んでください"
+    assert_includes messages, "画像は png / jpeg / webp / gif のいずれかにしてください"
+    assert messages.none? { |message| message.match?(/\A[A-Za-z]|is |must |can't/) }, messages.inspect
+
+    assert_includes build(correct_index: 4).tap(&:valid?).errors.full_messages, "正解は A〜D から選んでください"
+  end
+
   test "choices は A〜D の順の配列" do
     assert_equal %w[カレー ラーメン 寿司 ハンバーグ], questions(:first).choices
   end

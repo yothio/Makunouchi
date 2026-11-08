@@ -57,6 +57,18 @@ class Organizer::QuestionsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".error li"
   end
 
+  test "検証エラーは日本語で出す（正解未選択・同じ文言の選択肢）" do
+    sign_in_as users(:organizer)
+
+    post organizer_questions_path, params: { question: VALID.merge(correct_index: "", choice_b: "A") }
+
+    assert_response :unprocessable_entity
+    assert_select ".error li", text: "正解を選んでください"
+    assert_select ".error li", text: "選択肢 Aは他の選択肢と同じ文言です。違う文言にしてください"
+    assert_select ".error li", text: "選択肢 Bは他の選択肢と同じ文言です。違う文言にしてください"
+    assert_no_match(/is not a number|translation missing/i, response.body)
+  end
+
   test "編集と更新ができる。画像を送らなければ今の画像を残す" do
     sign_in_as users(:organizer)
     question = questions(:first)

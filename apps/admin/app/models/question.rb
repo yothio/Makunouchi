@@ -16,6 +16,7 @@ class Question < ApplicationRecord
   validates(*CHOICE_COLUMNS, length: { in: 1..50 })
   validates :correct_index, numericality: { only_integer: true, in: 0..3 }
   validate :image_is_acceptable
+  validate :choices_are_distinct
 
   # 出題順は作成順（id 昇順）。配点・並べ替えは持たない。
   def choices
@@ -23,6 +24,14 @@ class Question < ApplicationRecord
   end
 
   private
+
+  # ユーザー決定: 1 つの問題の中で同じ文言の選択肢は入力エラー（前後の空白は normalizes で取り除いてある）。
+  def choices_are_distinct
+    present = CHOICE_COLUMNS.select { |column| self[column].present? }
+    present.group_by { |column| self[column] }.each_value do |columns|
+      columns.each { |column| errors.add(column, :duplicate_choice) } if columns.size > 1
+    end
+  end
 
   def image_is_acceptable
     return unless image.attached?
