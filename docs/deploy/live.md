@@ -187,7 +187,8 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
 
 `live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、テスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
 
-手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。確認の文字列入力は release 側（とロールバック用の `workflow_dispatch`）にあります。
+手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。この手 push 経路では Worker 名の確認入力を通しません（`confirm` は release とロールバック用の `workflow_dispatch` だけ）。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限する前提です。
+
 
 
 ### 6.1 初回の設定
