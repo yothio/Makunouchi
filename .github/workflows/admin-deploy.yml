@@ -17,13 +17,15 @@ concurrency:
   group: admin-deploy
   cancel-in-progress: false
 
+# GCP の値はリポジトリが public になっても出さないよう、すべて repository secrets から渡す
+# （一覧は apps/admin/README.md）。ワークフローには値を書かない
 env:
-  GCP_PROJECT: yothio-rails-cloud-run
-  GCP_REGION: asia-northeast1
-  REGISTRY: asia-northeast1-docker.pkg.dev
-  IMAGE: asia-northeast1-docker.pkg.dev/yothio-rails-cloud-run/makunouchi/admin
-  SERVICE: makunouchi-admin
-  MIGRATE_JOB: makunouchi-admin-migrate
+  GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  REGISTRY: ${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}
+  IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+  SERVICE: ${{ secrets.GCP_CLOUD_RUN_SERVICE }}
+  MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
 
 jobs:
   deploy:
@@ -35,8 +37,8 @@ jobs:
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
 
