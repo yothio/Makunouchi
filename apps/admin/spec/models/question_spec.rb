@@ -82,9 +82,9 @@ RSpec.describe Question, type: :model do
 
   it "出題順は作成順（id 昇順）" do
     user = create(:user)
-    create_list(:question, 3, user: user)
+    created = create_list(:question, 3, user: user)
 
-    expect(user.questions.to_a).to eq user.questions.order(:id).to_a
+    expect(user.questions.to_a).to eq created
   end
 
   it "画像は任意で、png / jpeg / webp / gif だけ" do
