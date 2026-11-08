@@ -1,5 +1,4 @@
-# QuizSession のスナップショットから、live の PUT /api/sessions/:id 用の Hash を組み立てる。
-# points / topN は送らない。host は常に含め、平文パスワードは入れない。
+# live への PUT では points/topN を送らず、host は passwordHash のみ（平文なし）。
 class QuizPayloadBuilder
   class InsecureImageUrl < StandardError; end
 

@@ -14,7 +14,6 @@ const hmacHex = async (secret: string, message: string): Promise<string> => {
 
 export const MIN_ADMIN_SECRET_LENGTH = 32;
 
-/** A secret is usable only when it is a string of at least MIN_ADMIN_SECRET_LENGTH characters. */
 export const isUsableSecret = (secret: unknown): secret is string => {
   return typeof secret === "string" && secret.length >= MIN_ADMIN_SECRET_LENGTH;
 };
@@ -106,7 +105,6 @@ const parsePbkdf2 = (
   }
 };
 
-/** Verify a password against `pbkdf2-sha256$…` (same format as Rails HostCredentials). */
 export const verifyPbkdf2 = async (password: string, encoded: string): Promise<boolean> => {
   const parsed = parsePbkdf2(encoded);
   if (!parsed) return false;

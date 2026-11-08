@@ -1,7 +1,5 @@
-# ActiveStorage::DirectUploadsController は ApplicationController を継承しないので、
-# そのままでは認証を通らず、誰でも R2 への書き込み用 URL を発行できてしまう。
-# ログイン済みのユーザー（主催者またはシステム管理者）だけに絞り、発行前に
-# content_type とサイズを検査する（クライアントの自己申告なので、添付後のモデル検証だけに頼らない）。
+# DirectUploadsController は認証が無いので、この Concern でログイン必須にする。
+# 発行前に content_type/サイズを検査（自己申告のみではモデル検証が遅い）。
 module DirectUploadGuard
   extend ActiveSupport::Concern
 

@@ -1,4 +1,4 @@
-# 投影画面のトークン: HMAC-SHA256(ADMIN_API_SECRET, "screen:" + sessionId) の hex（apps/live の screenTokenFor と同じ式）。
+# apps/live の screenTokenFor と同じ HMAC（"screen:" + sessionId）。
 module ScreenToken
   def self.screen(secret, session_id)
     OpenSSL::HMAC.hexdigest("SHA256", secret, "screen:#{session_id}")

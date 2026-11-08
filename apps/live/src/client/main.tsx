@@ -10,7 +10,6 @@ const tokenFor = (role: TokenRole, sessionId: string): string => {
   try {
     storage = sessionStorage;
   } catch {
-    // storage blocked
   }
   return resolveToken(role, sessionId, {
     search: window.location.search,

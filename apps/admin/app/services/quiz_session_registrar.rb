@@ -1,9 +1,8 @@
-# pending の開催回を live に PUT し、応答に応じて status を更新する。
 # host_missing は終端（PUT しない・409 でも昇格しない）。
 # :error だけ同一 payload で最大 MAX_ATTEMPTS 回（設定ミス・画像 URL 不正は再試行しない）。
 class QuizSessionRegistrar
   MAX_ATTEMPTS = 3
-  # テストで FakeClient を差し込む用。本番では使わない。
+  # client_factory はテストで LiveClient の代替を差し込む。
   cattr_accessor :client_factory
 
   def self.call(session, client: nil, payload_builder: QuizPayloadBuilder)

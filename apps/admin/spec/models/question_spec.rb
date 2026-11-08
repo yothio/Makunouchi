@@ -108,7 +108,7 @@ RSpec.describe Question, type: :model do
     expect(question.errors.of_kind?(:image, :too_long)).to be true
   end
 
-  it "画像を差し替えても、古い blob は消さない（決定 5A）" do
+  it "画像を差し替えても、古い blob は消さない" do
     question = create(:question, :with_image)
     old_blob = question.image.blob
 

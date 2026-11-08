@@ -1,6 +1,3 @@
-// Usage: ADMIN_API_SECRET=... pnpm --filter live loadtest <baseUrl> <sessionId> --clients 150
-// Needs a fresh (lobby) session from `pnpm --filter live seed`; it plays the whole
-// quiz up to the first results list (`r:list`).
 import WebSocket from "ws";
 import { hostTokenFor } from "../src/worker/auth.ts";
 import { driveQuiz, type Sock } from "../src/loadtest/drive.ts";

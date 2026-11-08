@@ -1,5 +1,4 @@
-# ログイン状態（セッション cookie の user_id）を扱う。通常のコントローラーと、
-# ApplicationController を継承しない Active Storage の direct upload（Task 3）の両方から使う。
+# ApplicationController を継承しない ActiveStorage::DirectUploadsController でも使う Concern。
 module Authentication
   extend ActiveSupport::Concern
 
@@ -14,7 +13,6 @@ module Authentication
     end
   end
 
-  # セッションからユーザーを引く。無ければ nil。
   # ログイン時刻（マイクロ秒の整数）が users.sessions_valid_after より前のセッションは無効
   # （ログアウトで更新するので、控えておいた古い cookie を再送しても入れない）。
   def self.user_from(session)

@@ -73,7 +73,6 @@ class LiveClient
     end
   end
 
-  # Authorization・passwordHash・平文パスワードは出さない。
   def log_failure(error)
     Rails.logger.warn("[LiveClient] #{error.class}: #{error.message}")
   end

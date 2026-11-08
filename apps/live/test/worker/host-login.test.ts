@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hostTokenFor } from "../../src/worker/auth";
 import { authHeaders, connectHost, connectGuest, connectScreen, newSessionId, quiz } from "./helpers";
 
-/** Rails HostCredentials / Python hashlib と同じ固定ベクタ（Task 4）。 */
+/** Rails HostCredentials と同じ PBKDF2 固定ベクタ（auth.test と共有）。 */
 const FIXED_PASSWORD = "correct horse";
 const FIXED_HASH =
   "pbkdf2-sha256$100000$AAECAwQFBgcICQoLDA0ODw==$V/LC8HOXSNUWQZsGKohGZjI8WD6krhZVBKgfe1PGKgk=";
@@ -65,7 +65,6 @@ describe("host in PUT payload", () => {
   it("host 保存後にログインでき、各ビューと ranking に資格情報が現れない", async () => {
     const id = newSessionId();
     await put(id, quizWithHost);
-    // host が GameState ではなく別キーに入っていることの間接確認（ログイン成功）。
     expect((await login(id, { loginId: FIXED_LOGIN_ID, password: FIXED_PASSWORD })).status).toBe(200);
 
     const host = await connectHost(id);

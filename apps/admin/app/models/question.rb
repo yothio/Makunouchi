@@ -5,11 +5,10 @@ class Question < ApplicationRecord
 
   belongs_to :user
 
-  # 決定 5A: 差し替え・削除のときも古い blob（R2 のオブジェクト）は消さない。
+  # 差し替え・削除のときも古い blob（R2 のオブジェクト）は消さない。
   # 開催回に取り込んだスナップショットが画像の URL を持つため。
   has_one_attached :image, dependent: false
 
-  # 空白だけの入力は、前後の空白を取り除いたあとの長さの検証で弾く。
   normalizes :title, *CHOICE_COLUMNS, with: ->(value) { value.strip }
 
   validates :title, length: { in: 1..200 }
@@ -18,14 +17,13 @@ class Question < ApplicationRecord
   validate :image_is_acceptable
   validate :choices_are_distinct
 
-  # 出題順は作成順（id 昇順）。配点・並べ替えは持たない。
   def choices
     CHOICE_COLUMNS.map { |column| self[column] }
   end
 
   private
 
-  # ユーザー決定: 1 つの問題の中で同じ文言の選択肢は入力エラー（前後の空白は normalizes で取り除いてある）。
+  # 1 つの問題の中で同じ文言の選択肢は入力エラー（前後の空白は normalizes で取り除いてある）。
   def choices_are_distinct
     present = CHOICE_COLUMNS.select { |column| self[column].present? }
     present.group_by { |column| self[column] }.each_value do |columns|

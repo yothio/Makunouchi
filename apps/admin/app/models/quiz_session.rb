@@ -5,7 +5,7 @@ class QuizSession < ApplicationRecord
 
   enum :status, { pending: "pending", ready: "ready", host_missing: "host_missing" }, validate: true
 
-  # 幹事のパスワードは、開催回の詳細にいつでも表示するため暗号化して保存する（決定 1A）。
+  # 幹事のパスワードは、開催回の詳細にいつでも表示するため暗号化して保存する。
   encrypts :host_password
 
   # 作成後は変えない。再試行（live への再 PUT）でも同じ値を送るため。
@@ -17,8 +17,6 @@ class QuizSession < ApplicationRecord
   validates :public_id, format: { with: /\A[A-Za-z0-9_-]{1,100}\z/ }, uniqueness: true
   validate :question_count_in_range
 
-  # 作成する開催回（未保存）を組み立てる。その時点の問題一式をスナップショットにコピーし、
-  # public_id と幹事の ID/パスワード（とそのハッシュ）を 1 度だけ作る。
   def self.prepare(user:, title:)
     credentials = HostCredentials.generate
     new(
@@ -32,7 +30,6 @@ class QuizSession < ApplicationRecord
     )
   end
 
-  # live に送る形の元になる。画像は blob の key を持ち、公開 URL は送信時に組み立てる（Task 5）。
   def self.snapshot_of(questions)
     questions.map do |question|
       {
@@ -48,7 +45,7 @@ class QuizSession < ApplicationRecord
 
   def host_url = "#{live_public_url}/host/#{public_id}"
 
-  # 投影画面の URL（決定 2A）。トークンは HMAC-SHA256(ADMIN_API_SECRET, "screen:" + public_id)。
+  # 投影画面の URL。トークンは HMAC-SHA256(ADMIN_API_SECRET, "screen:" + public_id)。
   # ADMIN_API_SECRET が未設定なら nil（トークンを作れないので URL を出さない）。
   def screen_url
     secret = ENV["ADMIN_API_SECRET"].to_s

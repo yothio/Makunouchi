@@ -25,7 +25,6 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .mark { font-size: 96px; line-height: 1.2; }
 .score { font-size: 28px; font-weight: 700; }
 
-/* Host (projector) screen, designed for 16:9 */
 .host { min-height: 100vh; background: #1d1a17; color: #fff; display: flex; flex-direction: column; font-size: clamp(20px, 2.4vw, 40px); }
 .host-banner { background: #b00020; text-align: center; padding: 8px; font-size: 0.8em; font-weight: 700; }
 .host-relogin { margin-left: 0.5em; font: inherit; font-weight: 800; color: #fff; background: transparent; border: 2px solid #fff; border-radius: 8px; padding: 0.15em 0.6em; cursor: pointer; }
@@ -54,7 +53,6 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .host-advance { position: fixed; right: 3vw; bottom: 4vh; font-size: 1em; font-weight: 800; padding: 0.5em 1.2em; border: 0; border-radius: 16px; background: var(--accent); color: #fff; cursor: pointer; }
 .host-advance:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* Host (operator) console: compact status, not for the projector */
 .console { font-size: 1rem; line-height: 1.5; max-width: 40rem; margin: 0 auto; }
 .console-title { font-size: 1.3em; margin: 0.2em 0 0.5em; }
 .console-progress { margin: 0; color: #f0b27a; font-weight: 700; }
@@ -77,7 +75,6 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .host-rank-big { font-size: 4em; font-weight: 800; margin: 0.1em 0; color: #f0b27a; }
 .host-name-big { font-size: 3em; font-weight: 800; margin: 0.2em 0; text-wrap: balance; }
 
-/* Participant's own answers so far (shown while waiting) */
 .history { list-style: none; margin: 20px auto 0; padding: 0; max-width: 320px; max-height: 40vh; overflow-y: auto; text-align: left; }
 .history li { display: flex; gap: 12px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid #eee; font-size: 16px; }
 .history-q { flex: none; width: 3.5em; color: #666; }

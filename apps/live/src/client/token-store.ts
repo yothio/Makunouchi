@@ -4,7 +4,7 @@ export type TokenIo = {
   search: string;
   pathname: string;
   hash: string;
-  /** null when storage is unavailable (private window, blocked site data). */
+  /** sessionStorage が使えないとき null（トークンはメモリのみ）。 */
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
   replaceUrl(url: string): void;
 };
@@ -23,7 +23,6 @@ export const storeToken = (
   try {
     storage?.setItem(tokenStorageKey(role, sessionId), token);
   } catch {
-    // storage unavailable — caller still holds the token in memory
   }
 };
 
@@ -35,7 +34,6 @@ export const clearStoredToken = (
   try {
     storage?.removeItem(tokenStorageKey(role, sessionId));
   } catch {
-    // storage unavailable
   }
 };
 

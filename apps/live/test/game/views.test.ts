@@ -25,7 +25,6 @@ const step = (s: GameState, n = 1): GameState => {
   for (let i = 0; i < n; i++) s = ok(advance(s, phaseKey(s.phase)));
   return s;
 };
-/** Players with scores injected via answers; phase set to results list. */
 const results = (scores: number[]): GameState => {
   const questions = Array.from({ length: Math.max(0, ...scores) }, (_, i) => ({
     title: `q${i}`, imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string], correctIndex: 0 as const,
@@ -43,7 +42,7 @@ const at = (s: GameState, stage: ResultsStage): GameState => ({ ...s, phase: { t
 describe("answer leakage", () => {
   test("open・closed の段階では、guestView と hostView の JSON に correctIndex が含まれない", () => {
     let s = join(join(createGameState(quiz), "a", "p1"), "b", "p2");
-    s = step(s); // open
+    s = step(s);
     s = ok(submitAnswer(s, "p1", 0, 1));
     for (const st of [s, step(s)]) {
       expect(JSON.stringify(guestView(st, "p1"))).not.toContain("correctIndex");
@@ -77,11 +76,11 @@ describe("hostView", () => {
   });
   test("reveal の counts は選択肢ごとの回答数、isLast は最後の問題のとき true", () => {
     let s = ["a", "b", "c"].reduce((acc, n, i) => join(acc, n, `p${i}`), createGameState(quiz));
-    s = step(s); // q0 open
+    s = step(s);
     s = ok(submitAnswer(ok(submitAnswer(ok(submitAnswer(s, "p0", 0, 1)), "p1", 0, 1)), "p2", 0, 3));
     const r0 = hostView(step(s, 2));
     expect(r0.screen).toMatchObject({ kind: "reveal", correctIndex: 1, counts: [0, 2, 0, 1], isLast: false });
-    const last = hostView(step(s, 5)); // q1 revealed
+    const last = hostView(step(s, 5));
     expect(last.screen).toMatchObject({ kind: "reveal", isLast: true, counts: [0, 0, 0, 0] });
   });
 });
@@ -119,7 +118,6 @@ describe("screenView", () => {
 
 describe("guestView history", () => {
   const entry = (index: number, choice: number | null, correct: boolean) => ({ index, choice, correct });
-  /** q0 correct = 1, q1 correct = 2 */
   const started = () => ["a", "b", "c"].reduce((acc, n, i) => join(acc, n, `p${i}`), createGameState(quiz));
 
   test("出題中（open）は空。締め切り後（closed）も空で、現在の問題の正誤を JSON に出さない", () => {
@@ -136,7 +134,7 @@ describe("guestView history", () => {
     let s = step(started());
     s = ok(submitAnswer(s, "p0", 0, 1));
     s = ok(submitAnswer(s, "p1", 0, 3));
-    s = step(s, 2); // q:0:revealed
+    s = step(s, 2);
     expect(guestView(s, "p0")).toMatchObject({ kind: "reveal", history: [entry(0, 1, true)] });
     expect(guestView(s, "p1")).toMatchObject({ kind: "reveal", history: [entry(0, 3, false)] });
     expect(guestView(s, "p2")).toMatchObject({ kind: "reveal", history: [entry(0, null, false)] });
@@ -144,7 +142,7 @@ describe("guestView history", () => {
   test("次の問題が open の間は、現在の問題を含まず前の問題だけ", () => {
     let s = step(started());
     s = ok(submitAnswer(s, "p0", 0, 1));
-    s = step(s, 3); // q:1:open
+    s = step(s, 3);
     s = ok(submitAnswer(s, "p0", 1, 2));
     expect(guestView(s, "p0")).toMatchObject({ kind: "question", status: "open", history: [entry(0, 1, true)] });
     expect(guestView(step(s), "p0")).toMatchObject({ kind: "question", status: "closed", history: [entry(0, 1, true)] });
@@ -154,7 +152,7 @@ describe("guestView history", () => {
     s = ok(submitAnswer(s, "p0", 0, 1));
     s = step(s, 3);
     s = ok(submitAnswer(s, "p0", 1, 0));
-    s = step(s, 3); // results list
+    s = step(s, 3);
     expect(s.phase.type).toBe("results");
     expect(guestView(s, "p0")).toEqual({
       kind: "results_pending",
@@ -163,10 +161,10 @@ describe("guestView history", () => {
     });
   });
   test("途中参加の人は、参加前の問題が未回答として入る", () => {
-    let s = step(createGameState(quiz), 4); // q:1:open, nobody joined
+    let s = step(createGameState(quiz), 4);
     s = join(s, "late", "late");
     s = ok(submitAnswer(s, "late", 1, 2));
-    s = step(s, 2); // q:1:revealed
+    s = step(s, 2);
     expect(guestView(s, "late")).toMatchObject({ kind: "reveal", history: [entry(0, null, false), entry(1, 2, true)] });
   });
   test("history には本人の回答だけが入り、他人のニックネームや回答が出ない", () => {

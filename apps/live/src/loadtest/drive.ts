@@ -11,7 +11,6 @@ export type Sock = {
 export type AdvanceStat = {
   from: string;
   to: string;
-  /** ms until the slowest guest got the new guest_view (only guests that got it) */
   maxMs: number;
   missing: number;
 };
@@ -27,9 +26,7 @@ export type LoadResult = {
 export type DriveOptions = {
   host: Sock;
   guests: Sock[];
-  /** pass threshold per advance, default 2000 */
   limitMs?: number;
-  /** how long to wait for stragglers before counting them missing, default 10000 */
   graceMs?: number;
   log?: (line: string) => void;
 };
@@ -37,7 +34,6 @@ export type DriveOptions = {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const now = () => performance.now();
 
-/** Which guest_view proves that the guest saw the transition out of `from`. */
 const expectedView = (from: string): ((v: GuestView) => boolean) => {
   if (from === "lobby") return (v) => v.kind === "question" && v.status === "open" && v.question.index === 0;
   const m = /^q:(\d+):(open|closed|revealed)$/.exec(from);
@@ -49,13 +45,6 @@ const expectedView = (from: string): ((v: GuestView) => boolean) => {
     (v.kind === "question" && v.status === "open" && v.question.index === i + 1) || v.kind === "results_pending";
 };
 
-/**
- * Joins all guests, then drives the quiz from lobby through the last reveal
- * into the results list (the load test stops at `r:list`; free-order projection
- * steps are exercised separately). Each guest answers randomly in every open
- * phase. For every advance, measures how long until every guest has received
- * the matching new guest_view.
- */
 export const driveQuiz = async (opts: DriveOptions): Promise<LoadResult> => {
   const { host, guests } = opts;
   const limitMs = opts.limitMs ?? 2000;

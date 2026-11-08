@@ -13,7 +13,6 @@ export type LiveSocket = {
   last: ServerMessage | null;
   send(msg: ClientMessage): void;
   connected: boolean;
-  /** Drop and re-establish the connection (e.g. an action got no response). */
   forceReconnect(): void;
 };
 

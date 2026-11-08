@@ -2,6 +2,6 @@
 
 # 起動時にマイグレーションは流さない。Neon の pooled 接続（PgBouncer のトランザクションモード）は
 # アドバイザリロックと相性が悪く、Cloud Run の複数インスタンスが同時に流すと競合する。
-# マイグレーションは direct 接続（DATABASE_URL_DIRECT）で、デプロイ時に 1 回だけ流す（README 参照）。
+# マイグレーションは direct 接続（DATABASE_URL_DIRECT）で、デプロイ時に 1 回だけ流す。
 
 exec "${@}"

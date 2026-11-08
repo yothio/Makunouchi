@@ -7,7 +7,6 @@ import { AdvanceGate, hostActionLabel, resultsActionMessage } from "./host-actio
 export const useHostSession = (sessionId: string, token: string) => {
   const [view, setView] = useState<HostView | null>(null);
   const [neverOpened, setNeverOpened] = useState(0);
-  // Cooldown after a phase change + lock after a click; all timing lives in the gate.
   const [gate] = useState(() => new AdvanceGate());
   const [resultsGate] = useState(() => new AdvanceGate({ cooldownMs: 0 }));
   const { cooling, locked } = useSyncExternalStore(gate.subscribe, gate.getSnapshot);
@@ -49,7 +48,6 @@ export const useHostSession = (sessionId: string, token: string) => {
 
   const label = view ? hostActionLabel(view) : null;
   const canAdvance = connected && view !== null && label !== null && !locked && !cooling;
-  // While connected, never-opened failures are irrelevant; the socket also resets its own counter on open.
   const neverOpenedForUi = connected ? 0 : neverOpened;
 
   const advance = useCallback(() => {

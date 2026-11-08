@@ -5,7 +5,6 @@ import { RankRevealScreen } from "./screens/RankRevealScreen";
 import { ResultsWaitScreen } from "./screens/ResultsWaitScreen";
 import { RevealScreen } from "./screens/RevealScreen";
 
-/** Picks the projector screen for a ScreenView. */
 export const ScreenContent = ({ view, sessionId }: { view: ScreenView | null; sessionId: string }) => {
   if (!view) return <p className="host-wait">接続中…</p>;
   switch (view.kind) {

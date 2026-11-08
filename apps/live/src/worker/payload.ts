@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-// Limits on the quiz payload accepted at session creation. They only matter to this schema, so they
-// live here; the rules other game code depends on are in game/rules.ts.
+// 作成時ペイロード専用の上限。ゲーム本体のルールは game/rules.ts。
 const QUESTION_COUNT_MIN = 5;
 const QUESTION_COUNT_MAX = 15;
 const QUIZ_TITLE_MAX_LENGTH = 100;
