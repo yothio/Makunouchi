@@ -30,7 +30,7 @@
 | `LIVE_BASE_URL` | live 連携必須 | Rails → Worker の API ベース（例: `https://makunouchi-live.<account>.workers.dev`） |
 | `LIVE_PUBLIC_URL` | 本番で画面を使うなら必須 | 開催回詳細の参列者・幹事 URL の元。未設定だと URL が空（先頭が欠けたパス）になり、画面からコピーできない |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 初回 seed | システム管理者 1 人。`ADMIN_PASSWORD` は **12 文字以上**。既に管理者がいれば seed は何もしない |
-| `ADMIN_CANONICAL_HOST` | 任意（本番で独自ドメインを使うなら設定） | 管理画面の独自ドメインのホスト名だけ（`https://` やパスは付けない）。設定すると、Host が `*.run.app` のリクエストは `/up` 以外を独自ドメインへ 301（GET / HEAD）または 403（それ以外）にする。未設定なら何もしない。値が不正なら起動で落ちる。「Cloud Run の既定ドメインと独自ドメイン」の節を参照 |
+| `ADMIN_CANONICAL_HOST` | 任意（本番で独自ドメインを使うなら設定） | 管理画面の独自ドメインのホスト名だけ（`https://` やパスは付けない）。設定すると、Host が `*.run.app` のリクエストは `/up` 以外を独自ドメインへ 302（GET / HEAD）または 403（それ以外）にする。未設定なら何もしない。値が不正なら起動で落ちる。「Cloud Run の既定ドメインと独自ドメイン」の節を参照 |
 | `PORT` | Cloud Run が渡す | 待ち受け。無いときの既定は本番 8080、開発・テスト 3000 |
 | `RAILS_LOG_LEVEL` | 任意 | 既定 `info` |
 | `RAILS_MAX_THREADS` | 任意 | Puma スレッド（既定 3） |
@@ -118,7 +118,7 @@ DATABASE_URL="$DATABASE_URL_DIRECT" bin/rails db:migrate
 
 利用者（システム管理者・主催者）のアクセスは独自ドメインだけにし、Cloud Run の既定ドメイン（`https://<SERVICE_NAME>-<...>.run.app`）はヘルスチェックと監視専用にする。`--no-default-url` や ingress の制限は、監視が既定ドメインを使えなくなるので使わず、アプリ側（`lib/canonical_host_redirect.rb`）で制限する。
 
-- 環境変数 `ADMIN_CANONICAL_HOST` に独自ドメインのホスト名を入れる。Host が `*.run.app` のリクエストのうち、`/up` 以外が対象になる。GET / HEAD は独自ドメインの同じパス・クエリへ 301、それ以外のメソッドは 403。
+- 環境変数 `ADMIN_CANONICAL_HOST` に独自ドメインのホスト名を入れる。Host が `*.run.app` のリクエストのうち、`/up` 以外が対象になる。GET / HEAD は独自ドメインの同じパス・クエリへ 302、それ以外のメソッドは 403。
 - `/up` はどのホストでも通す。Cloud Run の probe は Host が `*.run.app` でも独自ドメインでもない（`localhost` や IP の）ことがあり、`*.run.app` 以外のホストはこの仕組みでは触らない。
 - リダイレクト先は環境変数の値だけから作る。リクエストの Host や `X-Forwarded-Host` は使わない。
 - 監視（稼働時間チェックなど）は既定ドメインの `https://<RUN_APP_HOST>/up` を使う。
@@ -133,7 +133,7 @@ gcloud run services update <SERVICE_NAME> --region <REGION> --project <PROJECT_I
 確かめ方（`<RUN_APP_HOST>` は既定ドメインのホスト名、`<ADMIN_HOST>` は独自ドメイン）:
 
 ```
-curl -sI https://<RUN_APP_HOST>/            # 301、location: https://<ADMIN_HOST>/
+curl -sI https://<RUN_APP_HOST>/            # 302、location: https://<ADMIN_HOST>/
 curl -sI https://<RUN_APP_HOST>/up          # 200
 curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/ が 302 なら location がログイン画面）
 ```

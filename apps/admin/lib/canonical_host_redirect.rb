@@ -39,7 +39,7 @@ class CanonicalHostRedirect
 
   def redirect(env)
     location = "https://#{@canonical_host}#{Rack::Request.new(env).fullpath}"
-    [ 301, { "location" => location, "content-type" => "text/plain; charset=utf-8" }, [ "" ] ]
+    [ 302, { "location" => location, "content-type" => "text/plain; charset=utf-8" }, [ "" ] ]
   end
 
   def forbidden

@@ -28,7 +28,7 @@ Rails.application.configure do
     config.middleware.insert_before 0, CanonicalHostRedirect, ENV["ADMIN_CANONICAL_HOST"]
   end
 
-  config.log_tags =[ :request_id ]
+  config.log_tags = [ :request_id ]
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
 
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
