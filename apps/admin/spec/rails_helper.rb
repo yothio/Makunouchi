@@ -40,6 +40,12 @@ RSpec.configure do |config|
   # instead of true.
   config.use_transactional_fixtures = true
 
+  # fixtures を使わないため、コミット済みの旧 fixture 行は example のロールバックでは消えない。
+  # suite 開始時に空にして、一意制約の衝突を防ぐ。
+  config.before(:suite) do
+    ActiveRecord::Tasks::DatabaseTasks.truncate_all
+  end
+
   # spec/services は type を付けずに書くので、トランザクションの仕組みだけ個別に入れる。
   config.include RSpec::Rails::RailsExampleGroup, file_path: %r{/spec/services/}
 
