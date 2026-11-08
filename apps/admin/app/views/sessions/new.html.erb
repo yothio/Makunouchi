@@ -1,20 +1,24 @@
 <% content_for :title, "ログイン" %>
-<main>
-  <h1>ログイン</h1>
+<main id="main" class="page page--narrow">
+  <h1 class="page-title">ログイン</h1>
 
   <% if @error %>
-    <p class="error" role="alert"><%= @error %></p>
+    <p class="form-errors error" role="alert"><%= @error %></p>
   <% end %>
 
-  <%= form_with url: session_path do |form| %>
-    <p>
-      <%= form.label :email, "メールアドレス" %><br>
-      <%= form.email_field :email, required: true, autofocus: true, autocomplete: "username" %>
-    </p>
-    <p>
-      <%= form.label :password, "パスワード" %><br>
-      <%= form.password_field :password, required: true, autocomplete: "current-password" %>
-    </p>
-    <p><%= form.submit "ログイン" %></p>
-  <% end %>
+  <div class="card">
+    <%= form_with url: session_path, class: "form" do |form| %>
+      <div class="field">
+        <%= form.label :email, "メールアドレス" %>
+        <%= form.email_field :email, required: true, autofocus: true, autocomplete: "username" %>
+      </div>
+      <div class="field">
+        <%= form.label :password, "パスワード" %>
+        <%= form.password_field :password, required: true, autocomplete: "current-password" %>
+      </div>
+      <div class="form-actions">
+        <%= form.submit "ログイン", class: "btn btn--primary" %>
+      </div>
+    <% end %>
+  </div>
 </main>

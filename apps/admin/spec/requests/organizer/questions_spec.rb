@@ -54,10 +54,10 @@ RSpec.describe Organizer::QuestionsController, type: :request do
     get new_organizer_question_path
 
     assert_select "form .choices > .choice input[type=text]", 4
-    assert_select "form p.form-actions input[type=submit][value=保存]"
+    assert_select "form .form-actions--sticky input[type=submit][value=保存]"
 
-    css = Rails.root.join("app/assets/stylesheets/application.css").read
-    expect(css).to match(/\.form-actions\s*\{[^}]*position:\s*sticky/)
+    css = Rails.root.glob("app/assets/stylesheets/*.css").map(&:read).join
+    expect(css).to match(/\.form-actions--sticky\s*\{[^}]*position:\s*sticky/)
     expect(css).to match(/\.choices\s*\{[^}]*grid-template-columns/)
     expect(css).to match(/\.field_with_errors\s*\{[^}]*display:\s*contents/)
   end
