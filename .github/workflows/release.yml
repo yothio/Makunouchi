@@ -1,33 +1,29 @@
 name: release
 
-# タグ作成は GITHUB_TOKEN で行う。このトークンが起こす push は他ワークフローを起動しないため、
-# デプロイは workflow_call で直接呼ぶ（PAT / GitHub App は使わない）。
+# Draft の GitHub Release を作るだけ。人が画面で公開するとタグが付き、admin-deploy / live-deploy が release: published で動く。
+# GITHUB_TOKEN が起こすイベントは workflow_dispatch / repository_dispatch を除き他ワークフローを起動しない。
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: "デプロイ対象（app = apps/admin、live = apps/live）"
+        description: "対象（app = apps/admin、live = apps/live）"
         required: true
         type: choice
         options:
           - app
           - live
 
-# contents: タグと Release。id-token: 呼び出し先の admin-deploy が Workload Identity に使う
 permissions:
   contents: write
-  id-token: write
 
 concurrency:
   group: release-${{ github.event.inputs.target }}
   cancel-in-progress: false
 
 jobs:
-  prepare:
+  draft:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - name: main 以外なら止める
         run: |
@@ -43,6 +39,7 @@ jobs:
       - name: タグ名を決める
         id: tag
         env:
+          GH_TOKEN: ${{ github.token }}
           TARGET: ${{ inputs.target }}
           TZ: Asia/Tokyo
         run: |
@@ -51,42 +48,46 @@ jobs:
             echo "::error::タグ $TAG は既にある"
             exit 1
           fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG は既にある"
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "次のタグ: $TAG"
 
-      - name: タグを打ち GitHub Release を作る
+      - name: 同じ対象の未公開 Draft を消す
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          PREFIX="${TARGET}-"
+          DELETED=0
+          while IFS= read -r DRAFT_TAG; do
+            [ -z "$DRAFT_TAG" ] && continue
+            case "$DRAFT_TAG" in
+              "${PREFIX}"*)
+                echo "古い Draft を消す: $DRAFT_TAG"
+                gh release delete "$DRAFT_TAG" --yes --cleanup-tag
+                DELETED=1
+                ;;
+            esac
+          done < <(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName')
+          if [ "$DELETED" -eq 0 ]; then
+            echo "消す Draft はない"
+          fi
+
+      - name: Draft Release を作る
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
           TARGET: ${{ inputs.target }}
+          TARGET_SHA: ${{ github.sha }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           PREFIX="${TARGET}-"
           PREV_TAG="$(git tag -l "${PREFIX}[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]" | sort | tail -n 1)"
 
-          git tag "$TAG" "$GITHUB_SHA"
-          git push origin "refs/tags/$TAG"
-
           if [ -n "$PREV_TAG" ]; then
-            gh release create "$TAG" --generate-notes --notes-start-tag "$PREV_TAG" --title "$TAG" --target "$GITHUB_SHA"
+            gh release create "$TAG" --draft --generate-notes --notes-start-tag "$PREV_TAG" --title "$TAG" --target "$TARGET_SHA"
           else
-            gh release create "$TAG" --generate-notes --title "$TAG" --target "$GITHUB_SHA"
+            gh release create "$TAG" --draft --generate-notes --title "$TAG" --target "$TARGET_SHA"
           fi
-
-  deploy-app:
-    needs: prepare
-    if: inputs.target == 'app'
-    uses: ./.github/workflows/admin-deploy.yml
-    with:
-      tag: ${{ needs.prepare.outputs.tag }}
-    secrets: inherit
-
-  deploy-live:
-    needs: prepare
-    if: inputs.target == 'live'
-    uses: ./.github/workflows/live-deploy.yml
-    with:
-      tag: ${{ needs.prepare.outputs.tag }}
-    secrets: inherit

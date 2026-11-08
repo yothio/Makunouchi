@@ -175,20 +175,21 @@ gcloud run services update <SERVICE_NAME> --project <PROJECT_ID> --region <REGIO
 
 ## 6. GitHub Actions でのデプロイ
 
-live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-20261109-1530`）をきっかけにします。日時は日本時間でタグを作る時刻です。`main` への push では動きません。
+live の本番デプロイは GitHub Release の公開をきっかけにします。人が触る CI は `release` の `workflow_dispatch`（対象 `live`）だけです。`main` への push では動きません。
 
 流れは次のとおりです。
 
 1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `live`）
-2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
-3. `main` の先頭にタグを打ち、GitHub Release を作る
-4. 同じ実行から `live-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
+2. 日本時間の現在時刻からタグ名 `live-YYYYMMDD-HHMM`（例: `live-20261109-1530`）を決める。同じ名前のタグか Release が既にあれば止める
+3. 同じ対象の未公開 Draft があれば消してから、起動時の `main` のコミット SHA を `--target` にした Draft Release を作る（ブランチ名ではなく SHA）
+4. GitHub の Releases 画面で Draft の内容を確かめ、公開（Publish）する。公開でタグが作られる
+5. `live-deploy.yml` が `release: published` で動き、タグ名が `live-YYYYMMDD-HHMM` のときだけ進む（`app-*` や prerelease はジョブをスキップする。失敗にはしない）
+
+`GITHUB_TOKEN` が起こすイベントは `workflow_dispatch` と `repository_dispatch` を除き他ワークフローを起動しません。Draft の作成は `GITHUB_TOKEN` で行い、公開は人が行うので、公開後の `release: published` でデプロイが起動します。PAT や GitHub App は使いません。
 
 `live-deploy.yml` が、タグのコミットが `main` に含まれることを確かめたあと、そのタグでテスト・型検査・lint を流し、`pnpm --filter live run deploy` を実行します。`ADMIN_API_SECRET` は CI から触りません。`wrangler deploy` は Worker に登録済みの secret を消しません。
 
-タグと GitHub Release はデプロイ側の CI より先に作られます。デプロイ前のテスト・型検査・lint が落ちてもタグと Release は残ります。直したら新しいタグでもう一度 `release` を回してください（同名タグは作れません）。
-
-手で `live-YYYYMMDD-HHMM` タグを push した場合も `live-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限してください。
+Draft を公開するとタグが付き、そのあとデプロイ前のテスト・型検査・lint が走ります。デプロイが落ちてもタグと Release は残ります。直したら新しい Draft を作り直して公開してください（同名タグは作れません）。誰でもタグを作れないよう、タグの ruleset で `live-*`（と `app-*`）の作成を制限してください。Release の公開は書き込み権限がある人ができるので、公開できる人も合わせて限ってください。
 
 ### 6.1 初回の設定
 
@@ -210,21 +211,16 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
    ```
 
    アカウント ID はダッシュボードか `wrangler whoami` で確かめる。
-3. ワークフローは `environment: production` で動く（admin のデプロイと共用）。Deployment branches and tags を次のようにする。
+3. ワークフローは `environment: production` で動く（admin のデプロイと共用）。Deployment branches and tags を次のようにする。`release: published` のときの ref はタグになる。
 
    画面から: Settings → Environments → `production` → Deployment branches and tags で「Selected branches and tags」を選ぶ。
 
-   - ブランチ: `main`（release.yml からの `workflow_call` は呼び出し元の ref が `main` のまま）
-   - タグ: `app-*` と `live-*`（手でタグを push したときのデプロイ用）
+   - タグ: `app-*` と `live-*`（付けないと environment で止まる。この文書では設定手順だけ示し、代行では変えない）
 
    コマンドから（既存設定が変わることがあるので、先に画面で現状を見る）:
 
    ```
    gh api --method PUT repos/<OWNER>/<REPO>/environments/production -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
-   ```
-
-   ```
-   gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=main -f type=branch
    ```
 
    ```
@@ -235,36 +231,28 @@ live の本番デプロイは release タグ `live-YYYYMMDD-HHMM`（例: `live-2
    gh api --method POST repos/<OWNER>/<REPO>/environments/production/deployment-branch-policies -f name=live-* -f type=tag
    ```
 
-4. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。この文書では設定手順だけ示し、代行では作らない。
+4. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。Release の公開は書き込み権限がある人ができるので、公開できる人も合わせて限る。この文書では設定手順だけ示し、代行では作らない。
 
 ### 6.2 起動のしかた
 
-通常のリリース（タグ作成からデプロイまで）。`main` 以外から起動したときは、タグを打つ前に止まります。
+通常のリリース（Draft 作成 → 画面で公開 → デプロイ）。`main` 以外から起動したときは、Draft を作る前に止まります。
 
 ```
 gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=live
 ```
 
-画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`。
-
-ロールバック（既存の `live-YYYYMMDD-HHMM` を再デプロイ）:
-
-```
-gh workflow run live-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=live-20261109-1530
-```
-
-`live-YYYYMMDD-HHMM` 以外のタグは受け付けない。再デプロイでも通常リリースと同じく、デプロイ前にテスト・型検査・lint が走ります。
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `live`。Draft ができたら Releases で内容を確かめ、Publish release する。
 
 **確かめること / 注意**
 
-- **本番の進行中は起動しない**（全員の WebSocket が切れる）
+- **本番の進行中は Draft を公開しない**（全員の WebSocket が切れる）
 - ログには `workers.dev` の URL を出さないよう、`wrangler deploy` の標準出力は捨てている。アカウント ID は `::add-mask::` で伏せる。成否は終了コード、エラーは標準エラー出力
 - デプロイ後の URL はダッシュボードの Workers & Pages で見る
 - `WRANGLER_SEND_METRICS=false` で wrangler の利用データ送信を止めている
 
 ### 6.3 ロールバック
 
-前の成功タグを `live-deploy.yml` の `workflow_dispatch` に渡して再デプロイできます。再デプロイでも通常リリースと同じく、デプロイ前にテスト・型検査・lint が走ります。手元の wrangler で戻す場合は次のとおりです。どちらも進行中は実行しません。
+デプロイの手動起動はない。戻したいコミットが `main` の上にあるなら、revert して新しい Draft Release を作り公開する。急ぐときは手元の wrangler で戻す。進行中は実行しない。
 
 ```
 cd apps/live
