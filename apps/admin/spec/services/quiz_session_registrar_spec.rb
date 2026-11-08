@@ -17,16 +17,8 @@ RSpec.describe QuizSessionRegistrar do
     end
   end
 
-  def session_for(user = users(:other_organizer))
-    user.questions.destroy_all
-    5.times do |i|
-      user.questions.create!(title: "問題#{i}", choice_a: "a", choice_b: "b", choice_c: "c", choice_d: "d", correct_index: i % 4)
-    end
-    QuizSession.prepare(user: user, title: "本番").tap(&:save!)
-  end
-
   it "201 host:true 相当の :created で ready になる" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:created)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :ready
@@ -37,7 +29,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it ":host_not_registered は host_missing にして再試行しない" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:host_not_registered)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :host_missing
@@ -46,8 +38,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it "host_missing の開催回は PUT しない" do
-    session = session_for
-    session.host_missing!
+    session = create(:quiz_session, :host_missing)
     client = fake_client_class.new(:created)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :host_missing
@@ -56,7 +47,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it "一時失敗のあと成功したら同一 public_id で再 PUT して ready" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:error, :created)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :ready
@@ -65,7 +56,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it ":exists（409）は pending から ready に昇格する" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:exists)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :ready
@@ -73,8 +64,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it "host_missing では 409 相当でも昇格しない（PUT 自体しない）" do
-    session = session_for
-    session.host_missing!
+    session = create(:quiz_session, :host_missing)
     client = fake_client_class.new(:exists)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :host_missing
@@ -83,20 +73,20 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it "422/401 は pending のまま失敗を返す" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:invalid_payload)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :invalid_payload
     expect(session.reload).to be_pending
 
-    session2 = session_for(users(:organizer))
+    session2 = create(:quiz_session)
     client2 = fake_client_class.new(:unauthorized)
     expect(QuizSessionRegistrar.call(session2, client: client2)).to eq :unauthorized
     expect(session2.reload).to be_pending
   end
 
   it "一時失敗が 3 回続くと pending のまま呼び出しは 3 回" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:error, :error, :error)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :error
@@ -105,7 +95,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it ":misconfigured は再試行せず pending のまま返す" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:misconfigured, :created)
 
     expect(QuizSessionRegistrar.call(session, client: client)).to eq :misconfigured
@@ -114,7 +104,7 @@ RSpec.describe QuizSessionRegistrar do
   end
 
   it "InsecureImageUrl は pending のまま :insecure_image_url を返す" do
-    session = session_for
+    session = create(:quiz_session)
     client = fake_client_class.new(:created)
     builder = Class.new do
       def self.call(*)

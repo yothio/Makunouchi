@@ -1,8 +1,12 @@
 require "rails_helper"
 
 RSpec.describe Organizer::HomeController, type: :request do
+  let(:organizer) { create(:user) }
+  let(:system_admin) { create(:user, :system_admin) }
+
   it "トップに問題の数と、問題一覧へのリンクが出る" do
-    sign_in_as users(:organizer)
+    create_list(:question, 2, user: organizer)
+    sign_in_as organizer
 
     get root_path
 
@@ -12,7 +16,7 @@ RSpec.describe Organizer::HomeController, type: :request do
   end
 
   it "順位や結果は出さない" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get root_path
 
@@ -20,7 +24,7 @@ RSpec.describe Organizer::HomeController, type: :request do
   end
 
   it "システム管理者のトップは問題 0 件" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     get root_path
 

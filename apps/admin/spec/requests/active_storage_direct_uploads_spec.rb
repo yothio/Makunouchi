@@ -1,6 +1,9 @@
 require "rails_helper"
 
 RSpec.describe "Active Storage の direct upload", type: :request do
+  let(:organizer) { create(:user) }
+  let(:system_admin) { create(:user, :system_admin) }
+
   def blob_params(**overrides)
     {
       blob: {
@@ -21,7 +24,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "ログイン済みの主催者は発行できる" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     expect { issue }.to change(ActiveStorage::Blob, :count).by(1)
 
@@ -30,7 +33,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "システム管理者も発行できる（主催者用の画面に入れる決定と揃える）" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     issue
 
@@ -38,14 +41,14 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "許可しない content_type は 422" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     expect { issue(content_type: "text/html") }.not_to change(ActiveStorage::Blob, :count)
     expect(response).to have_http_status(:unprocessable_content)
   end
 
   it "許可する 4 種類は通る" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     %w[image/png image/jpeg image/webp image/gif].each do |type|
       issue(content_type: type)
@@ -54,7 +57,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "上限を超えるサイズは 422、ちょうど上限は通る" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     issue(byte_size: Question::IMAGE_MAX_BYTES + 1)
     expect(response).to have_http_status(:unprocessable_content)
@@ -64,7 +67,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "ログアウト後に控えた古い cookie では発行できない" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
     old = cookies[Rails.application.config.session_options[:key]]
     delete session_path
     cookies[Rails.application.config.session_options[:key]] = old
@@ -75,7 +78,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "blob が文字列・配列・欠落でも 500 にならず 422" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     [ { blob: "abc" }, { blob: [ "x" ] }, {}, { blob: { content_type: "image/png" } } ].each do |payload|
       post rails_direct_uploads_path, params: payload, as: :json
@@ -84,7 +87,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
   end
 
   it "filename と checksum が欠けていても 500 にならず 422" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     %i[filename checksum].each do |key|
       params = blob_params

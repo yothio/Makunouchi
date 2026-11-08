@@ -35,19 +35,18 @@ rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
 RSpec.configure do |config|
-  # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
-  config.fixture_paths = [
-    Rails.root.join('spec/fixtures')
-  ]
-
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, remove the following line or assign false
   # instead of true.
   config.use_transactional_fixtures = true
 
-  config.global_fixtures = :all
+  # fixtures を使わないため、コミット済みの旧 fixture 行は example のロールバックでは消えない。
+  # suite 開始時に空にして、一意制約の衝突を防ぐ。
+  config.before(:suite) do
+    ActiveRecord::Tasks::DatabaseTasks.truncate_all
+  end
 
-  # spec/services は type を付けずに書くので、fixtures やトランザクションの仕組みだけ個別に入れる。
+  # spec/services は type を付けずに書くので、トランザクションの仕組みだけ個別に入れる。
   config.include RSpec::Rails::RailsExampleGroup, file_path: %r{/spec/services/}
 
   # You can uncomment this line to turn off ActiveRecord support entirely.

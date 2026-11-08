@@ -1,10 +1,12 @@
 require "rails_helper"
 
 RSpec.describe Admin::OrganizersController, type: :request do
+  let(:organizer) { create(:user) }
+  let(:system_admin) { create(:user, :system_admin) }
   let(:params) { { user: { email: "new-organizer@example.com", password: "password12345", password_confirmation: "password12345" } } }
 
   it "システム管理者が主催者用の画面（管理画面トップ）に入れるのは決定どおり" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     get root_path
 
@@ -20,7 +22,7 @@ RSpec.describe Admin::OrganizersController, type: :request do
   end
 
   it "主催者は 403 で、作れない" do
-    sign_in_as users(:organizer)
+    sign_in_as organizer
 
     get new_admin_organizer_path
     expect(response).to have_http_status(:forbidden)
@@ -30,7 +32,7 @@ RSpec.describe Admin::OrganizersController, type: :request do
   end
 
   it "システム管理者は主催者を作れる。role は必ず organizer" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     get new_admin_organizer_path
     expect(response).to have_http_status(:success)
@@ -46,7 +48,7 @@ RSpec.describe Admin::OrganizersController, type: :request do
   end
 
   it "不正な入力は 422 で作らない" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     expect {
       post admin_organizers_path, params: { user: { email: "", password: "password12345", password_confirmation: "password12345" } }
@@ -60,7 +62,7 @@ RSpec.describe Admin::OrganizersController, type: :request do
   end
 
   it "11 文字のパスワードでは主催者を作れない" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     expect {
       post admin_organizers_path, params: { user: { email: "weak@example.com", password: "a" * 11, password_confirmation: "a" * 11 } }
@@ -70,7 +72,7 @@ RSpec.describe Admin::OrganizersController, type: :request do
   end
 
   it "エラーメッセージは日本語" do
-    sign_in_as users(:system_admin)
+    sign_in_as system_admin
 
     post admin_organizers_path, params: { user: { email: "", password: "password12345", password_confirmation: "password12345" } }
 

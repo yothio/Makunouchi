@@ -1,18 +1,11 @@
 require "rails_helper"
 
 RSpec.describe "主催者のハッピーパス", type: :system do
-  let(:user) { users(:organizer) }
+  let!(:user) { create(:user) }
 
   before do
     QuizSessionRegistrar.client_factory = -> { FakeLiveClient.new }
-    user.questions.destroy_all
-    5.times do |i|
-      user.questions.create!(
-        title: "問題#{i}",
-        choice_a: "a", choice_b: "b", choice_c: "c", choice_d: "d",
-        correct_index: i % 4
-      )
-    end
+    create_list(:question, 5, user: user)
   end
 
   after do
