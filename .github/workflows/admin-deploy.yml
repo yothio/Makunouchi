@@ -18,15 +18,8 @@ concurrency:
   cancel-in-progress: false
 
 # GCP の値はリポジトリが public になっても出さないよう、すべて repository secrets から渡す
-# （一覧は apps/admin/README.md）。ワークフローには値を書かない
-env:
-  GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ secrets.GCP_REGION }}
-  REGISTRY: ${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}
-  IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
-  SERVICE: ${{ secrets.GCP_CLOUD_RUN_SERVICE }}
-  MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
-
+# （一覧は apps/admin/README.md）。ワークフローには値を書かない。
+# secrets は必要なステップの env にだけ置く（checkout などの公開アクションには渡さない）
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -34,6 +27,16 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # secrets に登録していない値（プロジェクト番号）をログに出さないよう、先に伏せる。
+      # 番号は GCP_WORKLOAD_IDENTITY_PROVIDER（projects/<番号>/locations/...）から取り出す
+      - name: プロジェクト番号をログで伏せる
+        env:
+          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        run: |
+          number="${WORKLOAD_IDENTITY_PROVIDER#projects/}"
+          number="${number%%/*}"
+          echo "::add-mask::$number"
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
@@ -43,23 +46,46 @@ jobs:
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
 
       - name: Artifact Registry へ docker を認証
+        env:
+          REGISTRY: ${{ secrets.GCP_ARTIFACT_REGISTRY_HOST }}
         run: gcloud auth configure-docker "$REGISTRY" --quiet
 
       - name: イメージをビルドして push（タグは git の SHA）
         working-directory: apps/admin
+        env:
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
         run: docker build --platform linux/amd64 -t "$IMAGE:$GITHUB_SHA" .
 
       - name: イメージを push
+        env:
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
         run: docker push "$IMAGE:$GITHUB_SHA"
 
+      # gcloud の出力（サービス URL・リビジョン名など）をログに出さないよう、
+      # 以下の 3 つには --quiet --no-user-output-enabled を付ける（エラーは出る）。
       # 環境変数・Secret・args は Job に設定済みのものを使う。ここではイメージだけ差し替える
       - name: migrate Job のイメージを更新
-        run: gcloud run jobs update "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA"
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+          MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
+        run: gcloud run jobs update "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA" --quiet --no-user-output-enabled
 
-      # --wait は Job が失敗すると非ゼロで終わる。失敗したら次の手順に進まずデプロイしない
+      # 進捗の出力は止まるが、--wait は Job が失敗すると非ゼロの終了コードで終わる。
+      # ステップの成否は終了コードで決まるので、失敗したら次の手順に進まずデプロイしない
       - name: migrate Job を実行して完了を待つ
-        run: gcloud run jobs execute "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --wait
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          MIGRATE_JOB: ${{ secrets.GCP_MIGRATE_JOB }}
+        run: gcloud run jobs execute "$MIGRATE_JOB" --project "$GCP_PROJECT" --region "$GCP_REGION" --wait --quiet --no-user-output-enabled
 
       # 環境変数・Secret はサービスに設定済みのものを使う。ここではイメージだけ差し替える
       - name: サービスをデプロイ
-        run: gcloud run deploy "$SERVICE" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA"
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          IMAGE: ${{ secrets.GCP_ARTIFACT_IMAGE }}
+          SERVICE: ${{ secrets.GCP_CLOUD_RUN_SERVICE }}
+        run: gcloud run deploy "$SERVICE" --project "$GCP_PROJECT" --region "$GCP_REGION" --image "$IMAGE:$GITHUB_SHA" --quiet --no-user-output-enabled

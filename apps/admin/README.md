@@ -211,20 +211,41 @@ GCP 側と GitHub 側を 1 回だけ設定する。`gcloud` の作業はプロ�
    | `GCP_WORKLOAD_IDENTITY_PROVIDER` | 手順 7 の値 |
    | `GCP_DEPLOY_SERVICE_ACCOUNT` | `<DEPLOY_SERVICE_ACCOUNT_NAME>@<PROJECT_ID>.iam.gserviceaccount.com` |
 
-   値はコマンドに書かず、`gh secret set` の対話入力で貼る（シェルの履歴に残さないため）。1 つずつ実行して、プロンプトに値を貼る:
+   値はコマンドに書かず、`gh secret set` の対話入力で貼る。手順 1〜7 の `gcloud` は値を含むため手元のシェルの履歴に残るが、公開されるものではない。履歴に残したくないのは secret の登録だけである。コードブロックごとに 1 つずつ実行し、プロンプトに値を貼る（まとめて貼ると、2 行目以降のコマンドが値として登録される）:
 
    ```
    gh secret set GCP_PROJECT_ID --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_REGION --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_ARTIFACT_REGISTRY_HOST --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_ARTIFACT_IMAGE --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_CLOUD_RUN_SERVICE --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_MIGRATE_JOB --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo <OWNER>/<REPO>
+   ```
+
+   ```
    gh secret set GCP_DEPLOY_SERVICE_ACCOUNT --repo <OWNER>/<REPO>
    ```
 
-   **ログのマスクに注意**: secret の値は Actions のログで `***` に伏せられるが、伏せられるのは値と**完全に一致する文字列**だけ。値を加工（一部だけ取り出す・URL エンコードや base64 にする・別の文字列に埋め込んで変形する）して出力すると伏せられない。ワークフローでは secret を加工せずそのまま使い、`echo` などで出力しない。gcloud の出力に含まれる、secret の値と一致しない文字列（例: プロジェクト番号、サービスの URL）は伏せられず、公開リポジトリではログも公開される点に注意する。
+   **ログのマスクに注意**: secret の値は Actions のログで `***` に伏せられる。値を含む長い文字列の中でも、その部分は伏せられる。伏せられないのは、値を加工して出力した場合（一部だけ取り出す・URL エンコードや base64 にするなど）と、secret に登録していない値（プロジェクト番号、サービスの URL など）。ワークフローでは secret を加工せずそのまま使い、`echo` などで出力しない。公開リポジトリではログも公開される。そこで、gcloud の `run deploy` / `jobs update` / `jobs execute` には `--quiet --no-user-output-enabled` を付けて出力を止め（成否は終了コードで決まる。エラーは出る）、プロジェクト番号は `GCP_WORKLOAD_IDENTITY_PROVIDER` から取り出して `::add-mask::` で伏せている。実際に何が出るかは、非公開のうちに初回の `workflow_dispatch` で確かめる。
 
 9. GitHub の environment `production` を作る（Settings → Environments → New environment。または `gh`）:
 
