@@ -49,9 +49,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # system spec は rack_test（ブラウザ不要）なので、ヘッドレスブラウザの準備は要らない。
-      # ruby-version は未指定のままにして、working-directory の .ruby-version を読ませる。
+      # defaults.run.working-directory は uses に効かないので、ここで指定する
       - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
+          ruby-version: .ruby-version
           bundler-cache: true
           working-directory: apps/admin
 
