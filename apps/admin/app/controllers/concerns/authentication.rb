@@ -22,7 +22,7 @@ module Authentication
     return unless user && session[:login_at]
 
     valid_after = user.sessions_valid_after
-    return user if valid_after.nil? || session[:login_at] >= micros(valid_after)
+    user if valid_after.nil? || session[:login_at] >= micros(valid_after)
   end
 
   def self.micros(time)

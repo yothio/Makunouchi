@@ -26,7 +26,7 @@ module DirectUploadGuard
     content_type = blob[:content_type].to_s
     byte_size = blob[:byte_size].to_s
     return render_unacceptable unless Question::IMAGE_CONTENT_TYPES.include?(content_type)
-    return render_unacceptable unless byte_size.match?(/\A\d+\z/) && byte_size.to_i <= Question::IMAGE_MAX_BYTES
+    render_unacceptable unless byte_size.match?(/\A\d+\z/) && byte_size.to_i <= Question::IMAGE_MAX_BYTES
   end
 
   def render_unacceptable
