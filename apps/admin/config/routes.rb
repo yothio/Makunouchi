@@ -11,6 +11,8 @@ Rails.application.routes.draw do
 
   namespace :organizer do
     resources :questions, except: :show
+    # 開催回は作って見るだけ。スナップショットを差し替える update は作らない。
+    resources :quiz_sessions, only: %i[new create show]
   end
 
   root "organizer/home#show"

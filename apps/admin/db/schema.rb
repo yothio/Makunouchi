@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_07_140100) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_07_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -56,6 +56,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_07_140100) do
     t.check_constraint "correct_index >= 0 AND correct_index <= 3", name: "questions_correct_index_check"
   end
 
+  create_table "quiz_sessions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "public_id", null: false
+    t.string "title", null: false
+    t.jsonb "quiz_snapshot", null: false
+    t.string "status", default: "pending", null: false
+    t.string "host_login_id", null: false
+    t.text "host_password", null: false
+    t.string "host_password_hash", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["public_id"], name: "index_quiz_sessions_on_public_id", unique: true
+    t.index ["user_id"], name: "index_quiz_sessions_on_user_id"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'ready'::character varying, 'host_missing'::character varying]::text[])", name: "quiz_sessions_status_check"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", null: false
     t.string "password_digest", null: false
@@ -70,4 +86,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_07_140100) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "questions", "users"
+  add_foreign_key "quiz_sessions", "users"
 end

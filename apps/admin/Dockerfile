@@ -54,8 +54,8 @@ COPY . .
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY.
-# R2_* は本番の起動時に必須（storage.yml の r2）。ビルド中だけダミーを渡す（ENV ではないのでイメージには残らない）。
-RUN SECRET_KEY_BASE_DUMMY=1 R2_BUCKET=build-dummy R2_ENDPOINT=https://build-dummy.invalid R2_ACCESS_KEY_ID=build-dummy R2_SECRET_ACCESS_KEY=build-dummy ./bin/rails assets:precompile
+# R2_* と Active Record Encryption の鍵は本番の起動時に必須（storage.yml の r2）。ビルド中だけダミーを渡す（ENV ではないのでイメージには残らない）。
+RUN SECRET_KEY_BASE_DUMMY=1 R2_BUCKET=build-dummy R2_ENDPOINT=https://build-dummy.invalid R2_ACCESS_KEY_ID=build-dummy R2_SECRET_ACCESS_KEY=build-dummy ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=build-dummy ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=build-dummy ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=build-dummy ./bin/rails assets:precompile
 
 
 

@@ -21,11 +21,15 @@
 | `TEST_DATABASE_URL` | test の接続先。未設定ならローカルの `admin_test` |
 | `RAILS_MASTER_KEY` | `config/master.key` の値。**コミットしない** |
 | `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2。**本番の起動に 4 つとも必須**（欠けたら起動で落ちる） |
+| `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` / `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` / `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | 幹事パスワード（`quiz_sessions.host_password`）の暗号化鍵。**本番の起動に必須**。`bin/rails db:encryption:init` で作る。失うと既存の開催回のパスワードが読めなくなる（バックアップする）。**コミットしない** |
+| `LIVE_PUBLIC_URL` | 開催回の詳細に出す参列者・幹事の URL の元（`apps/live` の公開 URL） |
 | `PORT` | 待ち受けポート。Cloud Run が渡す。無いときの既定は本番だけ 8080、開発・テストは 3000（`config/puma.rb`）。開発の CORS の例（`http://localhost:3000`）と一致 |
 
 `ADMIN_API_SECRET`、`LIVE_BASE_URL`、`LIVE_PUBLIC_URL`、`R2_PUBLIC_BASE_URL` などは後続の Task で足す。
 
 ## ローカルで動かす
+
+開発・テストの Active Record Encryption の鍵は `config/environments/{development,test}.rb` に捨ての固定値で入れてある（本番の鍵とは無関係。本番は環境変数で必須）。
 
 ローカルの Postgres が要る（`PGUSER` / `PGHOST` で接続先を変えられる）。
 

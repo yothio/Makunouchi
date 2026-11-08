@@ -1,0 +1,23 @@
+<% content_for :title, "開催回の作成" %>
+<main>
+  <h1>開催回の作成</h1>
+  <p>作成した時点の質問解答（<%= current_user.questions.count %> 問）が、この開催回の問題になります。あとで問題を直しても、作成済みの開催回には反映されません。</p>
+
+  <%= form_with model: @quiz_session, url: organizer_quiz_sessions_path do |form| %>
+    <% if @quiz_session.errors.any? %>
+      <ul class="error" role="alert">
+        <% @quiz_session.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    <% end %>
+
+    <p>
+      <%= form.label :title, "開催回名" %><br>
+      <%= form.text_field :title, required: true, maxlength: 100, size: 40 %>
+    </p>
+    <p><%= form.submit "作成", data: { turbo_submits_with: "作成中…" } %></p>
+  <% end %>
+
+  <p><%= link_to "トップへ戻る", root_path %></p>
+</main>

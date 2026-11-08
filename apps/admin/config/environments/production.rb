@@ -47,6 +47,12 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
+  # Active Record Encryption（QuizSession#host_password）。鍵は環境変数から必須で読む（無ければ起動で落ちる）。
+  # 生成: bin/rails db:encryption:init。リポジトリに入れない。
+  config.active_record.encryption.primary_key = ENV.fetch("ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY")
+  config.active_record.encryption.deterministic_key = ENV.fetch("ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY")
+  config.active_record.encryption.key_derivation_salt = ENV.fetch("ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT")
+
   # キャッシュはメモリ（インスタンス間で共有しない）。DB は primary の 1 つだけ。
   config.cache_store = :memory_store
 

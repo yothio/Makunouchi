@@ -123,6 +123,22 @@ class InfrastructureTest < Minitest::Test
     assert_match(/config\.i18n\.fallbacks = \[ :en \]/, read("config/application.rb"))
   end
 
+  test "development にも Active Record Encryption の開発用の鍵がある（無いと開催回の作成が 500 になる）" do
+    development = read("config/environments/development.rb")
+
+    %w[primary_key deterministic_key key_derivation_salt].each do |key|
+      assert_match(/encryption\.#{key} = "/, development)
+    end
+  end
+
+  test "production は Active Record Encryption の鍵を環境変数から必須で読む" do
+    production = read("config/environments/production.rb")
+
+    assert_match(/encryption\.primary_key = ENV\.fetch\("ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"\)/, production)
+    assert_match(/encryption\.key_derivation_salt = ENV\.fetch\("ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT"\)/, production)
+    assert_match(/ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=build-dummy/, read("Dockerfile"))
+  end
+
   test "production は force_ssl で /up を除外する" do
     production = read("config/environments/production.rb")
 
