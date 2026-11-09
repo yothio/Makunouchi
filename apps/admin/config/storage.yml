@@ -9,6 +9,7 @@ local:
 # Cloudflare R2（S3 互換）。鍵・バケット名・エンドポイントは環境変数で渡す。
 # 本番は 4 つとも必須（欠けたら ENV.fetch が KeyError で起動を止める。ダミーに黙って落ちない）。
 # 開発・テストは R2 を使わないので、無くても読み込める。
+# R2_ENDPOINT はアカウントの S3 API オリジンだけ（バケット名のパスは付けない。詳細は R2Endpoint）。
 <% r2 = ->(name) { Rails.env.production? ? ENV.fetch(name) : ENV[name] } %>
 # aws-sdk-s3 1.178 以降の既定のチェックサム（CRC 系）は R2 で失敗することがあるため when_required にする。
 r2:

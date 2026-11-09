@@ -26,8 +26,8 @@
 | `TEST_DATABASE_URL` | テスト推奨 | test の接続先。未設定ならローカルの `admin_test` |
 | `RAILS_MASTER_KEY` | 本番必須 | `credentials.yml.enc` 解読用。リポジトリには入れない。**作成者のローカル** `apps/admin/config/master.key` を手元で読み、Secret Manager に一度だけ保存する。クローンしただけではファイルは無い。失うと credentials の再発行が必要 |
 | `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` / `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` / `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | 本番必須 | 幹事パスワード暗号化。**ローカル開発**で `bin/rails db:encryption:init` を実行し、表示された 3 値を本番 Secret へ移す（production イメージ上では回さない）。失うと既存開催回の PASS が読めない |
-| `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | 本番必須 | R2。欠けたら起動で落ちる |
-| `R2_PUBLIC_BASE_URL` | 画像付き開催回 | 公開 https のベース（`{base}/{blob.key}`）。カスタムドメイン。`r2.dev` は本番向けでない |
+| `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | 本番必須 | R2。欠けたら起動で落ちる。`R2_ENDPOINT` はダッシュボードの S3 API の URL から**バケット名を外した**オリジンだけ（パス付きなら本番起動で落ちる。バケット名は `R2_BUCKET`） |
+| `R2_PUBLIC_BASE_URL` | 画像付き開催回 | 公開 https のベース（`{base}/{blob.key}`）。カスタムドメイン。`r2.dev` は本番向けでない。admin プレビューで見えても公開 URL で見えるとは限らないので、公開 URL を直接開いて確かめる |
 | `ADMIN_API_SECRET` | live 連携必須 | live Worker と同じ値（本番は 32 文字以上）。PUT `/api/sessions/:id` の Bearer |
 | `LIVE_BASE_URL` | live 連携必須 | Rails → Worker の API ベース |
 | `LIVE_PUBLIC_URL` | 本番で画面を使うなら必須 | 開催回詳細の参列者・幹事 URL の元。未設定だと URL が空（先頭が欠けたパス）になり、画面からコピーできない |
@@ -66,6 +66,7 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='your-long-password' bin/rails db:s
 
 - `bin/setup` や rspec が DB で落ちる → ローカル Postgres と `DATABASE_URL` / `TEST_DATABASE_URL` を確認する
 - 画像 upload がローカルで失敗する → 開発用のストレージ設定と、必要なら開発用 R2／ディスクを確認する
+- admin では画像プレビューが見えるが live の投影で 404 → `R2_ENDPOINT` にバケット名のパスが付いていないか、公開 URL（`R2_PUBLIC_BASE_URL/{blob.key}`）を直接開けるかを確認する。プレビューは Active Storage 経由なので公開面の証明にならない
 - live への開催回登録が失敗する → `LIVE_BASE_URL` と `ADMIN_API_SECRET`（live と同じ値）を確認する
 
 ## マイグレーション

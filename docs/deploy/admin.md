@@ -110,6 +110,7 @@ curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/
 **目的**: 管理画面からの画像 direct upload と、公開 https URL を使えるようにする。
 
 - **バケット**を作り、オブジェクト読み取りを公開する（カスタムドメインで https）
+- **`R2_ENDPOINT`**: ダッシュボードの S3 API の URL（`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`）。**バケット名を含めない**（パスにバケット名を付けると、オブジェクトキーがずれて公開 URL が 404 になる。バケット名は `R2_BUCKET`）。本番起動時にパス付きなら止める
 - **公開 URL** はカスタムドメイン（https）を `R2_PUBLIC_BASE_URL` に設定する（`r2.dev` は本番向けでない）。live の `imageUrl` は https 必須
 - **CORS**（direct upload 用）:
   - `AllowedOrigins`: 管理画面の本番オリジン（独自ドメイン `https://<ADMIN_HOST>`）のみ。`ADMIN_CANONICAL_HOST` を設定すると利用者は独自ドメインでしかアップロードしないので、`*.run.app` は入れない（開発用別バケットなら `http://localhost:3000`）
@@ -119,7 +120,7 @@ curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/
 - **aws-sdk-s3**: `config/storage.yml` でチェックサムを `when_required` にしている。実 R2 で画像の analyze / purge が通ることを確かめる
 - Content-Security-Policy を有効にする場合は `connect-src` に R2 エンドポイントを足す（雛形では CSP はコメントアウト）
 
-**確かめること**: 管理画面から画像付きの問題を保存でき、公開 URL が https で開ける。
+**確かめること**: 管理画面から画像付きの問題を保存でき、**公開 URL をブラウザで直接開いて** https で画像本体が返ることを確かめる。admin のプレビューで見えても、公開 URL で見えるとは限らない（経路が別）。
 
 ---
 
