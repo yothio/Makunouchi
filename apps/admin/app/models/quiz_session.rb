@@ -36,7 +36,7 @@ class QuizSession < ApplicationRecord
         "title" => question.title,
         "choices" => question.choices,
         "correctIndex" => question.correct_index,
-        "imageKey" => (question.image.blob.key if question.image.attached?)
+        "imageKey" => question.live_image_key
       }
     end
   end

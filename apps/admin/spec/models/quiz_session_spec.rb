@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe QuizSession, type: :model do
+  include ActiveJob::TestHelper
+
   def organizer_with(count)
     create(:user).tap { |user| create_list(:question, count, user: user) }
   end
@@ -72,6 +74,19 @@ RSpec.describe QuizSession, type: :model do
     session = QuizSession.prepare(user: user, title: "本番")
 
     expect(session.quiz_snapshot.first["imageKey"]).to eq question.image.blob.key
+  end
+
+  it "派生画像があるときはその key をスナップショットに持つ" do
+    user = organizer_with(5)
+    question = user.questions.first
+    question.image.attach(io: file_fixture("sample.png").open, filename: "sample.png", content_type: "image/png")
+    question.save!
+    perform_enqueued_jobs only: GenerateDeliveryImageJob
+    question.reload
+
+    session = QuizSession.prepare(user: user, title: "本番")
+
+    expect(session.quiz_snapshot.first["imageKey"]).to eq question.delivery_image.blob.key
   end
 
   it "host_password は DB 上で暗号文になっている" do
