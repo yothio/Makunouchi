@@ -5,6 +5,7 @@ const JOIN_ERROR_TEXT: Record<JoinError, string> = {
   nickname_taken: "その名前は使われています",
   nickname_invalid: "1〜20 文字で入力してください",
   closed: "受付は終了しました",
+  full: "参加人数がいっぱいです",
 };
 
 export const JoinForm = ({

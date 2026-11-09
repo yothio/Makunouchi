@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
 import { safeEqualDigest, verifyPbkdf2 } from "./auth";
+import { isGuestAtConnectionCap, isInboundMessageTooLarge } from "./connection-caps";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { rankPlayers, type RankedPlayer } from "./game/ranking";
@@ -74,6 +75,12 @@ export class SessionRoom extends DurableObject<Env> {
     const role = request.headers.get(ROLE_HEADER);
     if (!isRole(role)) return new Response("bad role", { status: 400 });
 
+    // Guests are capped; host/screen must still connect so the day can be run.
+    // CLOSING/CLOSED sockets are excluded so a Wi-Fi blip's overlapping reconnects are less likely to 503.
+    if (isGuestAtConnectionCap(role, this.ctx.getWebSockets())) {
+      return new Response("too many connections", { status: 503 });
+    }
+
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
@@ -95,7 +102,15 @@ export class SessionRoom extends DurableObject<Env> {
   }
 
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
-    if (!this.state || typeof raw !== "string") return;
+    if (!this.state) return;
+    if (isInboundMessageTooLarge(raw)) {
+      try {
+        ws.close(1009, "message too large");
+      } catch {
+      }
+      return;
+    }
+    if (typeof raw !== "string") return;
     const msg = parseClientMessage(raw);
     const att = attachmentOf(ws);
     if (!msg || !att) return;
