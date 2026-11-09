@@ -43,7 +43,7 @@ pnpm --filter live build
 **確かめること**
 
 - Node 環境と Workers 環境のテストが通る
-- `load.test.ts` が 150 接続で、advance ごとに全員へ 2000 ms 以内に `guest_view` が届く
+- `load.test.ts` が 150 接続で、問題の advance では全員への `guest_view` と投影の `screen_view`、表彰台の操作では `host_view` / `screen_view` が 2000 ms 以内に届き、ゲストが `results_pending` のままであること
 
 必要なら dry-run もできます（本番には公開しません）。
 
@@ -301,7 +301,7 @@ ADMIN_API_SECRET="$(gcloud secrets versions access latest --secret=<ADMIN_API_SE
 **確かめること**
 
 - 負荷試験はロビー状態の新しい開催回に対して実行する。進めた回は戻せないので、試験のたびに `seed` し直す
-- 合格: すべての advance で p100 が 2000 ms 以下、取りこぼし 0。最後に `PASS` または `FAIL`
+- 合格: 問題の advance（ゲスト・投影）と表彰台の各操作（幹事・投影）で p100 が 2000 ms 以下、取りこぼし 0、ゲストは `results_pending` のまま。最後に `PASS` または `FAIL`
 - 試験用の開催回は本番に使わない。できればスマホのテザリング回線から行う
 - `seed` / `loadtest` の出力に幹事 PASS や投影トークンが出る。貼り付け・共有しない
 

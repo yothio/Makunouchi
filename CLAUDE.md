@@ -24,7 +24,7 @@ pnpm exec vitest run test/game/state.test.ts
 pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts
 ```
 
-`test/worker/load.test.ts` は 150 ゲスト + 1 ホストを同一プロセスでつなぎ、advance ごとに全員へ 2000 ms 以内に `guest_view` が届くことを確認する。
+`test/worker/load.test.ts` は 150 ゲスト + 1 ホスト + 1 投影画面を同一プロセスでつなぎ、問題の advance では全員への `guest_view`、表彰台の操作では `host_view` / `screen_view` が 2000 ms 以内に届くことと、ゲストが `results_pending` のままであることを確認する。
 
 ## アーキテクチャ（apps/live）
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { driveQuiz, type Sock } from "../../src/loadtest/drive";
 import sample from "../../fixtures/sample-quiz.json";
-import { authHeaders, connectGuest, connectHost, connectScreen, findLast, newSessionId } from "./helpers";
+import { authHeaders, connectGuest, connectHost, connectScreen, newSessionId } from "./helpers";
 import { exports } from "cloudflare:workers";
 
 const toSock = (c: Awaited<ReturnType<typeof connectHost>>): Sock => {
@@ -13,7 +13,7 @@ const toSock = (c: Awaited<ReturnType<typeof connectHost>>): Sock => {
 };
 
 describe("load: 150 guests", () => {
-  it("every advance reaches all 150 guests within 2000 ms", async () => {
+  it("quiz advances and podium actions reach host/screen within 2000 ms; guests stay results_pending", async () => {
     const id = newSessionId();
     const put = await exports.default.fetch(`https://x/api/sessions/${id}`, {
       method: "PUT",
@@ -41,41 +41,29 @@ describe("load: 150 guests", () => {
 
     const result = await driveQuiz({
       host: replay(host),
+      screen: replay(screen),
       guests: guestClients.map(replay),
       log: (l) => console.log(l),
     });
-    // The projector gets one screen_view per advance. Wait for them instead of sleeping a fixed time.
-    const screenStages = () => screen.messages.flatMap((m) => (m.type === "screen_view" && m.view.kind !== "lobby" ? [m.view] : []));
-    const deadline = Date.now() + 5000;
-    while (screenStages().length < result.advances.length && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    expect(screenStages()).toHaveLength(result.advances.length);
-    console.log(`worst advance ${result.worstMs.toFixed(0)} ms, missing ${result.totalMissing}`);
+    console.log(`worst ${result.worstMs.toFixed(0)} ms, missing ${result.totalMissing}`);
 
     expect(result.advances.length).toBe(sample.questions.length * 3 + 1);
+    expect(result.advances.every((a) => a.screenMissing === 0 && a.screenMs <= 2000)).toBe(true);
+    expect(result.podium.length).toBe(12);
     expect(result.totalMissing).toBe(0);
     expect(result.worstMs).toBeLessThanOrEqual(2000);
     expect(result.pass).toBe(true);
+    expect(result.podium.every((p) => p.guestExtra === 0)).toBe(true);
+    expect(result.podium.every((p) => p.hostMs <= 2000 && p.screenMs <= 2000)).toBe(true);
 
-    const rankingView = findLast(
-      host.messages,
-      (m) => m.type === "host_view" && m.view.screen.kind === "ranking",
-    );
-    if (!rankingView || rankingView.type !== "host_view" || rankingView.view.screen.kind !== "ranking") {
-      throw new Error("expected ranking host_view after driveQuiz");
-    }
-    const playerId = rankingView.view.screen.entries[0].playerId;
-    const guestCounts = guestClients.map((c) => c.messages.length);
-    host.send({ type: "results_action", from: "r:list", action: { kind: "select", playerId } });
-    await host.next("host_view", (m) => m.view.screen.kind === "ranking_detail");
-    host.send({ type: "results_action", from: `r:${playerId}:hidden`, action: { kind: "show_rank" } });
-    await host.next("host_view", (m) => m.view.phaseKey === `r:${playerId}:rank`);
-    await new Promise((r) => setTimeout(r, 300));
-    guestClients.forEach((c, i) => expect(c.messages.length).toBe(guestCounts[i]));
+    const lastGuestViews = guestClients.map((c) => {
+      const views = c.messages.filter((m) => m.type === "guest_view");
+      return views[views.length - 1];
+    });
+    expect(lastGuestViews.every((m) => m?.type === "guest_view" && m.view.kind === "results_pending")).toBe(true);
 
     screen.ws.close();
     guestClients.forEach((c) => c.ws.close());
     host.ws.close();
-  }, 60_000);
+  }, 90_000);
 });

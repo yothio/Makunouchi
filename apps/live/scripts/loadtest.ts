@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { hostTokenFor } from "../src/worker/auth.ts";
+import { hostTokenFor, screenTokenFor } from "../src/worker/auth.ts";
 import { driveQuiz, type Sock } from "../src/loadtest/drive.ts";
 import { normalizeBase, requireSecret } from "./env.ts";
 
@@ -41,16 +41,28 @@ const open = (path: string): Promise<Sock> => {
   });
 };
 
-const token = await hostTokenFor(secret, sessionId);
-const host = await open(`/ws/${sessionId}/host?token=${token}`);
+const hostToken = await hostTokenFor(secret, sessionId);
+const screenToken = await screenTokenFor(secret, sessionId);
+const host = await open(`/ws/${sessionId}/host?token=${hostToken}`);
+const screen = await open(`/ws/${sessionId}/screen?token=${screenToken}`);
 const guests = await Promise.all(Array.from({ length: clients }, () => open(`/ws/${sessionId}/guest`)));
-console.log(`connected: 1 host + ${clients} guests`);
+console.log(`connected: 1 host + 1 screen + ${clients} guests`);
 
-const result = await driveQuiz({ host, guests, log: console.log });
+const result = await driveQuiz({ host, screen, guests, log: console.log });
 console.log("");
-for (const a of result.advances) console.log(`${a.from.padEnd(12)} -> ${a.to.padEnd(12)} max ${String(Math.round(a.maxMs)).padStart(5)} ms  missing ${a.missing}`);
+for (const a of result.advances) {
+  console.log(
+    `${a.from.padEnd(12)} -> ${a.to.padEnd(12)} guests ${String(Math.round(a.maxMs)).padStart(5)} ms missing ${a.missing}  screen ${String(Math.round(a.screenMs)).padStart(5)} ms missing ${a.screenMissing}`,
+  );
+}
+for (const p of result.podium) {
+  console.log(
+    `podium ${p.action.padEnd(9)} ${p.from.padEnd(24)} -> ${p.to.padEnd(24)} host ${String(Math.round(p.hostMs)).padStart(5)} ms  screen ${String(Math.round(p.screenMs)).padStart(5)} ms  guestExtra ${p.guestExtra}`,
+  );
+}
 console.log(`\nworst p100: ${Math.round(result.worstMs)} ms, missing total: ${result.totalMissing}`);
 console.log(result.pass ? "PASS" : "FAIL");
 guests.forEach((g) => g.close());
+screen.close();
 host.close();
 process.exit(result.pass ? 0 : 1);
