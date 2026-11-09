@@ -77,6 +77,26 @@ export const connect = async (path: string): Promise<Client> => {
   };
 };
 
+/** Upgrade succeeds (101) then the server closes with a permanent application close code. */
+export const connectExpectingClose = async (path: string): Promise<{ status: number; code: number }> => {
+  const res = await exports.default.fetch(`https://x${path}`, { headers: { Upgrade: "websocket" } });
+  if (res.status !== 101 || !res.webSocket) {
+    throw new Error(`expected 101 with webSocket, got ${res.status}`);
+  }
+  const ws = res.webSocket;
+  const closed = new Promise<number>((resolve) => {
+    ws.addEventListener("close", (e) => resolve(e.code));
+  });
+  ws.accept();
+  const code = await Promise.race([
+    closed,
+    new Promise<number>((_, reject) => {
+      setTimeout(() => reject(new Error("timed out waiting for close")), 3000);
+    }),
+  ]);
+  return { status: res.status, code };
+};
+
 export const connectHost = async (sessionId: string): Promise<Client> => {
   const token = await hostTokenFor(env.ADMIN_API_SECRET, sessionId);
   return connect(`/ws/${sessionId}/host?token=${token}`);

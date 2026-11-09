@@ -1,15 +1,23 @@
+import { guestPermanentErrorMessage } from "../permanent-ws-error";
 import { GuestScreen } from "./GuestScreen";
 import { useGuestSession } from "./useGuestSession";
 
 export const GuestApp = ({ sessionId }: { sessionId: string }) => {
-  const { view, needJoin, joinError, pending, connected, answer, join } = useGuestSession(sessionId);
+  const { view, needJoin, joinError, pending, connected, permanentError, answer, join } =
+    useGuestSession(sessionId);
 
   return (
     <div className="guest">
-      {!connected && (
-        <div className="banner" role="status">
-          再接続中…
+      {permanentError ? (
+        <div className="banner" role="alert">
+          {guestPermanentErrorMessage(permanentError)}
         </div>
+      ) : (
+        !connected && (
+          <div className="banner" role="status">
+            再接続中…
+          </div>
+        )
       )}
       <main className="guest-main">
         <GuestScreen

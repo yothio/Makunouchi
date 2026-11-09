@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import type { HostView, ResultsAction } from "../../shared/types";
+import { permanentWsErrorFromCode, type PermanentWsError } from "../permanent-ws-error";
 import { buildSocketUrl } from "../socket-url";
 import { useLiveSocket } from "../use-live-socket";
 import { AdvanceGate, hostActionLabel, resultsActionMessage } from "./host-action";
@@ -7,6 +8,7 @@ import { AdvanceGate, hostActionLabel, resultsActionMessage } from "./host-actio
 export const useHostSession = (sessionId: string, token: string) => {
   const [view, setView] = useState<HostView | null>(null);
   const [neverOpened, setNeverOpened] = useState(0);
+  const [permanentError, setPermanentError] = useState<PermanentWsError | null>(null);
   const [gate] = useState(() => new AdvanceGate());
   const [resultsGate] = useState(() => new AdvanceGate({ cooldownMs: 0 }));
   const { cooling, locked } = useSyncExternalStore(gate.subscribe, gate.getSnapshot);
@@ -22,6 +24,10 @@ export const useHostSession = (sessionId: string, token: string) => {
         setView(msg.view);
       },
       onNeverOpened: setNeverOpened,
+      onPermanentClose: (code) => {
+        const error = permanentWsErrorFromCode(code);
+        if (error) setPermanentError(error);
+      },
     },
   );
 
@@ -81,6 +87,7 @@ export const useHostSession = (sessionId: string, token: string) => {
     view,
     connected,
     neverOpened: neverOpenedForUi,
+    permanentError,
     label,
     canAdvance,
     advance,

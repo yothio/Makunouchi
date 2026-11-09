@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
+import { WS_CLOSE_SESSION_NOT_FOUND } from "../shared/ws-close";
 import { safeEqualDigest, verifyPbkdf2 } from "./auth";
 import { isGuestAtConnectionCap, isInboundMessageTooLarge } from "./connection-caps";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
@@ -69,8 +70,10 @@ export class SessionRoom extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
-    if (!this.state) return new Response("not found", { status: 404 });
-    if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
+    if (request.headers.get("Upgrade") !== "websocket") {
+      if (!this.state) return new Response("not found", { status: 404 });
+      return new Response("expected websocket", { status: 426 });
+    }
     const url = new URL(request.url);
     const role = request.headers.get(ROLE_HEADER);
     if (!isRole(role)) return new Response("bad role", { status: 400 });
@@ -83,6 +86,13 @@ export class SessionRoom extends DurableObject<Env> {
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
+    // Uncreated session: same DO wake as the old HTTP 404 path; accept then close so
+    // the browser can read the permanent reason (close codes are not available on failed handshakes).
+    if (!this.state) {
+      this.ctx.acceptWebSocket(server);
+      server.close(WS_CLOSE_SESSION_NOT_FOUND, "not found");
+      return new Response(null, { status: 101, webSocket: client });
+    }
     this.ctx.acceptWebSocket(server);
 
     if (role === "host") {
