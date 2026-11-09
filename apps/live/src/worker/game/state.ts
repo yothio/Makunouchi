@@ -1,5 +1,5 @@
 import type { Choice, Phase, PhaseKey, QuizPayload, ResultsAction } from "../../shared/types";
-import { CHOICE_COUNT, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "./rules";
+import { CHOICE_COUNT, MAX_PLAYERS, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "./rules";
 import type { GameState, Player } from "./types";
 
 export const createGameState = (quiz: QuizPayload): GameState => {
@@ -29,7 +29,11 @@ export const phaseKey = (phase: Phase): PhaseKey => {
 };
 
 export const normalizeNickname = (raw: string): string => {
-  return raw.normalize("NFKC").trim();
+  // NFKC first so fullwidth spaces become trim-able; then strip Cc/Cf (incl. ZWJ).
+  return raw
+    .normalize("NFKC")
+    .replace(/\p{Cc}|\p{Cf}/gu, "")
+    .trim();
 };
 
 /**
@@ -50,8 +54,9 @@ export const joinPlayer = (
   s: GameState,
   nickname: string,
   ids: { id: string; token: string },
-): Transition<"nickname_taken" | "nickname_invalid" | "closed", { player: Player }> => {
+): Transition<"nickname_taken" | "nickname_invalid" | "closed" | "full", { player: Player }> => {
   if (s.phase.type === "results") return { ok: false, reason: "closed" };
+  if (s.players.length >= MAX_PLAYERS) return { ok: false, reason: "full" };
   const normalized = normalizeNickname(nickname);
   const length = [...normalized].length;
   if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) return { ok: false, reason: "nickname_invalid" };

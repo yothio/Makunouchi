@@ -70,7 +70,7 @@ pnpm exec vitest run test/game/state.test.ts
 pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts
 ```
 
-`test/worker/load.test.ts` は同一プロセス内で 150 ゲスト + 1 ホストを接続し、advance ごとに全員へ新しい `guest_view` が 2000 ms 以内に届くことを確認します。
+`test/worker/load.test.ts` は同一プロセス内で 150 ゲスト + 1 ホスト + 1 投影画面を接続し、問題の advance では全員への `guest_view`、表彰台の操作では `host_view` / `screen_view` が 2000 ms 以内に届くことと、ゲストが `results_pending` のままであることを確認します。
 
 負荷試験は開催回を 1 回進めると戻せないので、試験のたびに `seed` し直します。本番 URL 向けの seed / loadtest と当日の注意は [docs/deploy/live.md](../../docs/deploy/live.md) を見てください。
 

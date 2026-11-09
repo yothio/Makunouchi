@@ -76,7 +76,9 @@ app.put("/api/sessions/:sessionId", async (c) => {
 });
 
 app.get("/api/sessions/:sessionId/ranking", async (c) => {
-  const ranking = await roomFor(c.env, c.req.param("sessionId")).ranking();
+  const sessionId = c.req.param("sessionId");
+  if (!isValidSessionId(sessionId)) return c.json({ error: "not_found" }, 404);
+  const ranking = await roomFor(c.env, sessionId).ranking();
   if (!ranking) return c.json({ error: "not_found" }, 404);
   return c.json(ranking);
 });

@@ -108,4 +108,4 @@ export type ServerMessage =
   | { type: "guest_view"; view: GuestView }
   | { type: "need_join" }
   | { type: "joined"; playerToken: string }
-  | { type: "join_error"; reason: "nickname_taken" | "nickname_invalid" | "closed" };
+  | { type: "join_error"; reason: "nickname_taken" | "nickname_invalid" | "closed" | "full" };
