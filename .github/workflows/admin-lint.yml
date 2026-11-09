@@ -22,8 +22,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.run_id || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
+  # github.workflow は reusable 呼び出しで呼び出し元名になる。ネスト呼び出しでは
+  # event_name が workflow_call にならず、admin-test と group が衝突して並列がキャンセルされる。
+  group: admin-lint-${{ inputs.ref != '' && format('call-{0}', github.run_id) || github.ref }}
+  cancel-in-progress: ${{ inputs.ref == '' }}
 
 jobs:
   rubocop:
