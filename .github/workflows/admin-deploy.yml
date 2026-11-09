@@ -1,23 +1,10 @@
 name: admin-deploy
 
-# release.yml（workflow_call）と手で push した app-YYYYMMDD-HHMM タグ、ロールバック用の workflow_dispatch。
-# GITHUB_TOKEN で打ったタグの push は他ワークフローを起こさないので、release 経路と push 経路が二重に動かない。
+# GitHub Release の公開（release: published）だけがきっかけ。タグは公開時に作られる。
+# 進行中に公開すると migrate が開催回作成用のテーブルを触りうるので、当日は公開しない。
 on:
-  push:
-    tags:
-      - "app-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]"
-  workflow_call:
-    inputs:
-      tag:
-        description: "デプロイするタグ（app-YYYYMMDD-HHMM）"
-        required: true
-        type: string
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "再デプロイするタグ（app-YYYYMMDD-HHMM）"
-        required: true
-        type: string
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -33,34 +20,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      matched: ${{ steps.target.outputs.matched }}
       tag: ${{ steps.target.outputs.tag }}
     steps:
-      - name: タグ名を決める
+      - name: 対象のタグか確かめる
         id: target
         env:
-          INPUT_TAG: ${{ inputs.tag }}
-          REF_NAME: ${{ github.ref_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          TAG="$INPUT_TAG"
-          if [ -z "$TAG" ]; then
-            TAG="$REF_NAME"
+          if [ "$PRERELEASE" = "true" ]; then
+            echo "prerelease のためスキップ"
+            echo "matched=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           case "$TAG" in
             app-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9])
+              echo "matched=true" >> "$GITHUB_OUTPUT"
+              echo "tag=$TAG" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "::error::タグ $TAG は app-YYYYMMDD-HHMM 形式ではない"
-              exit 1
+              echo "タグ $TAG は app-YYYYMMDD-HHMM 形式ではないためスキップ"
+              echo "matched=false" >> "$GITHUB_OUTPUT"
               ;;
           esac
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.target.outputs.matched == 'true'
         with:
           ref: ${{ steps.target.outputs.tag }}
           fetch-depth: 0
 
       - name: タグのコミットが main に含まれるか確かめる
+        if: steps.target.outputs.matched == 'true'
         env:
           TAG: ${{ steps.target.outputs.tag }}
         run: |
@@ -73,18 +65,21 @@ jobs:
 
   rspec:
     needs: prepare
+    if: needs.prepare.outputs.matched == 'true'
     uses: ./.github/workflows/admin-test.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
 
   rubocop:
     needs: prepare
+    if: needs.prepare.outputs.matched == 'true'
     uses: ./.github/workflows/admin-lint.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
 
   deploy:
     needs: [prepare, rspec, rubocop]
+    if: needs.prepare.outputs.matched == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
