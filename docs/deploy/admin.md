@@ -125,17 +125,14 @@ curl -sI https://<ADMIN_HOST>/              # 200（ログイン画面など。/
 
 ## 5. GitHub Actions によるデプロイ
 
-admin の本番デプロイは GitHub Release の公開をきっかけにします。人が触る CI は `release` の `workflow_dispatch`（対象 `app`）だけです。`main` への push では動きません。
+admin の本番デプロイは release タグ `app-YYYYMMDD-HHMM`（例: `app-20261109-1530`）をきっかけにします。日時は日本時間でタグを作る時刻です。`main` への push では動きません。
 
 流れは次のとおりです。
 
 1. `.github/workflows/release.yml` を `main` から手動起動する（対象 `app`）
-2. 日本時間の現在時刻からタグ名 `app-YYYYMMDD-HHMM`（例: `app-20261109-1530`）を決める。同じ名前のタグか Release が既にあれば止める
-3. 同じ対象の未公開 Draft があれば消してから、起動時の `main` のコミット SHA を `--target` にした Draft Release を作る（ブランチ名ではなく SHA。公開までに `main` が進んでも、確かめた内容がデプロイされる）
-4. GitHub の Releases 画面で Draft の内容を確かめ、公開（Publish）する。公開でタグが作られる
-5. `admin-deploy.yml` が `release: published` で動き、タグ名が `app-YYYYMMDD-HHMM` のときだけ進む（`live-*` や prerelease はジョブをスキップする。失敗にはしない）
-
-`GITHUB_TOKEN` が起こすイベントは `workflow_dispatch` と `repository_dispatch` を除き他ワークフローを起動しません。Draft の作成は `GITHUB_TOKEN` で行い、公開は人が行うので、公開後の `release: published` でデプロイが起動します。PAT や GitHub App は使いません。
+2. 日本時間の現在時刻からタグ名を決める（同じ名前のタグが既にあれば止める）
+3. `main` の先頭にタグを打ち、GitHub Release を作る
+4. 同じ実行から `admin-deploy.yml` を `workflow_call` で呼ぶ（`GITHUB_TOKEN` で打ったタグの push は他ワークフローを起動しないため、PAT は使わず直接呼ぶ）
 
 `admin-deploy.yml` は次を順に流します。どこかで失敗したら以降は動きません（rspec / rubocop が失敗したらイメージは出さず、migrate が失敗したらサービスはデプロイされません）。
 
@@ -145,9 +142,11 @@ admin の本番デプロイは GitHub Release の公開をきっかけにしま�
 4. `<MIGRATE_JOB>` のイメージをその SHA に更新し、実行して完了を待つ
 5. `<SERVICE_NAME>` を同じイメージでデプロイ
 
+手で `app-YYYYMMDD-HHMM` タグを push した場合も `admin-deploy.yml` が動きます。release 経路（`workflow_call`）と二重にはなりません。
+
 **運用ルール**: **main は PR 経由でのみ更新**し（直接 push しない）、`admin-test` と `admin-lint` と `test` を required check にして、通ったものだけをマージしてください。デプロイ時にも同じ rspec / rubocop をタグのコミットで流します。
 
-Draft を公開するとタグが付き、そのあとデプロイ前の rspec / rubocop が走ります。デプロイが落ちてもタグと Release は残ります。直したら新しい Draft を作り直して公開してください（同名タグは作れません）。
+タグと GitHub Release はデプロイ側の CI より先に作られます。デプロイ前の rspec / rubocop が落ちてもタグと Release は残ります。直したら新しいタグでもう一度 `release` を回してください（同名タグは作れません）。
 
 CI が変えるのはイメージだけです。環境変数・Secret・Job の args・probe は、サービスと Job に設定済みのものがそのまま使われます。認証は Workload Identity 連携（鍵ファイルは作らない）。同時に 2 つは動かず（`concurrency`）、実行中のデプロイは取り消しません。
 
@@ -207,13 +206,13 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
    gcloud iam workload-identity-pools create <POOL_ID> --project <PROJECT_ID> --location global --display-name "GitHub"
    ```
 
-5. プロバイダを作る。`attribute-condition` で **リポジトリ `<OWNER>/<REPO>`（名前と数値 ID の両方）の `app-*` / `live-*` タグ、かつ environment `production`** のときだけ使えるようにする（他のリポジトリ・ブランチ・PR・environment を書かないワークフローからのトークンは、このプロバイダの時点で拒否される。`repository_id` は、リポジトリを改名・削除したあとに同じ名前を別の人が取った場合の対策）。`release: published` のときの ref はタグになる:
+5. プロバイダを作る。`attribute-condition` で **リポジトリ `<OWNER>/<REPO>`（名前と数値 ID の両方）の `main`、かつ environment `production`** のときだけ使えるようにする（他のリポジトリ・ブランチ・PR・environment を書かないワークフローからのトークンは、このプロバイダの時点で拒否される。`repository_id` は、リポジトリを改名・削除したあとに同じ名前を別の人が取った場合の対策）:
 
    ```
-   gcloud iam workload-identity-pools providers create-oidc <PROVIDER_ID> --project <PROJECT_ID> --location global --workload-identity-pool <POOL_ID> --issuer-uri "https://token.actions.githubusercontent.com" --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref,attribute.environment=assertion.environment" --attribute-condition "assertion.repository == '<OWNER>/<REPO>' && assertion.repository_id == '<REPOSITORY_ID>' && assertion.environment == 'production' && (assertion.ref.startsWith('refs/tags/app-') || assertion.ref.startsWith('refs/tags/live-'))"
+   gcloud iam workload-identity-pools providers create-oidc <PROVIDER_ID> --project <PROJECT_ID> --location global --workload-identity-pool <POOL_ID> --issuer-uri "https://token.actions.githubusercontent.com" --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref,attribute.environment=assertion.environment" --attribute-condition "assertion.repository == '<OWNER>/<REPO>' && assertion.repository_id == '<REPOSITORY_ID>' && assertion.ref == 'refs/heads/main' && assertion.environment == 'production'"
    ```
 
-   `environment: production` を使うと、トークンの `sub` は `repo:<OWNER>/<REPO>:environment:production` の形に変わる。ただし手順 6 の principalSet は `attribute.repository` で束ねていて `google.subject` は使わないので、認証は壊れない。
+   `environment: production` を使うと、トークンの `sub` は `repo:<OWNER>/<REPO>:environment:production` の形に変わる。ただし手順 6 の principalSet は `attribute.repository` で束ねていて `google.subject` は使わないので、認証は壊れない。`ref` も `refs/heads/main` のまま。
 
 6. そのリポジトリのトークンに、デプロイ用サービスアカウントを借りる権限を付ける:
 
@@ -279,7 +278,7 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
    gh secret set GCP_DEPLOY_SERVICE_ACCOUNT --repo <OWNER>/<REPO>
    ```
 
-   **ログのマスクに注意**: secret の値は Actions のログで `***` に伏せられる。値を含む長い文字列の中でも、その部分は伏せられる。伏せられないのは、値を加工して出力した場合（一部だけ取り出す・URL エンコードや base64 にするなど）と、secret に登録していない値（サービスの URL など）。ワークフローでは secret を加工せずそのまま使い、`echo` などで出力しない。公開リポジトリではログも公開される。そこで、gcloud の `run deploy` / `jobs update` / `jobs execute` には `--quiet --no-user-output-enabled` を付けて出力を止め（成否は終了コードで決まる。エラーは出る）、プロジェクト番号は `GCP_PROJECT_NUMBER` として登録しワークフローから参照する。実際に何が出るかは、非公開のうちに初回のリリース公開で確かめる。
+   **ログのマスクに注意**: secret の値は Actions のログで `***` に伏せられる。値を含む長い文字列の中でも、その部分は伏せられる。伏せられないのは、値を加工して出力した場合（一部だけ取り出す・URL エンコードや base64 にするなど）と、secret に登録していない値（サービスの URL など）。ワークフローでは secret を加工せずそのまま使い、`echo` などで出力しない。公開リポジトリではログも公開される。そこで、gcloud の `run deploy` / `jobs update` / `jobs execute` には `--quiet --no-user-output-enabled` を付けて出力を止め（成否は終了コードで決まる。エラーは出る）、プロジェクト番号は `GCP_PROJECT_NUMBER` として登録しワークフローから参照する。実際に何が出るかは、非公開のうちに初回の `workflow_dispatch` で確かめる。
 
 9. GitHub の environment `production` を作る:
 
@@ -290,38 +289,48 @@ CI が変えるのはイメージだけです。環境変数・Secret・Job の 
    作っただけでは保護ルールが無い。次も設定する:
 
    - **Deployment branches and tags** を「Selected branches and tags」にする
-     - タグ: `app-*` と `live-*`（`release: published` のときの ref はタグになる。付けないと environment で止まる。この文書では設定手順だけ示し、代行では変えない）
+     - ブランチ: `main`（release.yml からの `workflow_call` は呼び出し元の ref が `main` のままなので、これが必須）
+     - タグ: `app-*` と `live-*`（手でタグを push したときのデプロイ用。付けないとタグ起点の実行が environment で止まる）
    - 承認待ちにしたいときは **Required reviewers** を設定する（承認待ちの間は `concurrency` で後続も待つ。プライベート無料プランでは使えないことがある）
 
-10. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。Release の公開はリポジトリの書き込み権限がある人ができるので、公開できる人も合わせて限る。この文書では設定手順だけ示し、代行では作らない。
+10. **タグの ruleset** をリポジトリに作る（Settings → Rules → Rulesets）。`app-*` と `live-*` の作成・更新・削除を、リリース担当だけに限る。誰でもタグを押せないようにする。この文書では設定手順だけ示し、代行では作らない。
 
-11. **初回のデプロイ**は `release.yml` で Draft を作り、画面で公開して行う（下の「起動のしかた」）。権限不足は初回に出やすい（`gcloud run deploy` と `jobs update` は内部で操作の完了を待つため、`run.operations.get` などが足りるかが実機でしか分からない）。
+
+11. **初回のデプロイ**は `release.yml` でタグを切るか、既存タグを `admin-deploy.yml` の `workflow_dispatch` に渡して行う（下の「起動のしかた」）。権限不足は初回に出やすい（`gcloud run deploy` と `jobs update` は内部で操作の完了を待つため、`run.operations.get` などが足りるかが実機でしか分からない）。
 
 **確かめること（初回の切り分け）**
 
-- 認証のステップで失敗: プロバイダの条件（リポジトリ・ID・タグ ref・environment）、`workloadIdentityUser` の付与、secrets の値
+- 認証のステップで失敗: プロバイダの条件（リポジトリ・ID・ブランチ・environment）、`workloadIdentityUser` の付与、secrets の値
 - docker push で失敗: Artifact Registry の `artifactregistry.writer`
 - `jobs update` / `jobs execute` / `run deploy` で失敗: 出力の `PERMISSION_DENIED` の権限名を見て、該当リソースに足す。`iam.serviceAccountUser` が `<RUN_SERVICE_ACCOUNT_NAME>` に付いているかも確かめる
 
 注意:
 
-- プロバイダの条件は `app-*` / `live-*` のタグ ref に合わせる。`main` だけの条件のままだと、公開後のデプロイは認証で失敗する
+- プロバイダの条件が `main` 限定なので、release / `workflow_dispatch`（`--ref main`）以外の ref では認証で失敗する（意図どおり）。手で `app-YYYYMMDD-HHMM` を push した経路は `assertion.ref` がタグになるため、現状の WIF 条件では認証できない。手 push を使うならプロバイダ条件に `app-*` / `live-*` のタグ ref を足す（通常のリリースは `workflow_call` なので不要）
 - デプロイ用サービスアカウントは Secret Manager を読まない。Secret の参照はサービスと Job の実行用アカウント（`<RUN_SERVICE_ACCOUNT_NAME>`）が行う
-- 本番の進行中に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回作成に使うテーブルを触りうるので、当日は Draft を公開しない
+- 本番の進行中に管理画面をデプロイしても live の WebSocket には影響しないが、migrate は開催回作成に使うテーブルを触りうるので、当日はリリースしない
 
 ### 5.2 起動のしかた
 
-通常のリリース（Draft 作成 → 画面で公開 → デプロイ）:
+通常のリリース（タグ作成からデプロイまで）:
 
 ```
 gh workflow run release.yml --repo <OWNER>/<REPO> --ref main -f target=app
 ```
 
-画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `app`。Draft ができたら Releases で内容を確かめ、Publish release する。
+画面からは Actions → `release` → Run workflow。ブランチは `main`、対象は `app`。
+
+ロールバック（既存の `app-YYYYMMDD-HHMM` を再デプロイ）:
+
+```
+gh workflow run admin-deploy.yml --repo <OWNER>/<REPO> --ref main -f tag=app-20261109-1530
+```
+
+`app-YYYYMMDD-HHMM` 以外のタグは受け付けない。再デプロイでも通常リリースと同じく、デプロイ前に rspec と rubocop が走ります。
 
 ### 5.3 ロールバック
 
-デプロイの手動起動はない。戻したいコミットが `main` の上にあるなら、revert して新しい Draft Release を作り公開する。急ぐときは Cloud Run の以前のリビジョンへトラフィックを切り替えて手で戻す。イメージタグは git の SHA です。スキーマを戻す必要がある破壊的 migration がある場合は、別途 migration の方針（expand/contract）に従います。進行中のゲスト通信は live 側なので切れませんが、admin で作業中なら控えます。
+前の成功タグを `admin-deploy.yml` の `workflow_dispatch` に渡して再デプロイします。再デプロイでも通常リリースと同じく、デプロイ前に rspec と rubocop が走ります。イメージタグはタグが指す git SHA です。スキーマを戻す必要がある破壊的 migration がある場合は、別途 migration の方針（expand/contract）に従います。進行中のゲスト通信は live 側なので切れませんが、admin で作業中なら控えます。
 
 ---
 
