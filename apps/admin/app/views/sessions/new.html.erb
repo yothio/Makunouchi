@@ -9,11 +9,11 @@
   <div class="card">
     <%= form_with url: session_path, class: "form" do |form| %>
       <div class="field">
-        <%= form.label :email, "メールアドレス" %>
+        <%= form.label :email, User.human_attribute_name(:email) %>
         <%= form.email_field :email, required: true, autofocus: true, autocomplete: "username" %>
       </div>
       <div class="field">
-        <%= form.label :password, "パスワード" %>
+        <%= form.label :password, User.human_attribute_name(:password) %>
         <%= form.password_field :password, required: true, autocomplete: "current-password" %>
       </div>
       <div class="form-actions">

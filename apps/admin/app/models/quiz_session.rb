@@ -64,6 +64,7 @@ class QuizSession < ApplicationRecord
     count = quiz_snapshot&.size.to_i
     return if QUESTION_COUNT.cover?(count)
 
-    errors.add(:base, "問題は#{QUESTION_COUNT.min}〜#{QUESTION_COUNT.max}問にしてください（今は#{count}問です）。")
+    errors.add(:base, :question_count_out_of_range,
+               min: QUESTION_COUNT.min, max: QUESTION_COUNT.max, count: count)
   end
 end

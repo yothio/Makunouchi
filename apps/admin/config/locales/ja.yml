@@ -45,6 +45,10 @@ ja:
             choice_b: *duplicate_choice
             choice_c: *duplicate_choice
             choice_d: *duplicate_choice
+        quiz_session:
+          attributes:
+            base:
+              question_count_out_of_range: "問題は%{min}〜%{max}問にしてください（今は%{count}問です）。"
     attributes:
       question:
         title: "質問のタイトル"
@@ -61,8 +65,26 @@ ja:
         role: "役割"
       quiz_session:
         title: "開催回名"
+  flash:
+    questions:
+      saved: "問題を保存しました。"
+      destroyed: "問題を削除しました。"
+    quiz_sessions:
+      registered: "開催回を登録しました。"
+    organizers:
+      created: "主催者「%{email}」を作成しました。"
+  sessions:
+    invalid_credentials: "メールアドレスまたはパスワードが違います。"
+    too_many_attempts: "ログインの試行が多すぎます。しばらく待ってからやり直してください。"
   quiz_session:
     status:
       pending: "live への登録前（登録できていません）"
       ready: "登録済み"
       host_missing: "live が幹事の認証情報に未対応です。live を更新してから新しい開催回を作り直してください"
+    registration:
+      invalid_payload: "live がペイロードを受理しませんでした。内容を確認してから、もう一度送ってください。"
+      invalid_session_id: "開催回 ID の形式が live に通りませんでした。"
+      unauthorized: "live への認証に失敗しました。管理者に設定を確認してもらってください。"
+      misconfigured: "live への接続設定が不足しています。管理者に設定を確認してもらってください。"
+      insecure_image_url: "画像の公開 URL が https ではありません。R2 の公開設定を確認してから、もう一度送ってください。"
+      failed: "live への登録に失敗しました。しばらくしてから、もう一度送ってください。"

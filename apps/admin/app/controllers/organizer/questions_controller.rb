@@ -14,7 +14,7 @@ module Organizer
       @question = current_user.questions.new(question_params)
 
       if @question.save
-        redirect_to organizer_questions_path, notice: "問題を保存しました。"
+        redirect_to organizer_questions_path, notice: t("flash.questions.saved")
       else
         render :new, status: :unprocessable_entity
       end
@@ -25,7 +25,7 @@ module Organizer
 
     def update
       if @question.update(question_params)
-        redirect_to organizer_questions_path, notice: "問題を保存しました。"
+        redirect_to organizer_questions_path, notice: t("flash.questions.saved")
       else
         render :edit, status: :unprocessable_entity
       end
@@ -33,7 +33,7 @@ module Organizer
 
     def destroy
       @question.destroy!
-      redirect_to organizer_questions_path, notice: "問題を削除しました。"
+      redirect_to organizer_questions_path, notice: t("flash.questions.destroyed"), status: :see_other
     end
 
     private
