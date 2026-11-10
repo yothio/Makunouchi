@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Admin::OrganizersController, type: :request do
+RSpec.describe "Admin organizers", type: :request do
   let(:organizer) { create(:user) }
   let(:system_admin) { create(:user, :system_admin) }
   let(:params) { { user: { email: "new-organizer@example.com", password: "password12345", password_confirmation: "password12345" } } }

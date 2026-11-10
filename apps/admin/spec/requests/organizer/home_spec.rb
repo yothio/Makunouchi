@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Organizer::HomeController, type: :request do
+RSpec.describe "Organizer home", type: :request do
   let(:organizer) { create(:user) }
   let(:system_admin) { create(:user, :system_admin) }
 

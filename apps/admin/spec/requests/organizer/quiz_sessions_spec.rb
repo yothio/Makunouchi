@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Organizer::QuizSessionsController, type: :request do
+RSpec.describe "Organizer quiz sessions", type: :request do
   before do
     @fake_live = FakeLiveClient.new(:created)
     QuizSessionRegistrar.client_factory = -> { @fake_live }

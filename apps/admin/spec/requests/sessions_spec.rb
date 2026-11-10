@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe SessionsController, type: :request do
+RSpec.describe "Sessions", type: :request do
   let(:organizer) { create(:user) }
   let(:system_admin) { create(:user, :system_admin) }
 

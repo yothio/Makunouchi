@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Organizer::QuestionsController, type: :request do
+RSpec.describe "Organizer questions", type: :request do
   let(:organizer) { create(:user) }
   let(:other_organizer) { create(:user) }
   let(:system_admin) { create(:user, :system_admin) }
