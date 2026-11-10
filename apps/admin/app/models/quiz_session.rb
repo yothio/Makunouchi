@@ -51,7 +51,7 @@ class QuizSession < ApplicationRecord
     secret = ENV["ADMIN_API_SECRET"].to_s
     return if secret.empty?
 
-    "#{live_public_url}/screen/#{public_id}?token=#{ScreenToken.screen(secret, public_id)}"
+    "#{live_public_url}/screen/#{public_id}?token=#{Live::ScreenToken.screen(secret, public_id)}"
   end
 
   private

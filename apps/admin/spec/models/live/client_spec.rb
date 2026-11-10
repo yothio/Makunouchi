@@ -1,50 +1,50 @@
 require "rails_helper"
 
-RSpec.describe LiveClient do
+RSpec.describe Live::Client do
   let(:payload) { { title: "本番", questions: [], host: { loginId: "abc", passwordHash: "h" } }.freeze }
 
   it "201 で host: true なら :created" do
-    client = LiveClient.new(requester: ->(*) { [ 201, { "ok" => true, "host" => true } ] })
+    client = Live::Client.new(requester: ->(*) { [ 201, { "ok" => true, "host" => true } ] })
 
     expect(client.create_session("sess-1", payload)).to eq :created
   end
 
   it "201 で host: true が無いと :host_not_registered（再試行しない専用結果）" do
-    client = LiveClient.new(requester: ->(*) { [ 201, { "ok" => true } ] })
+    client = Live::Client.new(requester: ->(*) { [ 201, { "ok" => true } ] })
 
     expect(client.create_session("sess-1", payload)).to eq :host_not_registered
   end
 
   it "409 は :exists" do
-    client = LiveClient.new(requester: ->(*) { [ 409, { "error" => "exists" } ] })
+    client = Live::Client.new(requester: ->(*) { [ 409, { "error" => "exists" } ] })
 
     expect(client.create_session("sess-1", payload)).to eq :exists
   end
 
   it "422 は :invalid_payload" do
-    client = LiveClient.new(requester: ->(*) { [ 422, { "error" => "invalid_payload" } ] })
+    client = Live::Client.new(requester: ->(*) { [ 422, { "error" => "invalid_payload" } ] })
 
     expect(client.create_session("sess-1", payload)).to eq :invalid_payload
   end
 
   it "400 invalid_session_id は :invalid_session_id" do
-    client = LiveClient.new(requester: ->(*) { [ 400, { "error" => "invalid_session_id" } ] })
+    client = Live::Client.new(requester: ->(*) { [ 400, { "error" => "invalid_session_id" } ] })
 
     expect(client.create_session("bad id", payload)).to eq :invalid_session_id
   end
 
   it "401 は :unauthorized" do
-    client = LiveClient.new(requester: ->(*) { [ 401, { "error" => "unauthorized" } ] })
+    client = Live::Client.new(requester: ->(*) { [ 401, { "error" => "unauthorized" } ] })
 
     expect(client.create_session("sess-1", payload)).to eq :unauthorized
   end
 
   it "ネットワーク失敗や想定外の応答は :error" do
-    client = LiveClient.new(requester: ->(*) { raise Errno::ECONNREFUSED })
+    client = Live::Client.new(requester: ->(*) { raise Errno::ECONNREFUSED })
 
     expect(client.create_session("sess-1", payload)).to eq :error
 
-    client = LiveClient.new(requester: ->(*) { [ 500, { "error" => "boom" } ] })
+    client = Live::Client.new(requester: ->(*) { [ 500, { "error" => "boom" } ] })
     expect(client.create_session("sess-1", payload)).to eq :error
   end
 
@@ -54,20 +54,20 @@ RSpec.describe LiveClient do
     ENV.delete("LIVE_BASE_URL")
     ENV.delete("ADMIN_API_SECRET")
 
-    expect(LiveClient.new.create_session("sess-1", payload)).to eq :misconfigured
+    expect(Live::Client.new.create_session("sess-1", payload)).to eq :misconfigured
   ensure
     ENV["LIVE_BASE_URL"] = original_base
     ENV["ADMIN_API_SECRET"] = original_secret
   end
 
   it "タイムアウト定数は同期再試行 3 回でもリクエストを長く止めすぎない値" do
-    expect(LiveClient::OPEN_TIMEOUT).to eq 3
-    expect(LiveClient::READ_TIMEOUT).to eq 5
+    expect(Live::Client::OPEN_TIMEOUT).to eq 3
+    expect(Live::Client::READ_TIMEOUT).to eq 5
   end
 
   it "PUT は Bearer と JSON を付け、ranking は呼ばない" do
     calls = []
-    client = LiveClient.new(
+    client = Live::Client.new(
       base_url: "https://live.example.com",
       secret: "test-admin-api-secret-32chars!!",
       requester: ->(method, url, headers, body) {

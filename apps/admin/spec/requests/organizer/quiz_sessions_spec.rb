@@ -109,7 +109,7 @@ RSpec.describe "Organizer quiz sessions", type: :request do
     created = user.quiz_sessions.order(:id).last
     follow_redirect!
 
-    assert_select ".screen-url", text: /\/screen\/#{created.public_id}\?token=#{ScreenToken.screen("t" * 32, created.public_id)}\z/
+    assert_select ".screen-url", text: /\/screen\/#{created.public_id}\?token=#{Live::ScreenToken.screen("t" * 32, created.public_id)}\z/
     expect(response.body).not_to match(/#{"t" * 32}/)
 
     ENV.delete("ADMIN_API_SECRET")

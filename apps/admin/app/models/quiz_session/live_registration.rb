@@ -2,11 +2,11 @@
 # :error だけ同一 payload で最大 MAX_ATTEMPTS 回（設定ミス・画像 URL 不正は再試行しない）。
 class QuizSessionRegistrar
   MAX_ATTEMPTS = 3
-  # client_factory はテストで LiveClient の代替を差し込む。
+  # client_factory はテストで Live::Client の代替を差し込む。
   cattr_accessor :client_factory
 
   def self.call(session, client: nil, payload_builder: QuizPayloadBuilder)
-    client ||= client_factory&.call || LiveClient.new
+    client ||= client_factory&.call || Live::Client.new
     new(session, client: client, payload_builder: payload_builder).call
   end
 
