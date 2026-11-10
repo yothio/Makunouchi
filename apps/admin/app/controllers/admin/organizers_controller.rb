@@ -8,10 +8,10 @@ module Admin
 
     def create
       # role は params から受け取らず、必ず organizer にする（システム管理者の追加はここでは作らない）。
-      @user = User.new(organizer_params.merge(role: "organizer"))
+      @user = User.new(organizer_params.merge(role: :organizer))
 
       if @user.save
-        redirect_to new_admin_organizer_path, notice: "主催者「#{@user.email}」を作成しました。"
+        redirect_to new_admin_organizer_path, notice: t("flash.organizers.created", email: @user.email)
       else
         render :new, status: :unprocessable_entity
       end

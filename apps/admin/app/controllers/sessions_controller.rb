@@ -2,7 +2,6 @@ class SessionsController < ApplicationController
   # ログイン試行の回数制限。キャッシュ（本番は memory_store）には依存せず、専用のプロセス内ストアを使う。
   # インスタンスごとの回数になる（Cloud Run の複数インスタンスでは緩くなるが、制限なしよりはるかによい）。
   LOGIN_RATE_LIMIT_STORE = ActiveSupport::Cache::MemoryStore.new
-  TOO_MANY_ATTEMPTS = "ログインの試行が多すぎます。しばらく待ってからやり直してください。".freeze
 
   allow_unauthenticated_access only: %i[new create]
 
@@ -22,7 +21,7 @@ class SessionsController < ApplicationController
       start_session_for(user)
       redirect_to after_login_path(user)
     else
-      @error = "メールアドレスまたはパスワードが違います。"
+      @error = t("sessions.invalid_credentials")
       render :new, status: :unprocessable_entity
     end
   end
@@ -35,7 +34,7 @@ class SessionsController < ApplicationController
   private
 
   def render_too_many_attempts
-    @error = TOO_MANY_ATTEMPTS
+    @error = t("sessions.too_many_attempts")
     render :new, status: :too_many_requests
   end
 
