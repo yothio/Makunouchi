@@ -1,33 +1,28 @@
 module Organizer
   class QuizSessionsController < ApplicationController
+    before_action :set_quiz_session, only: %i[show register]
+
     def new
       @quiz_session = QuizSession.new
     end
 
     def create
       # user・status・public_id・幹事の ID/パスワードは params から受けず、サーバーで決める。
-      @quiz_session = QuizSession.prepare(user: current_user, title: params.expect(quiz_session: [ :title ])[:title])
+      @quiz_session = QuizSession.prepare(user: current_user, title: quiz_session_params[:title])
 
       if @quiz_session.save
-        result = QuizSessionRegistrar.call(@quiz_session)
-        if result == :ready
-          redirect_to organizer_quiz_session_path(@quiz_session), notice: "開催回を登録しました。"
-        else
-          redirect_to organizer_quiz_session_path(@quiz_session), alert: registration_alert(result)
-        end
+        redirect_after_registration(QuizSessionRegistrar.call(@quiz_session))
       else
         render :new, status: :unprocessable_entity
       end
     end
 
     def show
-      @quiz_session = current_user.quiz_sessions.find(params[:id])
       # 幹事の平文パスワードを出す画面なので、戻るボタンやブラウザのキャッシュに残さない。
       response.headers["Cache-Control"] = "no-store"
     end
 
     def register
-      @quiz_session = current_user.quiz_sessions.find(params[:id])
       if @quiz_session.host_missing?
         redirect_to organizer_quiz_session_path(@quiz_session), alert: registration_alert(:host_missing)
         return
@@ -37,15 +32,26 @@ module Organizer
         return
       end
 
-      result = QuizSessionRegistrar.call(@quiz_session)
+      redirect_after_registration(QuizSessionRegistrar.call(@quiz_session))
+    end
+
+    private
+
+    def set_quiz_session
+      @quiz_session = current_user.quiz_sessions.find(params[:id])
+    end
+
+    def quiz_session_params
+      params.expect(quiz_session: [ :title ])
+    end
+
+    def redirect_after_registration(result)
       if result == :ready
         redirect_to organizer_quiz_session_path(@quiz_session), notice: "開催回を登録しました。"
       else
         redirect_to organizer_quiz_session_path(@quiz_session), alert: registration_alert(result)
       end
     end
-
-    private
 
     def registration_alert(result)
       case result
