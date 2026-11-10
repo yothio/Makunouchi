@@ -29,7 +29,7 @@ class SessionsController < ApplicationController
 
   def destroy
     end_session
-    redirect_to new_session_path
+    redirect_to new_session_path, status: :see_other
   end
 
   private

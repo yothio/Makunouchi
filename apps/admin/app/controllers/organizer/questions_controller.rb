@@ -33,7 +33,7 @@ module Organizer
 
     def destroy
       @question.destroy!
-      redirect_to organizer_questions_path, notice: "問題を削除しました。"
+      redirect_to organizer_questions_path, notice: "問題を削除しました。", status: :see_other
     end
 
     private
