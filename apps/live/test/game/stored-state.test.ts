@@ -68,14 +68,15 @@ describe("loadStoredState", () => {
   it("returns a broken shape as stored, with issues that do not echo stored values", () => {
     const raw = stored(current()) as any;
     raw.phase = { type: "question", index: "one", status: "open" };
-    raw.players[0].nickname = 42;
+    // Keep the nickname string so a regression that echoes stored values fails this assertion.
     raw.players[0].token = undefined;
     const result = loadStoredState(raw, STATE_SCHEMA_VERSION);
     expect(result.state).toBe(raw);
     expect(result.issues.length).toBeGreaterThan(0);
     expect(result.issues.some((i) => i.startsWith("phase"))).toBe(true);
-    expect(result.issues.some((i) => i.startsWith("players.0.nickname"))).toBe(true);
+    expect(result.issues.some((i) => i.startsWith("players.0.token"))).toBe(true);
     expect(result.issues.join("\n")).not.toContain("Taro");
+    expect(result.issues.every((i) => /^[\w.()-]+: [a-z_]+$/.test(i) || i.startsWith("stateVersion:"))).toBe(true);
   });
 
   it("reports an unknown version but still returns the state", () => {

@@ -54,7 +54,7 @@ const storedStateSchema = z.looseObject({
   quiz: z.looseObject({ title: z.string(), questions: z.array(questionSchema) }),
   phase: phaseSchema,
   players: z.array(playerSchema).default([]),
-});
+}) satisfies z.ZodType<GameState>;
 
 export type LoadedState = { state: GameState | null; issues: string[] };
 
@@ -77,5 +77,5 @@ export const loadStoredState = (raw: unknown, storedVersion: unknown): LoadedSta
   if (!parsed.success) {
     return { state: raw as GameState, issues: [...issues, ...parsed.error.issues.map(describeIssue)] };
   }
-  return { state: parsed.data as GameState, issues };
+  return { state: parsed.data, issues };
 };
