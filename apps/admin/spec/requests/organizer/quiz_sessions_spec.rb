@@ -3,11 +3,11 @@ require "rails_helper"
 RSpec.describe "Organizer quiz sessions", type: :request do
   before do
     @fake_live = FakeLiveClient.new(:created)
-    QuizSessionRegistrar.client_factory = -> { @fake_live }
+    QuizSession.live_client_factory = -> { @fake_live }
   end
 
   after do
-    QuizSessionRegistrar.client_factory = nil
+    QuizSession.live_client_factory = nil
   end
 
   let(:organizer) { create(:user) }
@@ -63,7 +63,7 @@ RSpec.describe "Organizer quiz sessions", type: :request do
     create_list(:question, 5, user: user)
     sign_in_as user
     @fake_live = FakeLiveClient.new(:host_not_registered)
-    QuizSessionRegistrar.client_factory = -> { @fake_live }
+    QuizSession.live_client_factory = -> { @fake_live }
 
     post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
     created = user.quiz_sessions.order(:id).last
@@ -225,7 +225,7 @@ RSpec.describe "Organizer quiz sessions", type: :request do
     create_list(:question, 5, user: user)
     sign_in_as user
     @fake_live = FakeLiveClient.new(:misconfigured)
-    QuizSessionRegistrar.client_factory = -> { @fake_live }
+    QuizSession.live_client_factory = -> { @fake_live }
 
     post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
     created = user.quiz_sessions.order(:id).last

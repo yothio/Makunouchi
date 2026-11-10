@@ -1,5 +1,5 @@
 # live への PUT では points/topN を送らず、host は passwordHash のみ（平文なし）。
-class QuizPayloadBuilder
+class QuizSession::LivePayload
   class InsecureImageUrl < StandardError; end
 
   def self.call(session, strict_https: Rails.env.production?)

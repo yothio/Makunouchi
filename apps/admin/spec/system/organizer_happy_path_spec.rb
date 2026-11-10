@@ -4,12 +4,12 @@ RSpec.describe "主催者のハッピーパス", type: :system do
   let!(:user) { create(:user) }
 
   before do
-    QuizSessionRegistrar.client_factory = -> { FakeLiveClient.new }
+    QuizSession.live_client_factory = -> { FakeLiveClient.new }
     create_list(:question, 5, user: user)
   end
 
   after do
-    QuizSessionRegistrar.client_factory = nil
+    QuizSession.live_client_factory = nil
   end
 
   it "ログインして開催回を作ると live 登録済みになる" do

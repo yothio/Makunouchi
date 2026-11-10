@@ -1,4 +1,6 @@
 class QuizSession < ApplicationRecord
+  include LiveRegistration
+
   QUESTION_COUNT = (5..15) # live の制約（payload.ts）。開催回の作成時に検証する。
 
   belongs_to :user
