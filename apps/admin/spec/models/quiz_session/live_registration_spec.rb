@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe QuizSessionRegistrar do
+RSpec.describe QuizSession::LiveRegistration do
   let(:fake_client_class) do
     Class.new do
       attr_reader :calls
@@ -21,7 +21,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:created)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :ready
+    expect(session.register_with_live(client: client)).to eq :ready
     expect(session.reload).to be_ready
     expect(client.calls.size).to eq 1
     expect(client.calls.first[0]).to eq session.public_id
@@ -32,7 +32,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:host_not_registered)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :host_missing
+    expect(session.register_with_live(client: client)).to eq :host_missing
     expect(session.reload).to be_host_missing
     expect(client.calls.size).to eq 1
   end
@@ -41,7 +41,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session, :host_missing)
     client = fake_client_class.new(:created)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :host_missing
+    expect(session.register_with_live(client: client)).to eq :host_missing
     expect(client.calls).to be_empty
     expect(session.reload).to be_host_missing
   end
@@ -50,7 +50,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:error, :created)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :ready
+    expect(session.register_with_live(client: client)).to eq :ready
     expect(session.reload).to be_ready
     expect(client.calls.map(&:first)).to eq [ session.public_id, session.public_id ]
   end
@@ -59,7 +59,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:exists)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :ready
+    expect(session.register_with_live(client: client)).to eq :ready
     expect(session.reload).to be_ready
   end
 
@@ -67,7 +67,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session, :host_missing)
     client = fake_client_class.new(:exists)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :host_missing
+    expect(session.register_with_live(client: client)).to eq :host_missing
     expect(client.calls).to be_empty
     expect(session.reload).to be_host_missing
   end
@@ -76,12 +76,12 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:invalid_payload)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :invalid_payload
+    expect(session.register_with_live(client: client)).to eq :invalid_payload
     expect(session.reload).to be_pending
 
     session2 = create(:quiz_session)
     client2 = fake_client_class.new(:unauthorized)
-    expect(QuizSessionRegistrar.call(session2, client: client2)).to eq :unauthorized
+    expect(session2.register_with_live(client: client2)).to eq :unauthorized
     expect(session2.reload).to be_pending
   end
 
@@ -89,7 +89,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:error, :error, :error)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :error
+    expect(session.register_with_live(client: client)).to eq :error
     expect(session.reload).to be_pending
     expect(client.calls.size).to eq 3
   end
@@ -98,7 +98,7 @@ RSpec.describe QuizSessionRegistrar do
     session = create(:quiz_session)
     client = fake_client_class.new(:misconfigured, :created)
 
-    expect(QuizSessionRegistrar.call(session, client: client)).to eq :misconfigured
+    expect(session.register_with_live(client: client)).to eq :misconfigured
     expect(session.reload).to be_pending
     expect(client.calls.size).to eq 1
   end
@@ -108,11 +108,11 @@ RSpec.describe QuizSessionRegistrar do
     client = fake_client_class.new(:created)
     builder = Class.new do
       def self.call(*)
-        raise QuizPayloadBuilder::InsecureImageUrl, "http://"
+        raise QuizSession::LivePayload::InsecureImageUrl, "http://"
       end
     end
 
-    expect(QuizSessionRegistrar.call(session, client: client, payload_builder: builder)).to eq :insecure_image_url
+    expect(session.register_with_live(client: client, payload_builder: builder)).to eq :insecure_image_url
     expect(session.reload).to be_pending
     expect(client.calls).to be_empty
   end

@@ -11,7 +11,7 @@ module Organizer
       @quiz_session = QuizSession.prepare(user: current_user, title: quiz_session_params[:title])
 
       if @quiz_session.save
-        redirect_after_registration(QuizSessionRegistrar.call(@quiz_session))
+        redirect_after_registration(@quiz_session.register_with_live)
       else
         render :new, status: :unprocessable_entity
       end
@@ -32,7 +32,7 @@ module Organizer
         return
       end
 
-      redirect_after_registration(QuizSessionRegistrar.call(@quiz_session))
+      redirect_after_registration(@quiz_session.register_with_live)
     end
 
     private

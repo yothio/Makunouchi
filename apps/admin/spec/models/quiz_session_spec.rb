@@ -123,7 +123,7 @@ RSpec.describe QuizSession, type: :model do
     ENV["LIVE_PUBLIC_URL"] = "https://live.example.com/"
     ENV["ADMIN_API_SECRET"] = "s" * 32
 
-    token = ScreenToken.screen("s" * 32, session.public_id)
+    token = Live::ScreenToken.screen("s" * 32, session.public_id)
     expect(session.screen_url).to eq "https://live.example.com/screen/#{session.public_id}?token=#{token}"
     expect(session.screen_url).not_to match(/#{"s" * 32}/)
 

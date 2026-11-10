@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe QuizPayloadBuilder do
+RSpec.describe QuizSession::LivePayload do
   def organizer_with(count)
     create(:user).tap { |user| create_list(:question, count, user: user) }
   end
@@ -8,7 +8,7 @@ RSpec.describe QuizPayloadBuilder do
   it "points と topN は無く、host.passwordHash があり平文パスワードはどこにも入らない" do
     session = QuizSession.prepare(user: organizer_with(5), title: "本番").tap(&:save!)
 
-    payload = QuizPayloadBuilder.call(session)
+    payload = QuizSession::LivePayload.call(session)
 
     expect(payload[:title]).to eq "本番"
     expect(payload[:questions].size).to eq 5
@@ -33,7 +33,7 @@ RSpec.describe QuizPayloadBuilder do
     original = ENV["R2_PUBLIC_BASE_URL"]
     ENV["R2_PUBLIC_BASE_URL"] = "https://cdn.example.com/quiz"
 
-    payload = QuizPayloadBuilder.call(session)
+    payload = QuizSession::LivePayload.call(session)
 
     expect(payload[:questions].first[:imageUrl]).to eq "https://cdn.example.com/quiz/#{question.image.blob.key}"
   ensure
@@ -43,7 +43,7 @@ RSpec.describe QuizPayloadBuilder do
   it "画像なしなら imageUrl は null" do
     session = QuizSession.prepare(user: organizer_with(5), title: "本番").tap(&:save!)
 
-    payload = QuizPayloadBuilder.call(session)
+    payload = QuizSession::LivePayload.call(session)
 
     expect(payload[:questions].first[:imageUrl]).to be_nil
   end
@@ -58,9 +58,19 @@ RSpec.describe QuizPayloadBuilder do
     ENV["R2_PUBLIC_BASE_URL"] = "http://insecure.example.com"
 
     expect {
-      QuizPayloadBuilder.call(session, strict_https: true)
-    }.to raise_error(QuizPayloadBuilder::InsecureImageUrl)
+      QuizSession::LivePayload.call(session, strict_https: true)
+    }.to raise_error(QuizSession::LivePayload::InsecureImageUrl)
   ensure
     ENV["R2_PUBLIC_BASE_URL"] = original
+  end
+
+  it "キーの並びは title → questions → host、質問は title → imageUrl → choices → correctIndex" do
+    session = QuizSession.prepare(user: organizer_with(5), title: "本番").tap(&:save!)
+
+    payload = QuizSession::LivePayload.call(session)
+
+    expect(payload.keys).to eq [ :title, :questions, :host ]
+    expect(payload[:questions].first.keys).to eq [ :title, :imageUrl, :choices, :correctIndex ]
+    expect(payload[:host].keys).to eq [ :loginId, :passwordHash ]
   end
 end

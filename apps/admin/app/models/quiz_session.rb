@@ -1,4 +1,6 @@
 class QuizSession < ApplicationRecord
+  include LiveRegistration
+
   QUESTION_COUNT = (5..15) # live の制約（payload.ts）。開催回の作成時に検証する。
 
   belongs_to :user
@@ -51,7 +53,7 @@ class QuizSession < ApplicationRecord
     secret = ENV["ADMIN_API_SECRET"].to_s
     return if secret.empty?
 
-    "#{live_public_url}/screen/#{public_id}?token=#{ScreenToken.screen(secret, public_id)}"
+    "#{live_public_url}/screen/#{public_id}?token=#{Live::ScreenToken.screen(secret, public_id)}"
   end
 
   private

@@ -20,8 +20,5 @@ RSpec.configure do |config|
     ActiveRecord::Tasks::DatabaseTasks.truncate_all
   end
 
-  # spec/services は type を付けずに書くので、トランザクションの仕組みだけ個別に入れる。
-  config.include RSpec::Rails::RailsExampleGroup, file_path: %r{/spec/services/}
-
   config.filter_rails_from_backtrace!
 end
