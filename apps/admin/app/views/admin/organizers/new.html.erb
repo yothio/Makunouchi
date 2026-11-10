@@ -13,15 +13,15 @@
       <% end %>
 
       <div class="field">
-        <%= form.label :email, "メールアドレス" %>
+        <%= form.label :email %>
         <%= form.email_field :email, required: true, autocomplete: "off" %>
       </div>
       <div class="field">
-        <%= form.label :password, "パスワード" %>
+        <%= form.label :password %>
         <%= form.password_field :password, required: true, autocomplete: "new-password" %>
       </div>
       <div class="field">
-        <%= form.label :password_confirmation, "パスワード（確認）" %>
+        <%= form.label :password_confirmation %>
         <%= form.password_field :password_confirmation, required: true, autocomplete: "new-password" %>
       </div>
       <div class="form-actions">
