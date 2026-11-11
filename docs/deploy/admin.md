@@ -69,6 +69,38 @@
 
 コンテナ起動時には `db:prepare` / `db:migrate` を流しません。Neon の pooled 接続はアドバイザリロックと相性が悪く、複数インスタンスが同時に流すと競合するためです。
 
+### ログの見方
+
+production のログは 1 行 1 件の JSON で標準出力に出ます（`lib/json_log_formatter.rb`）。Cloud Logging はこれを構造化ログとして読み、`severity` を重要度に使います。項目は次のとおりです。
+
+| 項目 | 中身 |
+| --- | --- |
+| `severity` | `DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL` |
+| `message` | ログの本文。バックトレースは改行を含めて 1 件に入る |
+| `time` | 出力した時刻（UTC） |
+| `request_id` | リクエストごとの ID（`X-Request-Id`）。同じリクエストのログを束ねる |
+| `tags` | `request_id` 以外のタグ（Active Job など）があるときだけ |
+
+ログ エクスプローラ（対象の Cloud Run サービスを選んだ状態）での絞り込みの例:
+
+- 警告以上だけ: `severity>=WARNING`
+- 1 リクエストのログをまとめて見る: `jsonPayload.request_id="<request_id>"`
+- 例外（`Rails.error` に報告されたもの）: `jsonPayload.message=~"Rails.error"`。未処理例外は Rails 標準のログ（`ERROR`、本文に例外クラスとバックトレース）にも別に 1 件出る
+- live への登録の失敗: `jsonPayload.message=~"Live::Client|LiveRegistration"`
+
+live への登録（開催回の作成と「もう一度送る」）では次のログが出ます。開催回 ID（`session_id`）で検索すると、1 回の登録の流れを追えます。
+
+| ログ | 重要度 | 意味 |
+| --- | --- | --- |
+| `[Live::Client] PUT session_id=… status=… result=…` | `WARNING`（409 は `INFO`） | live が 2xx 以外を返した。401 は `ADMIN_API_SECRET` の不一致、422 は問題データの不正、5xx は live 側の障害 |
+| `[Live::Client] PUT session_id=… 例外クラス: メッセージ` | `WARNING` | 接続できない・タイムアウト・`LIVE_BASE_URL` などの設定漏れ（`KeyError`） |
+| `[QuizSession::LiveRegistration] retrying session_id=… failed_attempt=…` | `WARNING` | 一時的な失敗のため同じ内容で送り直した |
+| `[QuizSession::LiveRegistration] finished session_id=… result=…` | 成功（`ready`）は `INFO`、それ以外は `WARNING` | 登録の最終結果。画面の flash と同じ結果 |
+
+ログに幹事のパスワード・パスワードハッシュ・`ADMIN_API_SECRET`・送った問題の内容は出しません。
+
+Cloud Error Reporting がこの JSON の `message` に入ったバックトレースをエラーとして拾うかは、本番で例外を 1 回起こして確かめていません。拾われない場合も、上の `severity>=ERROR` の絞り込みで見つけられます。
+
 ---
 
 ## 3. Cloud Run の既定ドメインと独自ドメイン
