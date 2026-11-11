@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
 import { WS_CLOSE_SESSION_NOT_FOUND } from "../shared/ws-close";
 import { safeEqualDigest, verifyPbkdf2 } from "./auth";
-import { isGuestAtConnectionCap, isInboundMessageTooLarge } from "./connection-caps";
+import { activeWebSocketCount, inboundByteLength, isGuestAtConnectionCap, isInboundMessageTooLarge } from "./connection-caps";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";
 import type { GameState } from "./game/types";
 import { rankPlayers, type RankedPlayer } from "./game/ranking";
@@ -11,17 +11,24 @@ import { parseClientMessage } from "./messages";
 import type { HostCredentials } from "./payload";
 import { isRole, ROLE_HEADER } from "./role";
 import { guestView, hostView, screenView } from "./game/views";
+import { logEvent } from "./log";
 
 type GuestAttachment = { role: "guest"; playerId: string | null };
 type Attachment = { role: "host" } | { role: "screen" } | GuestAttachment;
 
 const attachmentOf = (ws: WebSocket): Attachment | null => ws.deserializeAttachment() as Attachment | null;
 
+const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 export type RankingResult = { phaseKey: PhaseKey; final: boolean; players: RankedPlayer[] };
 export type HostLoginResult = "ok" | "invalid" | "locked" | "missing";
 
 export class SessionRoom extends DurableObject<Env> {
   private state: GameState | null;
+
+  private get sessionId(): string | undefined {
+    return this.ctx.id.name;
+  }
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -81,6 +88,11 @@ export class SessionRoom extends DurableObject<Env> {
     // Guests are capped; host/screen must still connect so the day can be run.
     // CLOSING/CLOSED sockets are excluded so a Wi-Fi blip's overlapping reconnects are less likely to 503.
     if (isGuestAtConnectionCap(role, this.ctx.getWebSockets())) {
+      logEvent("warn", "ws_rejected_capacity", {
+        sessionId: this.sessionId,
+        role,
+        activeSockets: activeWebSocketCount(this.ctx.getWebSockets()),
+      });
       return new Response("too many connections", { status: 503 });
     }
 
@@ -89,6 +101,7 @@ export class SessionRoom extends DurableObject<Env> {
     // Uncreated session: same DO wake as the old HTTP 404 path; accept then close so
     // the browser can read the permanent reason (close codes are not available on failed handshakes).
     if (!this.state) {
+      logEvent("warn", "ws_rejected_session_not_found", { sessionId: this.sessionId, role });
       this.ctx.acceptWebSocket(server);
       server.close(WS_CLOSE_SESSION_NOT_FOUND, "not found");
       return new Response(null, { status: 101, webSocket: client });
@@ -114,16 +127,33 @@ export class SessionRoom extends DurableObject<Env> {
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
     if (!this.state) return;
     if (isInboundMessageTooLarge(raw)) {
+      logEvent("warn", "ws_message_too_large", {
+        sessionId: this.sessionId,
+        role: attachmentOf(ws)?.role,
+        bytes: inboundByteLength(raw),
+      });
       try {
         ws.close(1009, "message too large");
       } catch {
       }
       return;
     }
-    if (typeof raw !== "string") return;
+    if (typeof raw !== "string") {
+      logEvent("warn", "ws_message_invalid", { sessionId: this.sessionId, role: attachmentOf(ws)?.role, reason: "binary" });
+      return;
+    }
     const msg = parseClientMessage(raw);
     const att = attachmentOf(ws);
-    if (!msg || !att) return;
+    if (!msg) {
+      logEvent("warn", "ws_message_invalid", {
+        sessionId: this.sessionId,
+        role: att?.role,
+        reason: "unparseable",
+        bytes: inboundByteLength(raw),
+      });
+      return;
+    }
+    if (!att) return;
 
     switch (msg.type) {
       case "advance":
@@ -143,18 +173,38 @@ export class SessionRoom extends DurableObject<Env> {
 
   private onAdvance(msg: Extract<ClientMessage, { type: "advance" }>): void {
     if (!this.state) return;
-    this.apply(advance(this.state, msg.from));
+    const result = advance(this.state, msg.from);
+    this.logHostTransition(result, { action: "advance", from: msg.from });
+    this.apply(result);
   }
 
   private onResultsAction(msg: Extract<ClientMessage, { type: "results_action" }>): void {
     if (!this.state) return;
-    this.apply(presentResults(this.state, msg.from, msg.action));
+    const result = presentResults(this.state, msg.from, msg.action);
+    this.logHostTransition(result, { action: `results_action:${msg.action.kind}`, from: msg.from });
+    this.apply(result);
+  }
+
+  /** Host operations are few, so every outcome is logged; guest answers are not (150 per question). */
+  private logHostTransition(result: Transition<string>, context: { action: string; from: string }): void {
+    if (result.ok) {
+      logEvent("info", "phase_changed", { sessionId: this.sessionId, ...context, to: phaseKey(result.state.phase) });
+      return;
+    }
+    logEvent("warn", "transition_rejected", {
+      sessionId: this.sessionId,
+      role: "host",
+      ...context,
+      current: this.state ? phaseKey(this.state.phase) : null,
+      reason: result.reason,
+    });
   }
 
   private onJoin(ws: WebSocket, att: GuestAttachment, msg: Extract<ClientMessage, { type: "join" }>): void {
     if (!this.state || att.playerId) return;
     const result = joinPlayer(this.state, msg.nickname, { id: crypto.randomUUID(), token: crypto.randomUUID() });
     if (!result.ok) {
+      logEvent("info", "join_rejected", { sessionId: this.sessionId, reason: result.reason });
       this.send(ws, { type: "join_error", reason: result.reason });
       return;
     }
@@ -177,7 +227,8 @@ export class SessionRoom extends DurableObject<Env> {
     }
   }
 
-  webSocketError(ws: WebSocket): void {
+  webSocketError(ws: WebSocket, error: unknown): void {
+    logEvent("error", "ws_error", { sessionId: this.sessionId, role: attachmentOf(ws)?.role, message: errorMessage(error) });
     try {
       ws.close(1011, "error");
     } catch {
@@ -192,7 +243,13 @@ export class SessionRoom extends DurableObject<Env> {
   private send(ws: WebSocket, msg: ServerMessage): void {
     try {
       ws.send(JSON.stringify(msg));
-    } catch {
+    } catch (error) {
+      logEvent("warn", "ws_send_failed", {
+        sessionId: this.sessionId,
+        role: attachmentOf(ws)?.role,
+        type: msg.type,
+        message: errorMessage(error),
+      });
     }
   }
 

@@ -65,7 +65,7 @@ pnpm --filter live exec wrangler deploy --dry-run --outdir /tmp/makunouchi-live-
 pnpm --filter live run deploy
 ```
 
-`deploy` は `vite build` のあと `wrangler deploy` を実行します。**`run` を省いた `pnpm deploy` / `pnpm --filter live deploy` は使わないでください。** `deploy` は pnpm 組み込みのコマンドでもあり、`ERR_PNPM_INVALID_DEPLOY_TARGET` で失敗します。
+`deploy` は `vite build` のあと `wrangler deploy` を実行します。**`run` を省いた `pnpm deploy` / `pnpm --filter live deploy` は使わないでください。** `deploy` は pnpm 組み込みのコマンドでもあり、`ERR_PNPM_INVALID_DEPLOY_TARGET` で失敗します。`wrangler.jsonc` の `upload_source_maps: true` は、解決できない source map があるとデプロイを失敗させる。デプロイが失敗したら source map を疑う。
 
 **確かめること**
 
