@@ -18,6 +18,8 @@ Rails.application.configure do
 
   config.action_controller.raise_on_missing_callback_actions = true
 
+  config.i18n.raise_on_missing_translations = true
+
   # Active Record Encryption（QuizSession#host_password）のテスト用の固定鍵。本番は環境変数から読む。
   config.active_record.encryption.primary_key = "test-primary-key-0123456789abcdef"
   config.active_record.encryption.deterministic_key = "test-deterministic-key-0123456789"

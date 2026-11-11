@@ -39,6 +39,8 @@ Rails.application.configure do
 
   config.action_controller.raise_on_missing_callback_actions = true
 
+  config.i18n.raise_on_missing_translations = true
+
   # Active Record Encryption（QuizSession#host_password）の開発用の固定鍵。捨ての値で、本番の鍵とは無関係
   # （本番は環境変数から必須で読む）。無いと開発で開催回を作ったときに落ちる。
   config.active_record.encryption.primary_key = "dev-primary-key-0123456789abcdef"
