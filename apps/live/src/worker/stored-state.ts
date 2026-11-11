@@ -11,7 +11,7 @@ export const STATE_VERSION_KEY = "stateVersion";
 
 const choiceSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 
-// looseObject にするのは、知らないキーを残して、ロールバックした古いコードが新しいデプロイの
+// looseObject にするのは、知らないキーを残して、ロールバックした古いコードが新しいデプロイが
 // 書いた項目を消さないようにするため。既定値で補うのは空の値が明らかな項目だけで、
 // それ以外の欠けは推測で補わずに報告する。
 const questionSchema = z.looseObject({
