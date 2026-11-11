@@ -10,7 +10,8 @@ const ROUTES: readonly (readonly [path: string, route: Route])[] = [
   ["/screen/:id", "screen"],
 ];
 
-// Pattern / Linear / Trie のうち client のバンドルが最も小さい。RegExp / Smart は params が index マップで取り出しに手間が要るので使わない
+// Pattern を使うのは、Linear / Trie より client のバンドルが小さく、params をそのまま取れるため
+// RegExp / Smart は params が index マップで返り、取り出しに手間が要るので避ける
 const router = new PatternRouter<Route>();
 for (const [path, route] of ROUTES) router.add("GET", path, route);
 
