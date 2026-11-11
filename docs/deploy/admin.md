@@ -83,7 +83,8 @@ production のログは 1 行 1 件の JSON で標準出力に出ます（`lib/j
 
 ログ エクスプローラ（対象の Cloud Run サービスを選んだ状態）での絞り込みの例:
 
-- 警告以上だけ: `severity>=WARNING`
+- エラー以上だけ（500 など。404・422 などの想定内の例外は `ERROR` で出さない）: `severity>=ERROR`
+- 警告以上だけ（live への登録の失敗も含む）: `severity>=WARNING`
 - 1 リクエストのログをまとめて見る: `jsonPayload.request_id="<request_id>"`
 - 例外（`Rails.error` に報告されたもの）: `jsonPayload.message=~"Rails.error"`。未処理例外は Rails 標準のログ（`ERROR`、本文に例外クラスとバックトレース）にも別に 1 件出る
 - live への登録の失敗: `jsonPayload.message=~"Live::Client|LiveRegistration"`
