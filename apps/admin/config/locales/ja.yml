@@ -65,6 +65,8 @@ ja:
         role: "役割"
       quiz_session:
         title: "開催回名"
+        # base のエラーを作るときも Rails は属性名を引く。full_messages には出ない。
+        base: "開催回"
   flash:
     questions:
       saved: "問題を保存しました。"
