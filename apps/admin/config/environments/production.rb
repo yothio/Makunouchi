@@ -28,8 +28,10 @@ Rails.application.configure do
     config.middleware.insert_before 0, CanonicalHostRedirect, ENV["ADMIN_CANONICAL_HOST"]
   end
 
-  config.log_tags = [ :request_id ]
-  config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
+  # JSON 1 行で出し、Cloud Logging で重要度と request_id で絞れるようにする。request_id は名前付きのタグにして formatter が取り出す。
+  require_relative "../../lib/json_log_formatter"
+  config.log_tags = [ ->(request) { "request_id=#{request.request_id}" } ]
+  config.logger   = ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new(STDOUT, formatter: JsonLogFormatter.new))
 
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 
