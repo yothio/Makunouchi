@@ -116,4 +116,42 @@ RSpec.describe QuizSession::LiveRegistration do
     expect(session.reload).to be_pending
     expect(client.calls).to be_empty
   end
+
+  describe "ログ" do
+    before do
+      allow(Rails.logger).to receive(:warn)
+      allow(Rails.logger).to receive(:info)
+    end
+
+    it "再試行ごとに warn、成功の最終結果を info に出す" do
+      session = create(:quiz_session)
+      client = fake_client_class.new(:error, :error, :created)
+
+      session.register_with_live(client: client)
+
+      expect(Rails.logger).to have_received(:warn).with("[QuizSession::LiveRegistration] retrying session_id=#{session.public_id} failed_attempt=1 result=error")
+      expect(Rails.logger).to have_received(:warn).with("[QuizSession::LiveRegistration] retrying session_id=#{session.public_id} failed_attempt=2 result=error")
+      expect(Rails.logger).to have_received(:info).with("[QuizSession::LiveRegistration] finished session_id=#{session.public_id} result=ready")
+    end
+
+    it "再試行し尽くした失敗は最終結果を warn に出し、3 回目のあとは retrying を出さない" do
+      session = create(:quiz_session)
+      client = fake_client_class.new(:error, :error, :error)
+
+      session.register_with_live(client: client)
+
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("retrying")).twice
+      expect(Rails.logger).to have_received(:warn).with("[QuizSession::LiveRegistration] finished session_id=#{session.public_id} result=error")
+      expect(Rails.logger).not_to have_received(:info)
+    end
+
+    it "host_missing になったときも warn に出す" do
+      session = create(:quiz_session)
+      client = fake_client_class.new(:host_not_registered)
+
+      session.register_with_live(client: client)
+
+      expect(Rails.logger).to have_received(:warn).with("[QuizSession::LiveRegistration] finished session_id=#{session.public_id} result=host_missing")
+    end
+  end
 end
