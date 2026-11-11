@@ -50,6 +50,7 @@ RSpec.describe "Sessions", type: :request do
     delete session_path
 
     expect(response).to redirect_to(new_session_path)
+    expect(response).to have_http_status(:see_other)
     get root_path
     expect(response).to redirect_to(new_session_path)
   end
