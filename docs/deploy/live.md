@@ -65,7 +65,7 @@ pnpm --filter live exec wrangler deploy --dry-run --outdir /tmp/makunouchi-live-
 pnpm --filter live run deploy
 ```
 
-`deploy` は `vite build` のあと `wrangler deploy` を実行します。**`run` を省いた `pnpm deploy` / `pnpm --filter live deploy` は使わないでください。** `deploy` は pnpm 組み込みのコマンドでもあり、`ERR_PNPM_INVALID_DEPLOY_TARGET` で失敗します。`wrangler.jsonc` の `upload_source_maps: true` は、解決できない source map があるとデプロイを失敗させる。デプロイが失敗したら source map を疑う。
+`deploy` は `vite build` のあと `wrangler deploy` を実行します。**`run` を省いた `pnpm deploy` / `pnpm --filter live deploy` は使わないでください。** `deploy` は pnpm 組み込みのコマンドでもあり、`ERR_PNPM_INVALID_DEPLOY_TARGET` で失敗します。`wrangler.jsonc` の `upload_source_maps: true` により、解決できない source map があるとデプロイが失敗します。デプロイが失敗したら source map を疑ってください（「9. よくある失敗」も参照）。
 
 **確かめること**
 
@@ -324,6 +324,7 @@ ADMIN_API_SECRET="$(gcloud secrets versions access latest --secret=<ADMIN_API_SE
 | どの API も 500 `misconfigured` | live に secret が無い、または 32 文字未満 |
 | 参加者 URL の先頭が欠ける | admin の `LIVE_PUBLIC_URL` が未設定 |
 | `pnpm deploy` が失敗する | `run` を付けて `pnpm --filter live run deploy` にする |
+| deploy が source map の解決で失敗する | `wrangler.jsonc` の `upload_source_maps: true` は、解決できない map があるとデプロイを失敗させる。ビルド出力の `.map` を確認する |
 | migration で失敗する | 一度適用した `migrations` の `tag` を書き換えない |
 | 投影画面が 401 | トークンが古い（secret 変更、または別開催回の URL） |
 
