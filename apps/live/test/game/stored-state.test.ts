@@ -15,7 +15,7 @@ const current = (): GameState => ({
   players: [{ id: "p1", token: "t1", nickname: "Taro", answers: { 0: 1, 1: 3 } }],
 });
 
-// What a DO actually hands back: JSON round-trip turns answer indexes into string keys.
+// DO が実際に返す形にする。JSON を通すと answers の番号が文字列のキーになる。
 const stored = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
 describe("loadStoredState", () => {
@@ -68,7 +68,7 @@ describe("loadStoredState", () => {
   it("returns a broken shape as stored, with issues that do not echo stored values", () => {
     const raw = stored(current()) as any;
     raw.phase = { type: "question", index: "one", status: "open" };
-    // Keep the nickname string so a regression that echoes stored values fails this assertion.
+    // ニックネームは残しておく。保存値をログに出す退行があれば、下の "Taro" の検査で落ちる。
     raw.players[0].token = undefined;
     const result = loadStoredState(raw, STATE_SCHEMA_VERSION);
     expect(result.state).toBe(raw);

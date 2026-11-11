@@ -5,8 +5,8 @@ import { SessionRoom } from "../../src/worker/session-room";
 import { STATE_SCHEMA_VERSION, STATE_VERSION_KEY } from "../../src/worker/stored-state";
 import { connectGuest, connectHost, createSession, newSessionId, quiz } from "./helpers";
 
-// The live instance read storage once in its constructor; re-run that read on what the test wrote
-// and hand the result to the live instance so sockets see it.
+// 動いているインスタンスはストレージを constructor で一度しか読まない。テストが書いた内容で
+// 同じ読み込みをやり直し、その結果を動いているインスタンスに渡して、ソケットから見えるようにする。
 const reloadFrom = async (id: string, write: (kv: SyncKvStorage) => void) => {
   const stub = env.SESSION_ROOM.getByName(id);
   await runInDurableObject(stub, async (inst, ctx) => {
