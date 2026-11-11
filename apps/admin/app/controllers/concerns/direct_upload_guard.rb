@@ -28,7 +28,7 @@ module DirectUploadGuard
   end
 
   def render_unacceptable
-    render json: { error: "画像（png / jpeg / webp / gif、#{Question::IMAGE_MAX_BYTES / 1.megabyte} MB 以下）だけアップロードできます。" },
+    render json: { error: t("direct_uploads.unacceptable", max_mb: Question::IMAGE_MAX_BYTES / 1.megabyte) },
            status: :unprocessable_entity
   end
 end

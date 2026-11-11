@@ -45,6 +45,7 @@ RSpec.describe "Organizer questions", type: :request do
       post organizer_questions_path, params: { question: valid }
     }.to change { organizer.questions.count }.by(1)
     expect(response).to redirect_to(organizer_questions_path)
+    expect(response).to have_http_status(:found)
     expect(organizer.questions.order(:id).last.correct_index).to eq 1
   end
 
@@ -106,6 +107,7 @@ RSpec.describe "Organizer questions", type: :request do
 
     patch organizer_question_path(question), params: { question: valid.merge(title: "更新後", image: "") }
     expect(response).to redirect_to(organizer_questions_path)
+    expect(response).to have_http_status(:see_other)
     expect(question.reload.title).to eq "更新後"
     expect(question.image).to be_attached
   end
@@ -126,6 +128,7 @@ RSpec.describe "Organizer questions", type: :request do
       delete organizer_question_path(first_question)
     }.to change(Question, :count).by(-1)
     expect(response).to redirect_to(organizer_questions_path)
+    expect(response).to have_http_status(:see_other)
   end
 
   it "他の主催者の問題は 404（見る・編集・更新・削除）" do

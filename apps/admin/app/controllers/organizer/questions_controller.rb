@@ -25,7 +25,7 @@ module Organizer
 
     def update
       if @question.update(question_params)
-        redirect_to organizer_questions_path, notice: t("flash.questions.saved")
+        redirect_to organizer_questions_path, notice: t("flash.questions.saved"), status: :see_other
       else
         render :edit, status: :unprocessable_entity
       end

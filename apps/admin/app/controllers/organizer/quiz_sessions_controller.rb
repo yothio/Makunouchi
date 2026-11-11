@@ -57,8 +57,16 @@ module Organizer
       case result
       when :host_missing
         t("quiz_session.status.host_missing")
-      when :invalid_payload, :invalid_session_id, :unauthorized, :misconfigured, :insecure_image_url
-        t("quiz_session.registration.#{result}")
+      when :invalid_payload
+        t("quiz_session.registration.invalid_payload")
+      when :invalid_session_id
+        t("quiz_session.registration.invalid_session_id")
+      when :unauthorized
+        t("quiz_session.registration.unauthorized")
+      when :misconfigured
+        t("quiz_session.registration.misconfigured")
+      when :insecure_image_url
+        t("quiz_session.registration.insecure_image_url")
       else
         t("quiz_session.registration.failed")
       end

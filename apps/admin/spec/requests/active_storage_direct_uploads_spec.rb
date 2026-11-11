@@ -45,6 +45,7 @@ RSpec.describe "Active Storage の direct upload", type: :request do
 
     expect { issue(content_type: "text/html") }.not_to change(ActiveStorage::Blob, :count)
     expect(response).to have_http_status(:unprocessable_content)
+    expect(response.parsed_body["error"]).to eq "画像（png / jpeg / webp / gif、5 MB 以下）だけアップロードできます。"
   end
 
   it "許可する 4 種類は通る" do
