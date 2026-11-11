@@ -236,6 +236,27 @@ RSpec.describe "Organizer quiz sessions", type: :request do
     expect(response.body).not_to match(/ADMIN_API_SECRET/)
   end
 
+  {
+    invalid_payload: "quiz_session.registration.invalid_payload",
+    invalid_session_id: "quiz_session.registration.invalid_session_id",
+    unauthorized: "quiz_session.registration.unauthorized",
+    insecure_image_url: "quiz_session.registration.insecure_image_url",
+    error: "quiz_session.registration.failed"
+  }.each do |result, key|
+    it "live 登録が #{result} のときは #{key} の案内を出し pending のまま" do
+      user = organizer
+      create_list(:question, 5, user: user)
+      sign_in_as user
+      @fake_live = FakeLiveClient.new(result)
+      QuizSession.live_client_factory = -> { @fake_live }
+
+      post organizer_quiz_sessions_path, params: { quiz_session: { title: "本番" } }
+
+      expect(user.quiz_sessions.order(:id).last).to be_pending
+      expect(flash[:alert]).to eq I18n.t(key)
+    end
+  end
+
   it "画像 URL 不正と認証失敗の案内に秘密名を出さない" do
     alerts = Organizer::QuizSessionsController.new.send(:registration_alert, :insecure_image_url)
     expect(alerts).to match(/https ではありません/)
