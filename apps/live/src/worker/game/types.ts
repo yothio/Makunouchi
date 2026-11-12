@@ -1,4 +1,4 @@
-import type { Choice, Phase, QuizPayload } from "../../shared/types";
+import type { Choice, Phase, QuizPayload } from "@shared/types";
 
 export type Player = {
   id: string;

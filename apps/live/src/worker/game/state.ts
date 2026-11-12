@@ -1,4 +1,4 @@
-import type { Choice, Phase, PhaseKey, QuizPayload, ResultsAction } from "../../shared/types";
+import type { Choice, Phase, PhaseKey, QuizPayload, ResultsAction } from "@shared/types";
 import { CHOICE_COUNT, MAX_PLAYERS, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "./rules";
 import type { GameState, Player } from "./types";
 

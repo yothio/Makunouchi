@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
-import type { HostView, ResultsAction } from "../../shared/types";
-import { permanentWsErrorFromCode, type PermanentWsError } from "../permanent-ws-error";
-import { buildSocketUrl } from "../socket-url";
-import { useLiveSocket } from "../use-live-socket";
+import type { HostView, ResultsAction } from "@shared/types";
+import { permanentWsErrorFromCode, type PermanentWsError } from "@client/permanent-ws-error";
+import { buildSocketUrl } from "@client/socket-url";
+import { useLiveSocket } from "@client/use-live-socket";
 import { AdvanceGate, hostActionLabel, resultsActionMessage } from "./host-action";
 
 export const useHostSession = (sessionId: string, token: string) => {

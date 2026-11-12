@@ -1,4 +1,4 @@
-import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "../../shared/types";
+import type { Choice, GuestView, HistoryEntry, HostView, PublicQuestion, ScreenView } from "@shared/types";
 import { rankPlayers } from "./ranking";
 import { revealedCount, scoreOf } from "./scoring";
 import { phaseKey } from "./state";

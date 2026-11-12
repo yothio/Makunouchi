@@ -1,4 +1,4 @@
-import type { PublicQuestion } from "../../shared/types";
+import type { PublicQuestion } from "@shared/types";
 
 export const QuestionBlock = ({ q }: { q: PublicQuestion }) => {
   return (

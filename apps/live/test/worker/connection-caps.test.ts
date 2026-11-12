@@ -5,8 +5,8 @@ import {
   inboundByteLength,
   isGuestAtConnectionCap,
   isInboundMessageTooLarge,
-} from "../../src/worker/connection-caps";
-import { MAX_MESSAGE_BYTES, MAX_WEBSOCKETS } from "../../src/worker/game/rules";
+} from "@worker/connection-caps";
+import { MAX_MESSAGE_BYTES, MAX_WEBSOCKETS } from "@worker/game/rules";
 
 describe("countsTowardConnectionCap", () => {
   test("OPEN と CONNECTING だけ数える（CLOSING / CLOSED は除外）", () => {

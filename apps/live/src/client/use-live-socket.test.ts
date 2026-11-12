@@ -6,8 +6,8 @@ import {
   playerTokenKey,
   type TokenStore,
 } from "./guest/guest-socket";
-import type { ServerMessage } from "../shared/types";
-import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../shared/ws-close";
+import type { ServerMessage } from "@shared/types";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "@shared/ws-close";
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];

@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WS_CLOSE_SESSION_NOT_FOUND,
   WS_CLOSE_UNAUTHORIZED,
-} from "../../src/shared/ws-close";
-import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
-import { SessionRoom } from "../../src/worker/session-room";
+} from "@shared/ws-close";
+import { hostTokenFor, screenTokenFor } from "@worker/auth";
+import { SessionRoom } from "@worker/session-room";
 import {
   authHeaders,
   connectExpectingClose,

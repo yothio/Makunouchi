@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { HostLogin } from "../HostLogin";
-import { clearStoredToken } from "../token-store";
+import { HostLogin } from "@client/HostLogin";
+import { clearStoredToken } from "@client/token-store";
 import { applyHostGateEvent, initialHostGateState, screenForHostGate } from "./host-gate-state";
 import { HostApp } from "./HostApp";
 

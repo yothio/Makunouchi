@@ -30,7 +30,19 @@
     // need handler bookkeeping for no behaviour gain, and its fake WebSocket tests use on* properties.
     "unicorn/prefer-add-event-listener": "off",
     // Side-effect-only imports are legitimate for stylesheets.
-    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }]
+    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }],
+    // 親ディレクトリへの相対 import は禁止し、@client / @shared / @worker で書く。同じディレクトリと子への ./ は許す。
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["../*", "../**"],
+            "message": "親ディレクトリへの相対 import ではなく、@client / @shared / @worker のエイリアスで書く。"
+          }
+        ]
+      }
+    ]
   },
   "overrides": [
     {
@@ -45,6 +57,14 @@
       "rules": {
         // Small local helpers inside describe/test blocks and drivers read better next to their use.
         "unicorn/consistent-function-scoping": "off"
+      }
+    },
+    {
+      "files": ["scripts/**/*.ts", "test/worker/load.test.ts"],
+      "rules": {
+        // scripts は Node が直接実行するのでエイリアスを解決できない。src/loadtest と fixtures を読む
+        // load.test.ts にはエイリアスがないので、相対で書く。
+        "no-restricted-imports": "off"
       }
     },
     {

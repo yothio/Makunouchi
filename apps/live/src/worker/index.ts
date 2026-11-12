@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../shared/ws-close";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "@shared/ws-close";
 import { hostTokenFor, isUsableSecret, isValidSessionId, safeEqual, screenTokenFor, verifyBearer } from "./auth";
 import { quizPayloadSchema } from "./payload";
 import { isRole, ROLE_HEADER, type Role } from "./role";

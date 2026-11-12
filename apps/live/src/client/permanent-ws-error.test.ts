@@ -5,7 +5,7 @@ import {
   permanentWsErrorFromCode,
   screenPermanentErrorMessage,
 } from "./permanent-ws-error";
-import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../shared/ws-close";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "@shared/ws-close";
 
 describe("permanentWsErrorFromCode", () => {
   test("4404 / 4401 だけを恒久エラーにする（1009 の巨大メッセージ切断は含めない）", () => {

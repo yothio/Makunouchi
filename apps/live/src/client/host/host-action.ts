@@ -1,4 +1,4 @@
-import type { ClientMessage, HostView, PhaseKey, ResultsAction } from "../../shared/types";
+import type { ClientMessage, HostView, PhaseKey, ResultsAction } from "@shared/types";
 
 export const hostActionLabel = (view: HostView): string | null => {
   const s = view.screen;

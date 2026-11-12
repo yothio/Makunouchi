@@ -1,4 +1,4 @@
-import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../shared/ws-close";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "@shared/ws-close";
 
 export type PermanentWsError = "session_not_found" | "unauthorized";
 

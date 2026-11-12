@@ -1,5 +1,5 @@
-import type { HistoryEntry } from "../../shared/types";
-import { CHOICE_LABELS } from "../choice-labels";
+import type { HistoryEntry } from "@shared/types";
+import { CHOICE_LABELS } from "@client/choice-labels";
 
 export type HistoryRow = { question: string; choice: string; mark: "○" | "×" };
 

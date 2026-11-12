@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { QuizPayload } from "../../shared/types";
+import type { QuizPayload } from "@shared/types";
 import { MAX_PLAYERS } from "./rules";
 import { scoreOf } from "./scoring";
 import type { GameState } from "./types";

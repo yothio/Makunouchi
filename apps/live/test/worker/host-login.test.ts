@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { hostTokenFor } from "../../src/worker/auth";
+import { hostTokenFor } from "@worker/auth";
 import { authHeaders, connectHost, connectGuest, connectScreen, newSessionId, quiz } from "./helpers";
 
 /** Rails HostCredentials と同じ PBKDF2 固定ベクタ（auth.test と共有）。 */

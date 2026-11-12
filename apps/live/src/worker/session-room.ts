@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
-import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "../shared/types";
-import { WS_CLOSE_SESSION_NOT_FOUND } from "../shared/ws-close";
+import type { ClientMessage, PhaseKey, QuizPayload, ServerMessage } from "@shared/types";
+import { WS_CLOSE_SESSION_NOT_FOUND } from "@shared/ws-close";
 import { safeEqualDigest, verifyPbkdf2 } from "./auth";
 import { activeWebSocketCount, inboundByteLength, isGuestAtConnectionCap, isInboundMessageTooLarge } from "./connection-caps";
 import { advance, createGameState, joinPlayer, phaseKey, presentResults, submitAnswer, type GameEvent, type Transition } from "./game/state";

@@ -1,4 +1,4 @@
-import type { HistoryEntry } from "../../shared/types";
+import type { HistoryEntry } from "@shared/types";
 import { formatHistoryEntry } from "./history";
 
 export const AnswerHistory = ({ history }: { history: HistoryEntry[] }) => {

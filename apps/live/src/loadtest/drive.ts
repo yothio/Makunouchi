@@ -7,7 +7,7 @@ import type {
   ResultsAction,
   ScreenView,
   ServerMessage,
-} from "../shared/types";
+} from "@shared/types";
 
 export type Sock = {
   send(data: string): void;

@@ -1,5 +1,5 @@
-import type { Choice } from "../../../shared/types";
-import type { GuestViewOf, PendingAnswer } from "../types";
+import type { Choice } from "@shared/types";
+import type { GuestViewOf, PendingAnswer } from "@client/guest/types";
 import { QuestionChoices } from "./QuestionChoices";
 import { QuestionClosed } from "./QuestionClosed";
 

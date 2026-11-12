@@ -1,4 +1,4 @@
-import type { ResultsAction } from "../../shared/types";
+import type { ResultsAction } from "@shared/types";
 
 type Detail = {
   playerId: string;

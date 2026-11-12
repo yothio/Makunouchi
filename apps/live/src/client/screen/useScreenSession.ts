@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { ScreenView } from "../../shared/types";
-import { permanentWsErrorFromCode, type PermanentWsError } from "../permanent-ws-error";
-import { buildSocketUrl } from "../socket-url";
-import { useLiveSocket } from "../use-live-socket";
+import type { ScreenView } from "@shared/types";
+import { permanentWsErrorFromCode, type PermanentWsError } from "@client/permanent-ws-error";
+import { buildSocketUrl } from "@client/socket-url";
+import { useLiveSocket } from "@client/use-live-socket";
 
 export const useScreenSession = (sessionId: string, token: string) => {
   const [view, setView] = useState<ScreenView | null>(null);

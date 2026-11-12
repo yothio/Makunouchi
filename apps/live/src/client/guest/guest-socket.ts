@@ -1,4 +1,4 @@
-import type { ServerMessage } from "../../shared/types";
+import type { ServerMessage } from "@shared/types";
 
 export type TokenStore = {
   get(key: string): string | null;

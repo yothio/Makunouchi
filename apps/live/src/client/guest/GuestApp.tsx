@@ -1,4 +1,4 @@
-import { guestPermanentErrorMessage } from "../permanent-ws-error";
+import { guestPermanentErrorMessage } from "@client/permanent-ws-error";
 import { GuestScreen } from "./GuestScreen";
 import { useGuestSession } from "./useGuestSession";
 

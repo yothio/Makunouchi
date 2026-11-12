@@ -1,5 +1,5 @@
-import type { ClientMessage, ServerMessage } from "../shared/types";
-import { isPermanentWsClose } from "../shared/ws-close";
+import type { ClientMessage, ServerMessage } from "@shared/types";
+import { isPermanentWsClose } from "@shared/ws-close";
 
 const MIN_DELAY = 500;
 const MAX_DELAY = 5000;
