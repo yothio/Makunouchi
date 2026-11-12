@@ -1,5 +1,5 @@
-import type { HostLoginErrorKind } from "./host-login-error";
-import { useHostLogin } from "./useHostLogin";
+import type { HostLoginErrorKind } from "@client/host/lib/host-login-error";
+import { useHostLogin } from "@client/host/hooks/useHostLogin";
 
 const errorMessage = (kind: HostLoginErrorKind): string => {
   switch (kind) {
