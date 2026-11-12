@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { GuestApp } from "./guest/GuestApp";
 import { HostGate } from "./host/HostGate";
 import { ScreenApp } from "./screen/ScreenApp";
+import { matchRoute } from "./route";
 import { resolveToken, type TokenRole } from "./token-store";
 import "./styles.css";
 
@@ -21,14 +22,17 @@ const tokenFor = (role: TokenRole, sessionId: string): string => {
 };
 
 const Router = () => {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  const id = parts[1];
-  if (parts[0] === "s" && id && parts.length === 2) return <GuestApp sessionId={id} />;
-  if (parts[0] === "host" && id && parts.length === 2) {
-    return <HostGate sessionId={id} initialToken={tokenFor("host", id)} />;
+  const match = matchRoute(window.location.pathname);
+  switch (match?.route) {
+    case "guest":
+      return <GuestApp sessionId={match.id} />;
+    case "host":
+      return <HostGate sessionId={match.id} initialToken={tokenFor("host", match.id)} />;
+    case "screen":
+      return <ScreenApp sessionId={match.id} token={tokenFor("screen", match.id)} />;
+    default:
+      return <p className="note">URL が正しくありません</p>;
   }
-  if (parts[0] === "screen" && id && parts.length === 2) return <ScreenApp sessionId={id} token={tokenFor("screen", id)} />;
-  return <p className="note">URL が正しくありません</p>;
 };
 
 createRoot(document.getElementById("root")!).render(<Router />);
