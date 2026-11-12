@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { WS_CLOSE_SESSION_NOT_FOUND } from "../../src/shared/ws-close";
-import app from "../../src/worker/index";
+import { WS_CLOSE_SESSION_NOT_FOUND } from "@shared/ws-close";
+import app from "@worker/index";
 import { newSessionId, quiz } from "./helpers";
 
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;

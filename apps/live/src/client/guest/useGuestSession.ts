@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { Choice, GuestView } from "../../shared/types";
-import { permanentWsErrorFromCode, type PermanentWsError } from "../permanent-ws-error";
-import { useLiveSocket } from "../use-live-socket";
+import type { Choice, GuestView } from "@shared/types";
+import { permanentWsErrorFromCode, type PermanentWsError } from "@client/permanent-ws-error";
+import { useLiveSocket } from "@client/use-live-socket";
 import { buildGuestUrl, handleGuestMessage, localTokenStore } from "./guest-socket";
 import type { JoinError, PendingAnswer } from "./types";
 

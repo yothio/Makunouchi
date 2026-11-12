@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
-import { hostTokenFor, screenTokenFor } from "../../src/worker/auth";
-import type { QuizPayload, ServerMessage } from "../../src/shared/types";
+import { hostTokenFor, screenTokenFor } from "@worker/auth";
+import type { QuizPayload, ServerMessage } from "@shared/types";
 
 export const quiz: QuizPayload = {
   title: "Test Quiz",

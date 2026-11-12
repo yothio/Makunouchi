@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
-import { MAX_MESSAGE_BYTES, MAX_WEBSOCKETS } from "../../src/worker/game/rules";
+import { MAX_MESSAGE_BYTES, MAX_WEBSOCKETS } from "@worker/game/rules";
 import { connectExpectingClose, connectGuest, connectHost, createSession, newSessionId } from "./helpers";
 import { exports } from "cloudflare:workers";
 

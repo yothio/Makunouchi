@@ -1,5 +1,5 @@
-import type { HostView, ResultsAction } from "../../shared/types";
-import { CHOICE_LABELS } from "../choice-labels";
+import type { HostView, ResultsAction } from "@shared/types";
+import { CHOICE_LABELS } from "@client/choice-labels";
 import { RankDetailPanel } from "./RankDetailPanel";
 import { ResultsPanel } from "./ResultsPanel";
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { QuizPayload } from "../../shared/types";
+import type { QuizPayload } from "@shared/types";
 import { createGameState, joinPlayer } from "./state";
 import type { GameState } from "./types";
 import { rankPlayers } from "./ranking";

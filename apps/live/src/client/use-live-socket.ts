@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
-import type { ClientMessage, ServerMessage } from "../shared/types";
+import type { ClientMessage, ServerMessage } from "@shared/types";
 import { createReconnectingSocket, type ReconnectingSocket } from "./reconnecting-socket";
 
 export type UseLiveSocketOptions = {

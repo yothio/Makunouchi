@@ -1,4 +1,4 @@
-import type { ScreenOf } from "../types";
+import type { ScreenOf } from "@client/screen/types";
 
 export const RankRevealScreen = ({ screen }: { screen: ScreenOf<"rank_reveal"> }) => {
   return (

@@ -86,6 +86,19 @@ src/client/
 
 テストは対象のファイルの隣に `<対象>.test.ts` として置く。例は `src/client/host/lib/host-action.test.ts`。node 環境で動く単体テストはすべてこの方式にする。miniflare 上の Workers ランタイムで動かす統合テストは、特定の 1 ファイルに対応しないので `test/worker/` に置く。`test/` に置くのは `test/worker/` の統合テストだけで、旧 `test/game/` と `test/client/` には足さない。置いてしまった単体テストも node 側の vitest が拾うが、対象の隣へ移す。
 
+## apps/live の import の書き方
+
+`src/` の 3 つのディレクトリにはエイリアスがある。`@client/*` は `src/client/*`、`@shared/*` は `src/shared/*`、`@worker/*` は `src/worker/*` を指す。
+
+- ディレクトリをまたぐ import は、同じトップレベルの中でもエイリアスで書く。例は `import { CHOICE_LABELS } from "@client/common/lib/choice-labels"`。
+- 同じディレクトリか、その子のディレクトリへの `./` の import は相対のままにする。同じ画面の中で近くのファイルを指すときは、移動しても壊れにくく読みやすい。
+- 親ディレクトリへの `../` は書かない。oxlint の `no-restricted-imports` がエラーにする。
+- エイリアスの定義は `apps/live/tsconfig.paths.json` の 1 か所だけにある。`tsconfig.json` と `scripts/tsconfig.json` はこれを `extends` する。Vite と vitest は `resolve.tsconfigPaths` で、Wrangler の bundle は esbuild の tsconfig 対応で、同じ定義を読む。エイリアスを足すときはこのファイルだけを直す。
+- `scripts/` は Node が型を消して直接実行するので、エイリアスを解決できない。`scripts/` 自身は `../src/` への相対で書く。
+- `scripts/` から読まれる `src/` のファイルは `src/worker/auth.ts` と `src/loadtest/` の下で、ここでは値の import にエイリアスを使えない。値は相対で書き、エイリアスは `import type` でだけ使う。`.oxlintrc.json` の override がこの 2 か所の値の import をエラーにする。`scripts/` から読むファイルを増やしたら、その override の `files` にも足す。
+- 型の import は `import type { X } from "..."` と書く。`import { type X } from "..."` は型を消すと `import {} from "..."` が残り、Node の型を消す実行では空の import が実在のモジュールを探して `ERR_MODULE_NOT_FOUND` になる。oxlint の `typescript/no-import-type-side-effects` が全体でエラーにする。
+- `src/loadtest/` と `fixtures/` を指すエイリアスはない。`test/worker/load.test.ts` だけは相対で読み、`no-restricted-imports` の対象から外している。
+
 ## apps/live のコードの書き方
 
 - 関数はすべて `const` のアロー関数で書く。oxlint の `func-style` で検査する。クラスのメソッドは対象外。

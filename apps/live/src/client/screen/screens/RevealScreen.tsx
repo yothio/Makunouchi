@@ -1,6 +1,6 @@
-import { CHOICE_LABELS } from "../../choice-labels";
-import { QuestionBlock } from "../QuestionBlock";
-import type { ScreenOf } from "../types";
+import { CHOICE_LABELS } from "@client/choice-labels";
+import { QuestionBlock } from "@client/screen/QuestionBlock";
+import type { ScreenOf } from "@client/screen/types";
 
 export const RevealScreen = ({ screen: s }: { screen: ScreenOf<"reveal"> }) => {
   const max = Math.max(1, ...s.counts);

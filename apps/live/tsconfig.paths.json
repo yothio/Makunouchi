@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@client/*": ["./src/client/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@worker/*": ["./src/worker/*"]
+    }
+  }
+}

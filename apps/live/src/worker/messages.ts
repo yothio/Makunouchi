@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ClientMessage } from "../shared/types";
+import type { ClientMessage } from "@shared/types";
 
 // Deliberately permissive: nickname length/normalisation and choice range are
 // validated by the game layer, which owns the matching rejection reasons.

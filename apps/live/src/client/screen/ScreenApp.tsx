@@ -1,4 +1,4 @@
-import { screenPermanentErrorMessage } from "../permanent-ws-error";
+import { screenPermanentErrorMessage } from "@client/permanent-ws-error";
 import { ScreenContent } from "./ScreenContent";
 import { useScreenSession } from "./useScreenSession";
 

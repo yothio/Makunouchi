@@ -1,4 +1,4 @@
-import type { Choice, GuestView, ServerMessage } from "../../shared/types";
+import type { Choice, GuestView, ServerMessage } from "@shared/types";
 
 export type JoinError = Extract<ServerMessage, { type: "join_error" }>["reason"];
 

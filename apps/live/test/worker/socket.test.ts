@@ -1,9 +1,9 @@
 import { env, exports } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { SessionRoom } from "../../src/worker/session-room";
-import { screenTokenFor } from "../../src/worker/auth";
-import { MAX_MESSAGE_BYTES, MAX_PLAYERS, MAX_WEBSOCKETS } from "../../src/worker/game/rules";
+import { SessionRoom } from "@worker/session-room";
+import { screenTokenFor } from "@worker/auth";
+import { MAX_MESSAGE_BYTES, MAX_PLAYERS, MAX_WEBSOCKETS } from "@worker/game/rules";
 import {
   connectGuest,
   connectHost,

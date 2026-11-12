@@ -1,4 +1,4 @@
-import type { ScreenView } from "../../shared/types";
+import type { ScreenView } from "@shared/types";
 import { LobbyScreen } from "./screens/LobbyScreen";
 import { QuestionScreen } from "./screens/QuestionScreen";
 import { RankRevealScreen } from "./screens/RankRevealScreen";

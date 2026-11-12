@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { QuizPayload, ResultsStage } from "../../shared/types";
+import type { QuizPayload, ResultsStage } from "@shared/types";
 import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "./state";
 import type { GameState } from "./types";
 import { guestView, hostView, screenView } from "./views";
