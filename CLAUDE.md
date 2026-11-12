@@ -41,9 +41,43 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 - `src/worker/game/`: 純関数のゲームロジック。`state.ts` の遷移関数（`joinPlayer` / `submitAnswer` / `advance` / `presentResults`）は `Transition`（新しい state と `GameEvent[]`、または失敗理由）を返し、通知先は決めない。`views.ts` が state から幹事用（`hostView`）・投影画面用（`screenView`）・ゲスト用のビューを作る（ゲストには順位を送らず、投影画面には幹事が投影した順位・名前だけを出す等のネタバレ防止はここ）。`ranking.ts` は同点同順位の順位付け。
 - `src/shared/types.ts`: Worker とクライアントで共有する型（`Phase`、`HostView`、`ScreenView`、`GuestView`、メッセージ）。問題フェーズの `PhaseKey`（`lobby` / `q:<i>:<open|closed|revealed>`）はホストが `advance.from` として送り返し、結果フェーズは `r:list` / `r:<playerId>:<hidden|rank|name|both>` を `results_action.from` でも使う。サーバーは現在のキーと照合して冪等にする。**問題フェーズのエンコーディングを変えないこと。**
 - `src/worker/payload.ts`: 開催回作成時のクイズ JSON を zod で検証。
-- `src/client/`: React。`main.tsx` が `/s/:id`（ゲスト）、`/host/:id`（幹事画面。手元で進行操作と確認。会場には映さない）、`/screen/:id`（投影画面。プロジェクター用の別の PC で開き、操作せず幹事の操作に従う）を振り分ける。ホストトークン・投影画面トークンは URL から sessionStorage に移してアドレスバーから消す（`token-store.ts`）。ゲストは `playerToken` を保存して再接続時に同じ参加者として復帰する。共通の再接続処理は `reconnecting-socket.ts` / `use-live-socket.ts`。
+- `src/client/`: React。`main.tsx` が `/s/:id`（ゲスト）、`/host/:id`（幹事画面。手元で進行操作と確認。会場には映さない）、`/screen/:id`（投影画面。プロジェクター用の別の PC で開き、操作せず幹事の操作に従う）を振り分ける。ホストトークン・投影画面トークンは URL から sessionStorage に移してアドレスバーから消す（`common/lib/token-store.ts`）。ゲストは `playerToken` を保存して再接続時に同じ参加者として復帰する。共通の再接続処理は `common/lib/reconnecting-socket.ts` / `common/hooks/useLiveSocket.ts`。
 
 進行状態はすべてサーバー（DO）が持ち、ブラウザ側では持たない。開催回の作成時に受け取った問題一式をその開催回の間ずっと使う。
+
+## ディレクトリ構成（apps/live）
+
+`src/` は `client/`（ブラウザ）、`worker/`（Worker と Durable Object）、`shared/`（両方が使う型と定数）、`loadtest/`（負荷試験の補助）に分ける。`src/client/` の構成は次のとおり。
+
+```
+src/client/
+├── main.tsx          # エントリ。index.html が参照する。URL で 3 画面に振り分けるだけ
+├── styles.css
+├── common/           # 3 画面で共有するもの（src/shared/ と区別するため common）
+│   ├── hooks/        #   useLiveSocket.ts
+│   └── lib/          #   reconnecting-socket / socket-url / permanent-ws-error / route / token-store / choice-labels
+├── guest/            # 参加者の画面
+├── host/             # 幹事の画面（ログイン含む）
+└── screen/           # 投影画面
+```
+
+`guest/` `host/` `screen/` は、それぞれ次の 3 つに分ける。ある画面専用のものはその画面の下に置き、2 つ以上の画面が使うものだけを `common/` に置く。
+
+- `*App.tsx`: 画面の入口。どの画面を出すかだけを決める。直下に置く。
+- `components/`: コンポーネント（`.tsx`）。分岐やロジックを持つものは 1 ファイル 1 コンポーネント。
+- `hooks/`: `useXxx.ts` のカスタムフック。1 つしかなくても `hooks/` を作る。
+- `lib/`: React に依存しない `.ts` の純関数・定数。純関数がない画面では作らない。
+- 画面専用の型は、その画面の直下の `types.ts` に置く。Worker と共有する型は `src/shared/` に置く。
+
+ファイル名は次の規約に従う。
+
+| 種類 | 名前 | 例 |
+|---|---|---|
+| コンポーネント | PascalCase の `.tsx` | `GuestScreen.tsx` |
+| カスタムフック | `useXxx.ts` | `useGuestSession.ts` |
+| 純関数・定数 | kebab-case の `.ts` | `host-action.ts` |
+
+テストは対象のファイルの隣に `<対象>.test.ts` として置く（例: `src/client/host/lib/host-action.test.ts`）。node 環境で動く単体テストはすべてこの方式にする。Workers ランタイム（miniflare）で動かす統合テストは、特定の 1 ファイルに対応しないので `test/worker/` に置く。
 
 ## コードの書き方（apps/live）
 
