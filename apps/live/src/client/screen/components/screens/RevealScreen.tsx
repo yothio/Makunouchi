@@ -1,5 +1,5 @@
 import { CHOICE_LABELS } from "@client/common/lib/choice-labels";
-import { QuestionBlock } from "@client/screen/QuestionBlock";
+import { QuestionBlock } from "@client/screen/components/QuestionBlock";
 import type { ScreenOf } from "@client/screen/types";
 
 export const RevealScreen = ({ screen: s }: { screen: ScreenOf<"reveal"> }) => {
