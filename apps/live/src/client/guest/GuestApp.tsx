@@ -1,6 +1,6 @@
-import { guestPermanentErrorMessage } from "@client/permanent-ws-error";
-import { GuestScreen } from "./GuestScreen";
-import { useGuestSession } from "./useGuestSession";
+import { guestPermanentErrorMessage } from "@client/common/lib/permanent-ws-error";
+import { GuestScreen } from "./components/GuestScreen";
+import { useGuestSession } from "./hooks/useGuestSession";
 
 export const GuestApp = ({ sessionId }: { sessionId: string }) => {
   const { view, needJoin, joinError, pending, connected, permanentError, answer, join } =

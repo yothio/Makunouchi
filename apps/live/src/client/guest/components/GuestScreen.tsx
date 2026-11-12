@@ -1,7 +1,7 @@
 import type { Choice, GuestView } from "@shared/types";
 import { AnswerHistory } from "./AnswerHistory";
 import { JoinForm } from "./JoinForm";
-import type { JoinError, PendingAnswer } from "./types";
+import type { JoinError, PendingAnswer } from "@client/guest/types";
 import { QuestionView } from "./views/QuestionView";
 
 type Props = {

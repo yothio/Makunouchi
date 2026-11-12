@@ -1,5 +1,5 @@
 import type { HistoryEntry } from "@shared/types";
-import { formatHistoryEntry } from "./history";
+import { formatHistoryEntry } from "@client/guest/lib/history";
 
 export const AnswerHistory = ({ history }: { history: HistoryEntry[] }) => {
   if (history.length === 0) return null;

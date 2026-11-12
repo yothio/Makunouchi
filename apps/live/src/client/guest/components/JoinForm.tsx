@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { JoinError } from "./types";
+import type { JoinError } from "@client/guest/types";
 
 const JOIN_ERROR_TEXT: Record<JoinError, string> = {
   nickname_taken: "その名前は使われています",

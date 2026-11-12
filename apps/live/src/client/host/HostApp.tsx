@@ -1,4 +1,4 @@
-import { hostPermanentErrorMessage } from "@client/permanent-ws-error";
+import { hostPermanentErrorMessage } from "@client/common/lib/permanent-ws-error";
 import { shouldOfferRelogin } from "./open-failure-counter";
 import { HostPanel } from "./HostPanel";
 import { useHostSession } from "./useHostSession";

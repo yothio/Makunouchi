@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createReconnectingSocket } from "./reconnecting-socket";
+import { createReconnectingSocket } from "@client/common/lib/reconnecting-socket";
 import {
   buildGuestUrl,
   handleGuestMessage,
   playerTokenKey,
   type TokenStore,
-} from "./guest/guest-socket";
+} from "@client/guest/lib/guest-socket";
 import type { ServerMessage } from "@shared/types";
 import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "@shared/ws-close";
 
