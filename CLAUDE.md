@@ -61,10 +61,10 @@ src/client/
 └── screen/           # 投影画面
 ```
 
-`guest/` `host/` `screen/` は、それぞれ次の 3 つに分ける。ある画面専用のものはその画面の下に置き、2 つ以上の画面が使うものだけを `common/` に置く。
+`guest/` `host/` `screen/` は、それぞれ次の 3 つに分ける。ある画面専用のものはその画面の下に置く。2 つ以上の画面、または `main.tsx` が使うものは `common/` に置く。`common/` の他の部品だけが使うもの（例: `useLiveSocket` が使う `reconnecting-socket`）も `common/` に置く。
 
 - `*App.tsx`: 画面の入口。どの画面を出すかだけを決める。直下に置く。
-- `components/`: コンポーネント（`.tsx`）。分岐やロジックを持つものは 1 ファイル 1 コンポーネント。
+- `components/`: コンポーネント（`.tsx`）。分岐やロジックを持つものは 1 ファイル 1 コンポーネント。画面の中の役割ごとに、下にサブディレクトリを切ってよい（例: `components/views/`）。
 - `hooks/`: `useXxx.ts` のカスタムフック。1 つしかなくても `hooks/` を作る。
 - `lib/`: React に依存しない `.ts` の純関数・定数。純関数がない画面では作らない。
 - 画面専用の型は、その画面の直下の `types.ts` に置く。Worker と共有する型は `src/shared/` に置く。
