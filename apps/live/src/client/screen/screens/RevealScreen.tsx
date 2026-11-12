@@ -1,4 +1,4 @@
-import { CHOICE_LABELS } from "@client/choice-labels";
+import { CHOICE_LABELS } from "@client/common/lib/choice-labels";
 import { QuestionBlock } from "@client/screen/QuestionBlock";
 import type { ScreenOf } from "@client/screen/types";
 

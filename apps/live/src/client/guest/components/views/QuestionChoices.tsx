@@ -1,5 +1,5 @@
 import type { Choice, PublicQuestion } from "@shared/types";
-import { CHOICE_LABELS } from "@client/choice-labels";
+import { CHOICE_LABELS } from "@client/common/lib/choice-labels";
 
 export const QuestionChoices = ({
   question,

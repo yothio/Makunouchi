@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { Choice, GuestView } from "@shared/types";
-import { permanentWsErrorFromCode, type PermanentWsError } from "@client/permanent-ws-error";
-import { useLiveSocket } from "@client/use-live-socket";
-import { buildGuestUrl, handleGuestMessage, localTokenStore } from "./guest-socket";
-import type { JoinError, PendingAnswer } from "./types";
+import { permanentWsErrorFromCode, type PermanentWsError } from "@client/common/lib/permanent-ws-error";
+import { useLiveSocket } from "@client/common/hooks/useLiveSocket";
+import { buildGuestUrl, handleGuestMessage, localTokenStore } from "@client/guest/lib/guest-socket";
+import type { JoinError, PendingAnswer } from "@client/guest/types";
 
 export const useGuestSession = (sessionId: string) => {
   const [view, setView] = useState<GuestView | null>(null);

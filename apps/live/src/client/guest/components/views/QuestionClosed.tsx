@@ -1,6 +1,6 @@
 import type { Choice, HistoryEntry, PublicQuestion } from "@shared/types";
-import { CHOICE_LABELS } from "@client/choice-labels";
-import { AnswerHistory } from "@client/guest/AnswerHistory";
+import { CHOICE_LABELS } from "@client/common/lib/choice-labels";
+import { AnswerHistory } from "@client/guest/components/AnswerHistory";
 
 export const QuestionClosed = ({
   question,
