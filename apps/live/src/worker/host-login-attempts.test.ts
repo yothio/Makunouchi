@@ -3,7 +3,7 @@ import {
   HOST_LOGIN_LOCK_MS,
   HOST_LOGIN_MAX_FAILURES,
   reserveHostLoginAttempt,
-} from "../../src/worker/host-login-attempts";
+} from "./host-login-attempts";
 
 describe("reserveHostLoginAttempt", () => {
   test("ロック期限切れ後は回数を消してから予約し、いきなりロックしない", () => {

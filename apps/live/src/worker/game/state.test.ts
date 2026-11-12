@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { QuizPayload } from "../../src/shared/types";
-import { MAX_PLAYERS } from "../../src/worker/game/rules";
-import { scoreOf } from "../../src/worker/game/scoring";
-import type { GameState } from "../../src/worker/game/types";
+import type { QuizPayload } from "../../shared/types";
+import { MAX_PLAYERS } from "./rules";
+import { scoreOf } from "./scoring";
+import type { GameState } from "./types";
 import {
   advance,
   createGameState,
@@ -12,7 +12,7 @@ import {
   presentResults,
   submitAnswer,
   type Transition,
-} from "../../src/worker/game/state";
+} from "./state";
 
 const quiz: QuizPayload = {
   title: "T",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildSocketUrl } from "../../src/client/socket-url";
+import { buildSocketUrl } from "./socket-url";
 
 describe("buildSocketUrl", () => {
   test("uses the role in the path and the token in the query", () => {

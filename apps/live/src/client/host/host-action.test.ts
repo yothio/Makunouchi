@@ -5,8 +5,8 @@ import {
   AdvanceGate,
   hostActionLabel,
   resultsActionMessage,
-} from "../../src/client/host/host-action";
-import type { HostView } from "../../src/shared/types";
+} from "./host-action";
+import type { HostView } from "../../shared/types";
 
 const q = { index: 0, total: 5, title: "t", imageUrl: null, choices: ["a", "b", "c", "d"] as [string, string, string, string] };
 const v = (screen: HostView["screen"]): HostView => ({ title: "T", phaseKey: "k", playerCount: 3, screen });

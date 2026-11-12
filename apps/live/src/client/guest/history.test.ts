@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatHistoryEntry } from "../../src/client/guest/history";
+import { formatHistoryEntry } from "./history";
 
 describe("formatHistoryEntry", () => {
   test("a correct answer shows the question number, the choice label and ○", () => {

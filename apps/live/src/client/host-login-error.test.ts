@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { classifyHostLoginError } from "../../src/client/host-login-error";
+import { classifyHostLoginError } from "./host-login-error";
 
 describe("host-login-error", () => {
   test("401/404/429/ネットワーク失敗を分類する", () => {

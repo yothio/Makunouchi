@@ -66,7 +66,7 @@
 単一テストは `apps/live` で次のように実行します。
 
 ```
-pnpm exec vitest run test/game/state.test.ts
+pnpm exec vitest run src/worker/game/state.test.ts
 pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts
 ```
 

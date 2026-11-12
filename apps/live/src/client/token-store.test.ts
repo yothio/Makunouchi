@@ -1,5 +1,5 @@
 import { describe, expect, test, vi, type Mock } from "vitest";
-import { resolveToken, type TokenIo } from "../../src/client/token-store";
+import { resolveToken, type TokenIo } from "./token-store";
 
 const memoryStorage = () => {
   const map = new Map<string, string>();

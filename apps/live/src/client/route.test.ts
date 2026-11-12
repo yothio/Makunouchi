@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchRoute } from "../../src/client/route";
+import { matchRoute } from "./route";
 
 describe("matchRoute", () => {
   it("3 つの画面の URL を route と id に振り分ける", () => {

@@ -20,7 +20,7 @@ This file provides guidance to Claude Code at claude.ai/code when working with c
 `apps/live` で単一テストを実行する例:
 
 ```
-pnpm exec vitest run test/game/state.test.ts
+pnpm exec vitest run src/worker/game/state.test.ts
 pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts
 ```
 

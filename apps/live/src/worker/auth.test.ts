@@ -9,7 +9,7 @@ import {
   screenTokenFor,
   verifyBearer,
   verifyPbkdf2,
-} from "../../src/worker/auth";
+} from "./auth";
 
 const good = "x".repeat(MIN_ADMIN_SECRET_LENGTH);
 const short = "x".repeat(MIN_ADMIN_SECRET_LENGTH - 1);

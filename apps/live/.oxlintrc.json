@@ -41,7 +41,7 @@
       }
     },
     {
-      "files": ["test/**/*.ts", "src/loadtest/**/*.ts", "scripts/**/*.ts"],
+      "files": ["test/**/*.ts", "src/**/*.test.ts", "src/loadtest/**/*.ts", "scripts/**/*.ts"],
       "rules": {
         // Small local helpers inside describe/test blocks and drivers read better next to their use.
         "unicorn/consistent-function-scoping": "off"
