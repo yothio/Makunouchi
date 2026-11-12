@@ -1,6 +1,6 @@
 import { screenPermanentErrorMessage } from "@client/common/lib/permanent-ws-error";
-import { ScreenContent } from "./ScreenContent";
-import { useScreenSession } from "./useScreenSession";
+import { ScreenContent } from "./components/ScreenContent";
+import { useScreenSession } from "./hooks/useScreenSession";
 
 export const ScreenApp = ({ sessionId, token }: { sessionId: string; token: string }) => {
   const { view, connected, permanentError } = useScreenSession(sessionId, token);

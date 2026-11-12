@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import type { HostView, ResultsAction } from "@shared/types";
 import { permanentWsErrorFromCode, type PermanentWsError } from "@client/common/lib/permanent-ws-error";
-import { buildSocketUrl } from "@client/socket-url";
+import { buildSocketUrl } from "@client/common/lib/socket-url";
 import { useLiveSocket } from "@client/common/hooks/useLiveSocket";
 import { AdvanceGate, hostActionLabel, resultsActionMessage } from "./host-action";
 
