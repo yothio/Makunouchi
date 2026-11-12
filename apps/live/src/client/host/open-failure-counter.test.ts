@@ -4,7 +4,7 @@ import {
   shouldOfferRelogin,
   recordNeverOpened,
   recordOpened,
-} from "../../src/client/host/open-failure-counter";
+} from "./open-failure-counter";
 
 describe("open-failure-counter", () => {
   test("一度も open しない失敗が 3 回でログインし直すを出す", () => {

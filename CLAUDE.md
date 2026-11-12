@@ -20,7 +20,7 @@ This file provides guidance to Claude Code at claude.ai/code when working with c
 `apps/live` で単一テストを実行する例:
 
 ```
-pnpm exec vitest run test/game/state.test.ts
+pnpm exec vitest run src/worker/game/state.test.ts
 pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.ts
 ```
 
@@ -84,7 +84,7 @@ src/client/
 | カスタムフック | `useXxx.ts` | `useGuestSession.ts` |
 | 純関数・定数 | kebab-case の `.ts` | `host-action.ts` |
 
-テストは対象のファイルの隣に `<対象>.test.ts` として置く。例は `src/client/host/lib/host-action.test.ts`。node 環境で動く単体テストはすべてこの方式にする。miniflare 上の Workers ランタイムで動かす統合テストは、特定の 1 ファイルに対応しないので `test/worker/` に置く。
+テストは対象のファイルの隣に `<対象>.test.ts` として置く。例は `src/client/host/lib/host-action.test.ts`。node 環境で動く単体テストはすべてこの方式にする。miniflare 上の Workers ランタイムで動かす統合テストは、特定の 1 ファイルに対応しないので `test/worker/` に置く。`test/` に置くのは `test/worker/` の統合テストだけで、旧 `test/game/` と `test/client/` には足さない。置いてしまった単体テストも node 側の vitest が拾うが、対象の隣へ移す。
 
 ## apps/live のコードの書き方
 

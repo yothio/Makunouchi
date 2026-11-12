@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { quizPayloadSchema } from "../../src/worker/payload";
+import { quizPayloadSchema } from "./payload";
 
 const question = (over: Record<string, unknown> = {}) => {
   return {

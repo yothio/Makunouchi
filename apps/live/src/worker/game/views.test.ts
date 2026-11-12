@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { QuizPayload, ResultsStage } from "../../src/shared/types";
-import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "../../src/worker/game/state";
-import type { GameState } from "../../src/worker/game/types";
-import { guestView, hostView, screenView } from "../../src/worker/game/views";
+import type { QuizPayload, ResultsStage } from "../../shared/types";
+import { advance, createGameState, joinPlayer, phaseKey, submitAnswer, type Transition } from "./state";
+import type { GameState } from "./types";
+import { guestView, hostView, screenView } from "./views";
 
 const quiz: QuizPayload = {
   title: "T",

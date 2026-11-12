@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { QuizPayload } from "../../src/shared/types";
-import { createGameState, joinPlayer } from "../../src/worker/game/state";
-import type { GameState } from "../../src/worker/game/types";
-import { rankPlayers } from "../../src/worker/game/ranking";
+import type { QuizPayload } from "../../shared/types";
+import { createGameState, joinPlayer } from "./state";
+import type { GameState } from "./types";
+import { rankPlayers } from "./ranking";
 
 const make = (scores: number[]): GameState => {
   const quiz: QuizPayload = {

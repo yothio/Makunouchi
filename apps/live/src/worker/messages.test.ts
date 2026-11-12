@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clientMessageSchema, parseClientMessage } from "../../src/worker/messages";
+import { clientMessageSchema, parseClientMessage } from "./messages";
 
 describe("clientMessageSchema", () => {
   test("accepts valid join / answer / advance", () => {

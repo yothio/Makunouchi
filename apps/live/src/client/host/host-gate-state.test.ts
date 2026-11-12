@@ -4,7 +4,7 @@ import {
   initialHostGateState,
   screenForHostGate,
   type HostGateState,
-} from "../../src/client/host/host-gate-state";
+} from "./host-gate-state";
 
 describe("host-gate-state", () => {
   test("トークンが空なら HostLogin、あれば HostApp", () => {

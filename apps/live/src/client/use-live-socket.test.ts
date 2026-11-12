@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createReconnectingSocket } from "../../src/client/reconnecting-socket";
+import { createReconnectingSocket } from "./reconnecting-socket";
 import {
   buildGuestUrl,
   handleGuestMessage,
   playerTokenKey,
   type TokenStore,
-} from "../../src/client/guest/guest-socket";
-import type { ServerMessage } from "../../src/shared/types";
-import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../../src/shared/ws-close";
+} from "./guest/guest-socket";
+import type { ServerMessage } from "../shared/types";
+import { WS_CLOSE_SESSION_NOT_FOUND, WS_CLOSE_UNAUTHORIZED } from "../shared/ws-close";
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
