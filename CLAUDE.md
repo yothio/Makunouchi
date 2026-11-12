@@ -45,26 +45,33 @@ pnpm exec vitest run --config vitest.workers.config.ts test/worker/socket.test.t
 
 進行状態はすべてサーバー（DO）が持ち、ブラウザ側では持たない。開催回の作成時に受け取った問題一式をその開催回の間ずっと使う。
 
-## ディレクトリ構成（apps/live）
+## apps/live のディレクトリ構成
 
-`src/` は `client/`（ブラウザ）、`worker/`（Worker と Durable Object）、`shared/`（両方が使う型と定数）、`loadtest/`（負荷試験の補助）に分ける。`src/client/` の構成は次のとおり。
+`src/` は次の 4 つに分ける。
+
+- `client/`: ブラウザで動く React。
+- `worker/`: Worker と Durable Object。
+- `shared/`: Worker とクライアントの両方が使う型と定数。
+- `loadtest/`: 負荷試験の補助。
+
+`src/client/` の構成は次のとおり。
 
 ```
 src/client/
 ├── main.tsx          # エントリ。index.html が参照する。URL で 3 画面に振り分けるだけ
 ├── styles.css
-├── common/           # 3 画面で共有するもの（src/shared/ と区別するため common）
+├── common/           # 3 画面で共有するもの。src/shared/ と区別するため common とする
 │   ├── hooks/        #   useLiveSocket.ts
 │   └── lib/          #   reconnecting-socket / socket-url / permanent-ws-error / route / token-store / choice-labels
 ├── guest/            # 参加者の画面
-├── host/             # 幹事の画面（ログイン含む）
+├── host/             # 幹事の画面。ログインを含む
 └── screen/           # 投影画面
 ```
 
-`guest/` `host/` `screen/` は、それぞれ次の 3 つに分ける。ある画面専用のものはその画面の下に置く。2 つ以上の画面、または `main.tsx` が使うものは `common/` に置く。`common/` の他の部品だけが使うもの（例: `useLiveSocket` が使う `reconnecting-socket`）も `common/` に置く。
+`guest/` `host/` `screen/` は、それぞれ次の 3 つに分ける。ある画面専用のものはその画面の下に置く。2 つ以上の画面、または `main.tsx` が使うものは `common/` に置く。`common/` の他の部品だけが使うものも `common/` に置く。例は `useLiveSocket` だけが使う `reconnecting-socket`。
 
 - `*App.tsx`: 画面の入口。どの画面を出すかだけを決める。直下に置く。
-- `components/`: コンポーネント（`.tsx`）。分岐やロジックを持つものは 1 ファイル 1 コンポーネント。画面の中の役割ごとに、下にサブディレクトリを切ってよい（例: `components/views/`）。
+- `components/`: `.tsx` のコンポーネント。分岐やロジックを持つものは 1 ファイル 1 コンポーネント。画面の中の役割ごとに、下にサブディレクトリを切ってよい。例は `components/views/`。
 - `hooks/`: `useXxx.ts` のカスタムフック。1 つしかなくても `hooks/` を作る。
 - `lib/`: React に依存しない `.ts` の純関数・定数。純関数がない画面では作らない。
 - 画面専用の型は、その画面の直下の `types.ts` に置く。Worker と共有する型は `src/shared/` に置く。
@@ -77,7 +84,7 @@ src/client/
 | カスタムフック | `useXxx.ts` | `useGuestSession.ts` |
 | 純関数・定数 | kebab-case の `.ts` | `host-action.ts` |
 
-テストは対象のファイルの隣に `<対象>.test.ts` として置く（例: `src/client/host/lib/host-action.test.ts`）。node 環境で動く単体テストはすべてこの方式にする。Workers ランタイム（miniflare）で動かす統合テストは、特定の 1 ファイルに対応しないので `test/worker/` に置く。
+テストは対象のファイルの隣に `<対象>.test.ts` として置く。例は `src/client/host/lib/host-action.test.ts`。node 環境で動く単体テストはすべてこの方式にする。miniflare 上の Workers ランタイムで動かす統合テストは、特定の 1 ファイルに対応しないので `test/worker/` に置く。
 
 ## コードの書き方（apps/live）
 
