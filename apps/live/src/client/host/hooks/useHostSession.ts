@@ -3,7 +3,7 @@ import type { HostView, ResultsAction } from "@shared/types";
 import { permanentWsErrorFromCode, type PermanentWsError } from "@client/common/lib/permanent-ws-error";
 import { buildSocketUrl } from "@client/common/lib/socket-url";
 import { useLiveSocket } from "@client/common/hooks/useLiveSocket";
-import { AdvanceGate, hostActionLabel, resultsActionMessage } from "./host-action";
+import { AdvanceGate, hostActionLabel, resultsActionMessage } from "@client/host/lib/host-action";
 
 export const useHostSession = (sessionId: string, token: string) => {
   const [view, setView] = useState<HostView | null>(null);

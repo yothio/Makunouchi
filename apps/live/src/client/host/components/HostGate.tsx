@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { HostLogin } from "@client/HostLogin";
-import { clearStoredToken } from "@client/token-store";
-import { applyHostGateEvent, initialHostGateState, screenForHostGate } from "./host-gate-state";
-import { HostApp } from "./HostApp";
+import { HostLogin } from "./HostLogin";
+import { clearStoredToken } from "@client/common/lib/token-store";
+import { applyHostGateEvent, initialHostGateState, screenForHostGate } from "@client/host/lib/host-gate-state";
+import { HostApp } from "@client/host/HostApp";
 
 const sessionStorageOrNull = (): Storage | null => {
   try {

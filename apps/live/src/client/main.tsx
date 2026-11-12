@@ -1,9 +1,9 @@
 import { createRoot } from "react-dom/client";
 import { GuestApp } from "./guest/GuestApp";
-import { HostGate } from "./host/HostGate";
+import { HostGate } from "./host/components/HostGate";
 import { ScreenApp } from "./screen/ScreenApp";
-import { matchRoute } from "./route";
-import { resolveToken, type TokenRole } from "./token-store";
+import { matchRoute } from "./common/lib/route";
+import { resolveToken, type TokenRole } from "./common/lib/token-store";
 import "./styles.css";
 
 const tokenFor = (role: TokenRole, sessionId: string): string => {

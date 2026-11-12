@@ -1,7 +1,7 @@
 import { hostPermanentErrorMessage } from "@client/common/lib/permanent-ws-error";
-import { shouldOfferRelogin } from "./open-failure-counter";
-import { HostPanel } from "./HostPanel";
-import { useHostSession } from "./useHostSession";
+import { shouldOfferRelogin } from "./lib/open-failure-counter";
+import { HostPanel } from "./components/HostPanel";
+import { useHostSession } from "./hooks/useHostSession";
 
 export const HostApp = ({
   sessionId,

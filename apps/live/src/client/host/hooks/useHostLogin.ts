@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { classifyHostLoginError, type HostLoginErrorKind } from "./host-login-error";
-import { storeToken } from "./token-store";
+import { classifyHostLoginError, type HostLoginErrorKind } from "@client/host/lib/host-login-error";
+import { storeToken } from "@client/common/lib/token-store";
 
 export type HostLoginSuccess = { token: string };
 
