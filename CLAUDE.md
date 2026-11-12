@@ -94,8 +94,10 @@ src/client/
 - 同じディレクトリか、その子のディレクトリへの `./` の import は相対のままにする。同じ画面の中で近くのファイルを指すときは、移動しても壊れにくく読みやすい。
 - 親ディレクトリへの `../` は書かない。oxlint の `no-restricted-imports` がエラーにする。
 - エイリアスの定義は `apps/live/tsconfig.paths.json` の 1 か所だけにある。`tsconfig.json` と `scripts/tsconfig.json` はこれを `extends` する。Vite と vitest は `resolve.tsconfigPaths` で、Wrangler の bundle は esbuild の tsconfig 対応で、同じ定義を読む。エイリアスを足すときはこのファイルだけを直す。
-- `scripts/` は Node が型を消して直接実行するのでエイリアスを解決できない。`scripts/` は `../src/` への相対で書き、そこから読まれる `src/` 側のファイルは、値の import をエイリアスにしない。`import type` は実行前に消えるのでエイリアスで書いてよい。
-- `src/loadtest/` と `fixtures/` にはエイリアスがない。`test/worker/load.test.ts` だけは相対で読み、lint の対象から外している。
+- `scripts/` は Node が型を消して直接実行するので、エイリアスを解決できない。`scripts/` 自身は `../src/` への相対で書く。
+- `scripts/` から読まれる `src/` のファイルは `src/worker/auth.ts` と `src/loadtest/` の下で、ここでは値の import にエイリアスを使えない。値は相対で書き、エイリアスは `import type` でだけ使う。`.oxlintrc.json` の override がこの 2 か所の値の import をエラーにする。`scripts/` から読むファイルを増やしたら、その override の `files` にも足す。
+- 型の import は `import type { X } from "..."` と書く。`import { type X } from "..."` は型を消すと `import {} from "..."` が残り、Node の型を消す実行では空の import が実在のモジュールを探して `ERR_MODULE_NOT_FOUND` になる。oxlint の `typescript/no-import-type-side-effects` が全体でエラーにする。
+- `src/loadtest/` と `fixtures/` を指すエイリアスはない。`test/worker/load.test.ts` だけは相対で読み、`no-restricted-imports` の対象から外している。
 
 ## apps/live のコードの書き方
 

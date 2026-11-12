@@ -31,6 +31,8 @@
     "unicorn/prefer-add-event-listener": "off",
     // Side-effect-only imports are legitimate for stylesheets.
     "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }],
+    // `import { type X } from "..."` は型を消すと `import {} from "..."` が残り、Node が型を消して直接実行する場合に壊れる。`import type { X }` と書く。
+    "typescript/no-import-type-side-effects": "error",
     // 親ディレクトリへの相対 import は禁止し、@client / @shared / @worker で書く。同じディレクトリと子への ./ は許す。
     "no-restricted-imports": [
       "error",
@@ -62,9 +64,32 @@
     {
       "files": ["scripts/**/*.ts", "test/worker/load.test.ts"],
       "rules": {
-        // scripts は Node が直接実行するのでエイリアスを解決できない。src/loadtest と fixtures を読む
-        // load.test.ts にはエイリアスがないので、相対で書く。
+        // scripts は Node が直接実行するのでエイリアスを解決できない。load.test.ts は src/loadtest と fixtures を
+        // 読み、この 2 つを指すエイリアスはないので、相対で書く。
         "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/worker/auth.ts", "src/loadtest/**/*.ts"],
+      "rules": {
+        // scripts から Node が直接実行して読むファイル。エイリアスは解決できないので、import type だけに限る。
+        // 全体の設定を上書きするので、../ の禁止もここで繰り返す。
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../*", "../**"],
+                "message": "親ディレクトリへの相対 import ではなく、@client / @shared / @worker のエイリアスで書く。"
+              },
+              {
+                "group": ["@client/*", "@shared/*", "@worker/*"],
+                "allowTypeImports": true,
+                "message": "scripts から Node が直接実行して読むので、エイリアスは import type でだけ使える。値の import は相対で書く。"
+              }
+            ]
+          }
+        ]
       }
     },
     {
