@@ -17,12 +17,14 @@ module Live
 
     def create_session(session_id, payload)
       code, body = put_session(session_id, payload)
-      interpret(code, body)
+      result = interpret(code, body)
+      log_response(session_id, code, result)
+      result
     rescue KeyError => error
-      log_failure(error)
+      log_failure(session_id, error)
       :misconfigured
     rescue StandardError => error
-      log_failure(error)
+      log_failure(session_id, error)
       :error
     end
 
@@ -74,8 +76,17 @@ module Live
       end
     end
 
-    def log_failure(error)
-      Rails.logger.warn("[Live::Client] #{error.class}: #{error.message}")
+    # 応答の本文・Authorization・payload（幹事の ID / パスワードハッシュを含む）は出さない。
+    def log_response(session_id, code, result)
+      return if (200..299).cover?(code)
+
+      # 409 はタイムアウト後の再送などで起きる正常な冪等応答。
+      level = code == 409 ? :info : :warn
+      Rails.logger.public_send(level, "[Live::Client] PUT session_id=#{session_id} status=#{code} result=#{result}")
+    end
+
+    def log_failure(session_id, error)
+      Rails.logger.warn("[Live::Client] PUT session_id=#{session_id} #{error.class}: #{error.message}")
     end
   end
 end

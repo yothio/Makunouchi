@@ -17,7 +17,7 @@ module Admin
   class Application < Rails::Application
     config.load_defaults 8.1
 
-    config.autoload_lib(ignore: %w[assets tasks canonical_host_redirect.rb])
+    config.autoload_lib(ignore: %w[assets tasks canonical_host_redirect.rb json_log_formatter.rb])
 
     # default_locale :ja（rails-i18n は使わず ja.yml のみ）
     config.i18n.default_locale = :ja
