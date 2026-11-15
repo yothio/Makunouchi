@@ -1,0 +1,42 @@
+version: 2
+updates:
+  # pnpm ワークスペース全体（ルートの pnpm-lock.yaml）
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Tokyo
+    # pnpm-workspace.yaml の minimumReleaseAge（7 日）に合わせる
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: bundler
+    directory: /apps/admin
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Tokyo
+    cooldown:
+      default-days: 7
+    groups:
+      bundler-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  # ワークフローは SHA で固定しているので、SHA とバージョンコメントを更新させる
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Tokyo
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
