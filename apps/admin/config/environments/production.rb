@@ -28,8 +28,15 @@ Rails.application.configure do
     config.middleware.insert_before 0, CanonicalHostRedirect, ENV["ADMIN_CANONICAL_HOST"]
   end
 
-  config.log_tags = [ :request_id ]
-  config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
+  # JSON 1 行で出し、Cloud Logging で重要度と request_id で絞れるようにする。request_id は名前付きのタグにして formatter が取り出す。
+  require_relative "../../lib/json_log_formatter"
+  config.log_tags = [ ->(request) { "request_id=#{request.request_id}" } ]
+  config.logger   = ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new(STDOUT, formatter: JsonLogFormatter.new))
+  # 404・422 など rescue_responses にある例外は ERROR で出さない。公開 URL にはスキャナの 404 が大量に来て、
+  # severity>=ERROR に本当の 500 が埋もれるため。Started / Completed 404 の INFO 行は残る。
+  # RecordInvalid（save! の失敗）と CSRF トークン不一致の 422 も rescue_responses にあるので ERROR で出なくなる。
+  # バグや攻撃でも Completed 422 の INFO 行しか残らないので、調べるときはそれで探す。
+  config.action_dispatch.log_rescued_responses = false
 
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 

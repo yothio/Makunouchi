@@ -87,4 +87,46 @@ RSpec.describe Live::Client do
     expect(body).to eq payload
     expect(url).not_to match(/ranking/)
   end
+
+  describe "ログ" do
+    before do
+      allow(Rails.logger).to receive(:warn)
+      allow(Rails.logger).to receive(:info)
+    end
+
+    it "2xx 以外は status・結果・開催回 ID を warn に出し、秘密と payload は出さない" do
+      client = Live::Client.new(secret: "test-admin-api-secret-32chars!!", requester: ->(*) { [ 401, { "error" => "unauthorized" } ] })
+
+      client.create_session("sess-1", payload)
+
+      expect(Rails.logger).to have_received(:warn).with("[Live::Client] PUT session_id=sess-1 status=401 result=unauthorized")
+      expect(Rails.logger).to have_received(:warn).once
+    end
+
+    it "409 は冪等な応答なので info" do
+      client = Live::Client.new(requester: ->(*) { [ 409, { "error" => "exists" } ] })
+
+      client.create_session("sess-1", payload)
+
+      expect(Rails.logger).to have_received(:info).with("[Live::Client] PUT session_id=sess-1 status=409 result=exists")
+      expect(Rails.logger).not_to have_received(:warn)
+    end
+
+    it "2xx はログに出さない" do
+      client = Live::Client.new(requester: ->(*) { [ 201, { "ok" => true, "host" => true } ] })
+
+      client.create_session("sess-1", payload)
+
+      expect(Rails.logger).not_to have_received(:warn)
+      expect(Rails.logger).not_to have_received(:info)
+    end
+
+    it "例外は開催回 ID と例外クラスを warn に出す" do
+      client = Live::Client.new(requester: ->(*) { raise Errno::ECONNREFUSED })
+
+      client.create_session("sess-1", payload)
+
+      expect(Rails.logger).to have_received(:warn).with(a_string_starting_with("[Live::Client] PUT session_id=sess-1 Errno::ECONNREFUSED"))
+    end
+  end
 end

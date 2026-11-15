@@ -32,20 +32,30 @@ module QuizSession::LiveRegistration
       result = client.create_session(public_id, payload)
       # 一時障害だけ自動再試行。:misconfigured などはすぐ返す。
       break if result != :error
+
+      Rails.logger.warn("[QuizSession::LiveRegistration] retrying session_id=#{public_id} failed_attempt=#{attempts} result=#{result}") if attempts < MAX_ATTEMPTS
     end
     result
   end
 
   def apply_live_registration_result(result)
-    case result
-    when :created, :exists
-      ready!
-      :ready
-    when :host_not_registered
-      host_missing!
-      :host_missing
-    else
-      result
-    end
+    outcome =
+      case result
+      when :created, :exists
+        ready!
+        :ready
+      when :host_not_registered
+        host_missing!
+        :host_missing
+      else
+        result
+      end
+    log_live_registration_outcome(outcome)
+    outcome
+  end
+
+  def log_live_registration_outcome(outcome)
+    level = outcome == :ready ? :info : :warn
+    Rails.logger.public_send(level, "[QuizSession::LiveRegistration] finished session_id=#{public_id} result=#{outcome}")
   end
 end
