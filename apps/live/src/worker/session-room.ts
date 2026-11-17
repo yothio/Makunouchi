@@ -12,6 +12,7 @@ import type { HostCredentials } from "./payload";
 import { isRole, ROLE_HEADER } from "./role";
 import { guestView, hostView, screenView } from "./game/views";
 import { logEvent } from "./log";
+import { loadStoredState, STATE_SCHEMA_VERSION, STATE_VERSION_KEY } from "./stored-state";
 
 type GuestAttachment = { role: "guest"; playerId: string | null };
 type Attachment = { role: "host" } | { role: "screen" } | GuestAttachment;
@@ -34,12 +35,21 @@ export class SessionRoom extends DurableObject<Env> {
     super(ctx, env);
     // Heartbeat reply handled by the runtime without waking the DO from hibernation.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
-    this.state = ctx.storage.kv.get<GameState>("state") ?? null;
+    const loaded = loadStoredState(ctx.storage.kv.get("state"), ctx.storage.kv.get(STATE_VERSION_KEY));
+    if (loaded.issues.length > 0) {
+      logEvent("error", "state_schema_mismatch", {
+        sessionId: ctx.id.name,
+        issueCount: loaded.issues.length,
+        issues: loaded.issues.slice(0, 10),
+      });
+    }
+    this.state = loaded.state;
   }
 
   async init(quiz: QuizPayload, host?: HostCredentials): Promise<"created" | "exists"> {
     if (this.state) return "exists";
     this.commit(createGameState(quiz));
+    this.ctx.storage.kv.put(STATE_VERSION_KEY, STATE_SCHEMA_VERSION);
     if (host) this.ctx.storage.kv.put("host", host);
     return "created";
   }
